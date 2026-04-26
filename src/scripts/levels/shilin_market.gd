@@ -72,12 +72,20 @@ var _npcs_by_cell: Dictionary[Vector2i, NPC] = {}
 # ---------------------------------------------------------------------------
 
 func _ready() -> void:
+	Game.current_area = "shilin"
 	_build_walkable_map()
 	_spawn_player()
 	_spawn_camera()
 	_spawn_stalls()
+	_spawn_mom()
 	_spawn_hud()
 	_player.bumped.connect(_on_player_bumped)
+
+
+func _spawn_mom() -> void:
+	var mom: MomNPC = MomNPC.new()
+	mom.cell = MOM_CELL
+	register_npc(mom)
 
 
 func _spawn_hud() -> void:
