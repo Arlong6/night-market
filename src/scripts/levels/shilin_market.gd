@@ -53,6 +53,9 @@ var walkable: Array[Array] = []
 var _player: PlayerGrid
 var _camera: Camera2D
 
+## NPCs indexed by their cell, for O(1) bump lookup.
+var _npcs_by_cell: Dictionary[Vector2i, NPC] = {}
+
 # ---------------------------------------------------------------------------
 # Built-in virtual methods
 # ---------------------------------------------------------------------------
@@ -61,6 +64,32 @@ func _ready() -> void:
 	_build_walkable_map()
 	_spawn_player()
 	_spawn_camera()
+	_player.bumped.connect(_on_player_bumped)
+
+
+# ---------------------------------------------------------------------------
+# Public API — register NPCs (called by R-006/R-008 spawn helpers)
+# ---------------------------------------------------------------------------
+
+## Adds an NPC as a child and indexes it by its cell so bumps trigger its
+## `on_bumped()` handler. The cell is also marked unwalkable.
+func register_npc(npc: NPC) -> void:
+	add_child(npc)
+	_npcs_by_cell[npc.cell] = npc
+	if GridWorld.in_bounds(npc.cell, GRID_W, GRID_H):
+		walkable[npc.cell.y][npc.cell.x] = false
+
+
+# ---------------------------------------------------------------------------
+# Bump handler
+# ---------------------------------------------------------------------------
+
+## Called when PlayerGrid emits `bumped(target_cell)`. If an NPC sits on the
+## bumped cell, dispatch to its on_bumped(). No-op otherwise.
+func _on_player_bumped(target_cell: Vector2i) -> void:
+	var npc: NPC = _npcs_by_cell.get(target_cell, null)
+	if npc != null:
+		npc.on_bumped()
 
 
 func _process(_delta: float) -> void:

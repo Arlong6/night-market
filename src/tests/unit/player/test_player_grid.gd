@@ -30,6 +30,8 @@ func _release_all_inputs() -> void:
 
 func before_each() -> void:
 	_release_all_inputs()
+	# Defensive: dialogue tests can leak Game.in_dialogue = true across files.
+	Game.in_dialogue = false
 
 
 func after_each() -> void:
