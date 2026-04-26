@@ -33,6 +33,16 @@ const STALL_CELLS: Array[Vector2i] = [
 	Vector2i(18, 8),
 ]
 
+## Per-stall configuration — one entry per STALL_CELLS index.
+## Order matches REQUIRED_INGREDIENTS prices (20/30/40/50/50).
+const STALL_DATA: Array[Dictionary] = [
+	{"id": "scallion",  "price": 20, "intro": ["新鮮蔥阿，要買嗎？"]},
+	{"id": "egg",       "price": 30, "intro": ["雞蛋一盒30元！"]},
+	{"id": "cabbage",   "price": 40, "intro": ["高麗菜，自家種的！"]},
+	{"id": "chicken",   "price": 50, "intro": ["雞肉新鮮現宰！"]},
+	{"id": "soy_sauce", "price": 50, "intro": ["陳年醬油，一瓶50！"]},
+]
+
 # Palette
 const COLOR_FLOOR_A: Color = Color("#3A1A0A")  ## warm dark brown
 const COLOR_FLOOR_B: Color = Color("#4A2412")  ## one shade lighter (rhythm)
@@ -64,7 +74,23 @@ func _ready() -> void:
 	_build_walkable_map()
 	_spawn_player()
 	_spawn_camera()
+	_spawn_stalls()
 	_player.bumped.connect(_on_player_bumped)
+
+
+func _spawn_stalls() -> void:
+	for i in STALL_CELLS.size():
+		var data: Dictionary = STALL_DATA[i]
+		var stall: StallNPC = StallNPC.new()
+		stall.cell = STALL_CELLS[i]
+		stall.ingredient_id = data["id"]
+		stall.price = data["price"]
+		# Explicit typed-array assign: dict literal stored as untyped Array,
+		# cannot auto-coerce to Array[String].
+		var intro: Array[String] = []
+		intro.assign(data["intro"])
+		stall.intro_lines = intro
+		register_npc(stall)
 
 
 # ---------------------------------------------------------------------------

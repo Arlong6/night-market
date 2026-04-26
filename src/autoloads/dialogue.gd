@@ -50,6 +50,22 @@ func show(lines: Array[String], on_done: Callable = Callable()) -> bool:
 func is_active() -> bool:
 	return _active
 
+
+## Asks the player a yes/no (or N-way) question. Shows the question with the
+## typewriter, then renders `options` as a selectable list. The Callable is
+## invoked with the chosen index once the player presses interact on a choice.
+## Returns false if a dialogue is already active.
+func ask_choice(question: String, options: Array[String], on_choice: Callable) -> bool:
+	if _active:
+		return false
+	_active = true
+	_on_done = on_choice  # repurposed for choice callback
+	Game.in_dialogue = true
+	_ensure_box()
+	_box.start_choice(question, options)
+	dialogue_started.emit()
+	return true
+
 # ---------------------------------------------------------------------------
 # Internal — called by DialogueBox when the player advances past the last line
 # ---------------------------------------------------------------------------
@@ -64,6 +80,19 @@ func _on_box_finished() -> void:
 		cb.call()
 
 
+## Internal — DialogueBox calls this when the player confirms a choice option.
+## Forwards the selected index to the original ask_choice callable, then
+## clears the active flag.
+func _on_box_choice_confirmed(index: int) -> void:
+	_active = false
+	Game.in_dialogue = false
+	var cb: Callable = _on_done
+	_on_done = Callable()
+	dialogue_finished.emit()
+	if cb.is_valid():
+		cb.call(index)
+
+
 # ---------------------------------------------------------------------------
 # Lazy spawn
 # ---------------------------------------------------------------------------
@@ -73,4 +102,5 @@ func _ensure_box() -> void:
 		return
 	_box = DialogueBox.new()
 	_box.finished.connect(_on_box_finished)
+	_box.choice_confirmed.connect(_on_box_choice_confirmed)
 	add_child(_box)

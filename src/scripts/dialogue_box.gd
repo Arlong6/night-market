@@ -14,6 +14,9 @@ extends CanvasLayer
 ## Emitted when the player has advanced past the final line.
 signal finished
 
+## Emitted with the selected option index when the player confirms a choice.
+signal choice_confirmed(index: int)
+
 # ---------------------------------------------------------------------------
 # Constants — tuning
 # ---------------------------------------------------------------------------
@@ -39,9 +42,15 @@ var _lines: Array[String] = []
 var _line_index: int = 0
 var _visible_chars_float: float = 0.0
 var _label: Label = null
+var _options_label: Label = null  ## rendered below the question in choice mode
 var _bg: ColorRect = null
 var _border: ColorRect = null
 var _active: bool = false
+
+## Choice mode state.
+var _choice_mode: bool = false
+var _options: Array[String] = []
+var _option_index: int = 0
 
 # ---------------------------------------------------------------------------
 # Built-in
@@ -59,10 +68,29 @@ func _process(delta: float) -> void:
 	# Advance typewriter timer.
 	_visible_chars_float += CHARS_PER_SECOND * delta
 	_label.visible_characters = mini(int(_visible_chars_float), _current_line_length())
+	# Reveal the options once the question typewriter completes.
+	if _choice_mode and _typewriter_complete() and _options_label != null:
+		_options_label.visible = true
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not _active:
+		return
+	if _choice_mode:
+		# In choice mode: arrows navigate options once typewriter is complete;
+		# interact either snaps the typewriter or confirms the selection.
+		if event.is_action_pressed("interact"):
+			_advance()
+			get_viewport().set_input_as_handled()
+		elif _typewriter_complete():
+			if event.is_action_pressed("ui_up"):
+				_option_index = max(0, _option_index - 1)
+				_update_options_label()
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("ui_down"):
+				_option_index = min(_options.size() - 1, _option_index + 1)
+				_update_options_label()
+				get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("interact"):
 		_advance()
@@ -78,8 +106,26 @@ func start_dialogue(lines: Array[String]) -> void:
 	_lines = lines
 	_line_index = 0
 	_active = true
+	_choice_mode = false
+	if _options_label != null:
+		_options_label.visible = false
 	visible = true
 	_show_current_line()
+
+
+## Begins a choice prompt: typewriter the question, then accept arrow-key
+## navigation through `options`. interact confirms the selected index.
+func start_choice(question: String, options: Array[String]) -> void:
+	_lines = [question]
+	_line_index = 0
+	_options = options
+	_option_index = 0
+	_choice_mode = true
+	_active = true
+	visible = true
+	_show_current_line()
+	_update_options_label()
+	_options_label.visible = false  # reveal once typewriter complete
 
 
 ## Test helper: returns how many characters of the current line are revealed.
@@ -107,6 +153,12 @@ func _advance() -> void:
 	if _label.visible_characters < _current_line_length():
 		_label.visible_characters = _current_line_length()
 		_visible_chars_float = float(_current_line_length())
+		if _choice_mode:
+			_options_label.visible = true
+		return
+	# In choice mode: confirm the current option.
+	if _choice_mode:
+		_confirm_choice()
 		return
 	# Already fully revealed — go to next line or finish.
 	_line_index += 1
@@ -114,6 +166,34 @@ func _advance() -> void:
 		_close()
 		return
 	_show_current_line()
+
+
+func _typewriter_complete() -> bool:
+	return _label.visible_characters >= _current_line_length()
+
+
+func _confirm_choice() -> void:
+	var idx: int = _option_index
+	_active = false
+	visible = false
+	_choice_mode = false
+	_lines = []
+	_options = []
+	_option_index = 0
+	choice_confirmed.emit(idx)
+
+
+## Renders the option list with a "▶" cursor on the active option.
+func _update_options_label() -> void:
+	if _options_label == null:
+		return
+	var text := ""
+	for i in _options.size():
+		var prefix: String = "▶ " if i == _option_index else "  "
+		text += prefix + _options[i]
+		if i < _options.size() - 1:
+			text += "\n"
+	_options_label.text = text
 
 
 func _close() -> void:
@@ -152,9 +232,19 @@ func _build_ui() -> void:
 	_label.add_theme_font_size_override("font_size", 12)
 	_label.add_theme_color_override("font_color", COLOR_TEXT)
 	_label.position = _bg.position + Vector2(TEXT_PADDING, TEXT_PADDING)
-	_label.size = _bg.size - Vector2(2 * TEXT_PADDING, 2 * TEXT_PADDING)
+	_label.size = Vector2(_bg.size.x - 2 * TEXT_PADDING, 16.0)  # one-line top
 	_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(_label)
+
+	# Options label — rendered below the question in choice mode.
+	_options_label = Label.new()
+	_options_label.add_theme_font_override("font", _make_cjk_font())
+	_options_label.add_theme_font_size_override("font_size", 11)
+	_options_label.add_theme_color_override("font_color", COLOR_TEXT)
+	_options_label.position = _label.position + Vector2(0.0, 18.0)
+	_options_label.size = Vector2(_bg.size.x - 2 * TEXT_PADDING, 28.0)
+	_options_label.visible = false
+	add_child(_options_label)
 
 
 func _make_cjk_font() -> SystemFont:
