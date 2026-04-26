@@ -23,17 +23,38 @@ const COLOR_BODY: Color = Color("#7A3A2A")  ## vendor brown placeholder
 ## Dialogue lines shown on bump. Subclasses can override or extend.
 @export var lines: Array[String] = ["..."]
 
+## Per-NPC bob period (seconds per cycle). Slightly randomised in _ready so
+## crowds don't sway in lockstep.
+const BOB_PERIOD: float = 0.55
+
+## Time accumulator for the idle Y bob.
+var _bob_time: float = 0.0
+
 # ---------------------------------------------------------------------------
 # Built-in
 # ---------------------------------------------------------------------------
 
 func _ready() -> void:
 	position = GridWorld.cell_to_px(cell)
+	# Stagger the bob phase so adjacent NPCs don't bob in unison.
+	_bob_time = randf() * BOB_PERIOD
+
+
+func _process(delta: float) -> void:
+	_bob_time += delta
+	queue_redraw()
 
 
 func _draw() -> void:
 	var half: float = NPC_SIZE / 2.0
-	draw_rect(Rect2(-half, -half, NPC_SIZE, NPC_SIZE), _draw_color())
+	var bob_y: float = _idle_bob_offset()
+	draw_rect(Rect2(-half, -half + bob_y, NPC_SIZE, NPC_SIZE), _draw_color())
+
+
+## Pixel-snapped sin-based bob — rounds to {-1, 0, 1} so motion stays crisp.
+func _idle_bob_offset() -> float:
+	var phase: float = (_bob_time / BOB_PERIOD) * TAU
+	return roundf(sin(phase))
 
 
 # ---------------------------------------------------------------------------

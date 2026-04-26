@@ -23,6 +23,7 @@ const FONT_SIZE: int = 10
 
 var _money_label: Label = null
 var _progress_label: Label = null
+var _time_label: Label = null
 
 # ---------------------------------------------------------------------------
 # Built-in
@@ -34,11 +35,17 @@ func _ready() -> void:
 	# Initial render from current Inventory state.
 	_refresh_money()
 	_refresh_progress()
+	_refresh_time()
 	# Subscribe so future changes auto-update.
 	if not Inventory.money_changed.is_connected(_on_money_changed):
 		Inventory.money_changed.connect(_on_money_changed)
 	if not Inventory.ingredient_added.is_connected(_on_ingredient_added):
 		Inventory.ingredient_added.connect(_on_ingredient_added)
+
+
+func _process(_delta: float) -> void:
+	# Time updates every frame from Game.session_time (driven by Game._process).
+	_refresh_time()
 
 
 # ---------------------------------------------------------------------------
@@ -61,6 +68,16 @@ func _build_ui() -> void:
 	_progress_label.size = Vector2(60.0, 16.0)
 	_progress_label.position = Vector2(VIEWPORT_W - MARGIN - 60.0, MARGIN)
 	add_child(_progress_label)
+
+	# Time label — top centre, slightly faded so money + progress dominate.
+	_time_label = Label.new()
+	_time_label.add_theme_font_override("font", _make_cjk_font())
+	_time_label.add_theme_font_size_override("font_size", FONT_SIZE)
+	_time_label.add_theme_color_override("font_color", Color("#888888"))
+	_time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_time_label.size = Vector2(60.0, 16.0)
+	_time_label.position = Vector2((VIEWPORT_W - 60.0) / 2.0, MARGIN)
+	add_child(_time_label)
 
 
 func _make_cjk_font() -> SystemFont:
@@ -94,3 +111,12 @@ func _refresh_progress() -> void:
 		Inventory.ingredient_count(),
 		Inventory.REQUIRED_INGREDIENTS.size()
 	]
+
+
+func _refresh_time() -> void:
+	if _time_label == null:
+		return
+	var t: float = Game.session_time
+	var minutes: int = int(t) / 60
+	var seconds: int = int(t) % 60
+	_time_label.text = "%d:%02d" % [minutes, seconds]

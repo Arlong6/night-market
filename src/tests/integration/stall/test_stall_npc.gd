@@ -95,11 +95,11 @@ func test_stall_no_choice_does_not_buy() -> void:
 	stall.on_bumped()
 	await get_tree().process_frame
 	Dialogue._box._advance()  # snap intro
-	Dialogue._box._advance()  # → choice
+	Dialogue._box._advance()  # → choice (3-way: 是 / 殺價 / 否)
 	await get_tree().process_frame
 	Dialogue._box._advance()  # snap question
-	# Move selection down to 否 (index 1)
-	Dialogue._box._option_index = 1
+	# 否 is at index 2 in the 3-way prompt.
+	Dialogue._box._option_index = 2
 	Dialogue._box._advance()  # confirm 否
 	await get_tree().process_frame
 

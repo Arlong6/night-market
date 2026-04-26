@@ -43,6 +43,53 @@ const STALL_DATA: Array[Dictionary] = [
 	{"id": "soy_sauce", "price": 50, "intro": ["陳年醬油，一瓶50！"]},
 ]
 
+## Chatter NPC slots — atmospheric world-flavour, no shop.
+const CHATTER_DATA: Array[Dictionary] = [
+	{
+		"cell": Vector2i(10, 11),
+		"color": Color("#5A8A5A"),  # green-ish (apron)
+		"pool": [
+			"今天人好多喔。",
+			"那家蔥比較甜，我都買那家。",
+			"小心錢包，人擠人小心扒手！",
+		],
+	},
+	{
+		"cell": Vector2i(15, 11),
+		"color": Color("#8A6A4A"),  # tan (uncle)
+		"pool": [
+			"啊你媽派你來買菜啊？乖喔。",
+			"我以前也是這樣被叫來夜市的。",
+			"哎呀我來這 30 年了！",
+		],
+	},
+	{
+		"cell": Vector2i(8, 6),
+		"color": Color("#A06090"),  # purple-ish (kid)
+		"pool": [
+			"你也來買晚餐喔？",
+			"那邊賣雞肉的最好吃！",
+			"快點啦，我媽在等。",
+		],
+	},
+	{
+		"cell": Vector2i(20, 6),
+		"color": Color("#B8A050"),  # mustard (auntie)
+		"pool": [
+			"小弟弟要錢嗎？阿姨給你 5 塊。",  # could be a tease line
+			"我覺得今天醬油那攤打折了！",
+			"哎喲走路看路啦！",
+		],
+	},
+]
+
+## Item pickups scattered on the floor — free money / loose change.
+const ITEM_DATA: Array[Dictionary] = [
+	{"cell": Vector2i(11, 5), "value": 10, "line": "撿到 NT$10！"},
+	{"cell": Vector2i(4, 7), "value": 5,  "line": "撿到 NT$5。"},
+	{"cell": Vector2i(22, 11), "value": 10, "line": "撿到 NT$10！"},
+]
+
 # Palette
 const COLOR_FLOOR_A: Color = Color("#3A1A0A")  ## warm dark brown
 const COLOR_FLOOR_B: Color = Color("#4A2412")  ## one shade lighter (rhythm)
@@ -63,9 +110,13 @@ var walkable: Array[Array] = []
 var _player: PlayerGrid
 var _camera: Camera2D
 var _hud: HudRpg
+var _lanterns: Lanterns
 
 ## NPCs indexed by their cell, for O(1) bump lookup.
 var _npcs_by_cell: Dictionary[Vector2i, NPC] = {}
+
+## Floor pickups indexed by cell. Removed when collected.
+var _items_by_cell: Dictionary[Vector2i, ItemPickup] = {}
 
 # ---------------------------------------------------------------------------
 # Built-in virtual methods
@@ -77,9 +128,13 @@ func _ready() -> void:
 	_spawn_player()
 	_spawn_camera()
 	_spawn_stalls()
+	_spawn_chatters()
+	_spawn_items()
 	_spawn_mom()
 	_spawn_hud()
+	_spawn_lanterns()
 	_player.bumped.connect(_on_player_bumped)
+	_player.cell_changed.connect(_on_player_cell_changed)
 
 
 func _spawn_mom() -> void:
@@ -94,7 +149,15 @@ func _spawn_hud() -> void:
 	add_child(_hud)
 
 
+func _spawn_lanterns() -> void:
+	_lanterns = Lanterns.new()
+	_lanterns.name = "Lanterns"
+	add_child(_lanterns)
+
+
 func _spawn_stalls() -> void:
+	# Pick one stall per run to discount by 20% (replayability touch).
+	var discount_idx: int = randi() % STALL_CELLS.size()
 	for i in STALL_CELLS.size():
 		var data: Dictionary = STALL_DATA[i]
 		var stall: StallNPC = StallNPC.new()
@@ -106,7 +169,45 @@ func _spawn_stalls() -> void:
 		var intro: Array[String] = []
 		intro.assign(data["intro"])
 		stall.intro_lines = intro
+		if i == discount_idx:
+			stall.discount = 0.8
 		register_npc(stall)
+
+
+## Spawns the world-flavour NPCs (no shop, no quest blockers).
+func _spawn_chatters() -> void:
+	for data: Dictionary in CHATTER_DATA:
+		var npc: ChatterNPC = ChatterNPC.new()
+		npc.cell = data["cell"]
+		npc.body_color = data["color"]
+		var pool: Array[String] = []
+		pool.assign(data["pool"])
+		npc.chatter_pool = pool
+		register_npc(npc)
+
+
+## Spawns floor pickups (free money sparkle items).
+func _spawn_items() -> void:
+	for data: Dictionary in ITEM_DATA:
+		var c: Vector2i = data["cell"]
+		# Skip cells that overlap an NPC or wall (shouldn't happen, but safe).
+		if not is_walkable(c):
+			continue
+		var item: ItemPickup = ItemPickup.new()
+		item.cell = c
+		item.value = data["value"]
+		item.pickup_line = data["line"]
+		add_child(item)
+		_items_by_cell[c] = item
+
+
+## Called when the player finishes a step. Picks up any item on that cell.
+func _on_player_cell_changed(new_cell: Vector2i) -> void:
+	var item: ItemPickup = _items_by_cell.get(new_cell, null)
+	if item == null:
+		return
+	_items_by_cell.erase(new_cell)
+	item.collect()
 
 
 # ---------------------------------------------------------------------------

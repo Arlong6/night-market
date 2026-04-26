@@ -71,6 +71,10 @@ var facing: Vector2i = Vector2i(0, 1)
 ## True while a tween is in flight; gates new step attempts.
 var is_stepping: bool = false
 
+## Counter incremented on every completed step. Drives alternating-foot bob
+## visual so the walk cycle feels left-right-left.
+var _step_count: int = 0
+
 # ---------------------------------------------------------------------------
 # Private state — input edge detection
 # ---------------------------------------------------------------------------
@@ -109,7 +113,25 @@ func _process(_delta: float) -> void:
 func _draw() -> void:
 	# Body centred on cell origin so the rect lands in the 1px gutter.
 	var half: float = PLAYER_SIZE / 2.0
-	draw_rect(Rect2(-half, -half, PLAYER_SIZE, PLAYER_SIZE), PLAYER_COLOR)
+
+	# Walk bob: when stepping, alternating-foot lift via _step_count parity.
+	# Body lifts 1px on even-numbered steps; stays low on odd ones. Combined
+	# with the position tween it reads as a Pokémon-style 2-frame walk cycle.
+	var bob_y: float = 0.0
+	if is_stepping and _step_count % 2 == 0:
+		bob_y = -1.0
+
+	# Body
+	draw_rect(Rect2(-half, -half + bob_y, PLAYER_SIZE, PLAYER_SIZE), PLAYER_COLOR)
+
+	# Facing dot — small dark "eye" 4px towards facing direction. Lives on
+	# the body so it inherits the walk bob.
+	var eye_centre: Vector2 = Vector2(facing) * 4.0 + Vector2(0.0, bob_y)
+	draw_rect(
+		Rect2(eye_centre.x - 1.0, eye_centre.y - 1.0, 2.0, 2.0),
+		Color("#2A1A0A")
+	)
+	queue_redraw()
 
 # ---------------------------------------------------------------------------
 # Private helpers
@@ -152,6 +174,7 @@ func _attempt_step(dir: Vector2i) -> void:
 
 func _on_step_finished() -> void:
 	is_stepping = false
+	_step_count += 1
 	cell_changed.emit(cell)
 
 

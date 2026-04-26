@@ -45,8 +45,11 @@ func test_mom_bump_with_all_ingredients_triggers_win() -> void:
 	mom.on_bumped()
 	await get_tree().process_frame
 
-	# Mom shows success line; advance through it to fire on_done → goto_level.
-	Dialogue._box._advance()  # snap typewriter
+	# Mom shows 2 success lines based on session_time bucket; advance 4 times
+	# (snap1, next, snap2, close → on_done → goto_level).
+	Dialogue._box._advance()  # snap line 1
+	Dialogue._box._advance()  # next line
+	Dialogue._box._advance()  # snap line 2
 	Dialogue._box._advance()  # close + on_done
 	await get_tree().process_frame
 

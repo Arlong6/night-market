@@ -8,7 +8,9 @@ extends NPC
 
 const COLOR_MOM: Color = Color("#9A4A8A")  ## purple — distinct from vendor brown / kid yellow
 
-@export var success_lines: Array[String] = ["謝謝你！加菜囉～"]
+## Time thresholds (seconds) for the success-line tier.
+const FAST_THRESHOLD: float = 90.0
+const SLOW_THRESHOLD: float = 240.0
 
 
 func _draw_color() -> Color:
@@ -17,8 +19,9 @@ func _draw_color() -> Color:
 
 func on_bumped() -> void:
 	if Inventory.has_all_required():
+		var lines: Array[String] = _success_lines_for_time(Game.session_time)
 		var on_done: Callable = func() -> void: Game.goto_level("end_win")
-		Dialogue.show(success_lines, on_done)
+		Dialogue.show(lines, on_done)
 	else:
 		var missing: int = Inventory.REQUIRED_INGREDIENTS.size() - Inventory.ingredient_count()
 		var lines: Array[String] = [
@@ -26,3 +29,14 @@ func on_bumped() -> void:
 			"還差 %d 樣，再去看看吧。" % missing,
 		]
 		Dialogue.show(lines)
+
+
+## Picks the closing line based on how long the player took. Faster = more
+## praise; slower = light teasing.
+func _success_lines_for_time(t: float) -> Array[String]:
+	if t < FAST_THRESHOLD:
+		return ["哇好快！厲害厲害！", "今晚加菜～"]
+	elif t < SLOW_THRESHOLD:
+		return ["謝謝你！", "今晚加菜囉～"]
+	else:
+		return ["怎麼這麼久才回來啊？", "餓死我了～加菜吧。"]
