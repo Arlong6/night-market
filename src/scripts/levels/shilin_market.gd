@@ -62,6 +62,7 @@ var walkable: Array[Array] = []
 
 var _player: PlayerGrid
 var _camera: Camera2D
+var _hud: HudRpg
 
 ## NPCs indexed by their cell, for O(1) bump lookup.
 var _npcs_by_cell: Dictionary[Vector2i, NPC] = {}
@@ -75,7 +76,14 @@ func _ready() -> void:
 	_spawn_player()
 	_spawn_camera()
 	_spawn_stalls()
+	_spawn_hud()
 	_player.bumped.connect(_on_player_bumped)
+
+
+func _spawn_hud() -> void:
+	_hud = HudRpg.new()
+	_hud.name = "Hud"
+	add_child(_hud)
 
 
 func _spawn_stalls() -> void:
