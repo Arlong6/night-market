@@ -79,11 +79,5 @@ func _make_label(text: String, font_size: int, color: Color) -> Label:
 	return l
 
 
-func _make_cjk_font() -> SystemFont:
-	var f: SystemFont = SystemFont.new()
-	f.font_names = PackedStringArray([
-		"PingFang TC", "Heiti TC", "Microsoft JhengHei",
-		"Noto Sans CJK TC", "Noto Sans TC", "sans-serif"
-	])
-	f.antialiasing = TextServer.FONT_ANTIALIASING_NONE
-	return f
+func _make_cjk_font() -> FontFile:
+	return CjkFont.make()

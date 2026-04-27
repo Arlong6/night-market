@@ -262,11 +262,5 @@ func _build_ui() -> void:
 	add_child(_options_label)
 
 
-func _make_cjk_font() -> SystemFont:
-	var f: SystemFont = SystemFont.new()
-	f.font_names = PackedStringArray([
-		"PingFang TC", "Heiti TC", "Microsoft JhengHei",
-		"Noto Sans CJK TC", "Noto Sans TC", "sans-serif"
-	])
-	f.antialiasing = TextServer.FONT_ANTIALIASING_NONE
-	return f
+func _make_cjk_font() -> FontFile:
+	return CjkFont.make()
