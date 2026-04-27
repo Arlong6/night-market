@@ -7,8 +7,10 @@
 class_name ItemPickup
 extends Node2D
 
-const ITEM_SIZE: float = 6.0
+const ITEM_SIZE: float = 8.0           ## v0.7.1: bumped 6→8 for visibility
 const PULSE_PERIOD: float = 0.6  ## seconds for one breathing cycle
+const SPARKLE_PERIOD: float = 1.8       ## seconds between ambient sparkle pops
+const COLOR_RIM: Color = Color("#FFE9B0")  ## outer glow ring
 
 @export var cell: Vector2i = Vector2i(0, 0)
 @export var value: int = 10            ## money awarded on pickup
@@ -16,15 +18,21 @@ const PULSE_PERIOD: float = 0.6  ## seconds for one breathing cycle
 @export var color: Color = Color("#F2A227")  ## gold default
 
 var _t: float = 0.0
+var _sparkle_t: float = 0.0
 
 
 func _ready() -> void:
 	position = GridWorld.cell_to_px(cell)
 	_t = randf() * PULSE_PERIOD
+	_sparkle_t = randf() * SPARKLE_PERIOD
 
 
 func _process(delta: float) -> void:
 	_t += delta
+	_sparkle_t += delta
+	if _sparkle_t >= SPARKLE_PERIOD:
+		_sparkle_t -= SPARKLE_PERIOD
+		_emit_ambient_sparkle()
 	queue_redraw()
 
 
@@ -34,10 +42,32 @@ func _draw() -> void:
 	var pulse: float = roundf(sin(phase))  # ∈ {-1, 0, 1}
 	var size: float = ITEM_SIZE + pulse
 	var half: float = size / 2.0
+	# Outer rim — 1px lighter halo so the coin reads as "glowing"
+	draw_rect(Rect2(-half - 1.0, -half - 1.0, size + 2.0, size + 2.0), COLOR_RIM)
 	# Body
 	draw_rect(Rect2(-half, -half, size, size), color)
-	# Single-pixel highlight in the upper-left
-	draw_rect(Rect2(-half, -half, 1.0, 1.0), Color("#FFFFFF"))
+	# Diagonal highlight strip — 2 pixels in upper-left for "metallic" feel
+	draw_rect(Rect2(-half, -half, 2.0, 1.0), Color("#FFFFFF"))
+	draw_rect(Rect2(-half, -half + 1.0, 1.0, 1.0), Color("#FFFFFF"))
+
+
+## Tiny 2-particle pop every SPARKLE_PERIOD seconds — readable from across the
+## map as "this thing is alive". Doesn't deplete the coin or trigger pickup.
+func _emit_ambient_sparkle() -> void:
+	var parent: Node = get_parent()
+	if parent == null:
+		return
+	var burst: ParticleBurst = ParticleBurst.new()
+	burst.position = position
+	burst.count = 2
+	burst.color = COLOR_RIM
+	burst.speed_min = 12.0
+	burst.speed_max = 28.0
+	burst.particle_size = 1.0
+	burst.lifetime = 0.45
+	burst.gravity_scale = 0.0
+	burst.upward_bias = 0.7
+	parent.add_child(burst)
 
 
 ## Called by the level when the player steps onto this cell. Awards money

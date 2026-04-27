@@ -25,7 +25,7 @@ const VIEWPORT_W: int = 320
 const VIEWPORT_H: int = 180
 
 const BOX_MARGIN: int = 8       ## px from viewport edge
-const BOX_HEIGHT: int = 50      ## px tall
+const BOX_HEIGHT: int = 60      ## px tall — fits 3-option choice menu (是/殺價/否)
 const TEXT_PADDING: int = 6     ## px inside the box
 
 const CHARS_PER_SECOND: float = 30.0
@@ -256,8 +256,8 @@ func _build_ui() -> void:
 	_options_label.add_theme_font_override("font", _make_cjk_font())
 	_options_label.add_theme_font_size_override("font_size", 11)
 	_options_label.add_theme_color_override("font_color", COLOR_TEXT)
-	_options_label.position = _label.position + Vector2(0.0, 18.0)
-	_options_label.size = Vector2(_bg.size.x - 2 * TEXT_PADDING, 28.0)
+	_options_label.position = _label.position + Vector2(0.0, 16.0)
+	_options_label.size = Vector2(_bg.size.x - 2 * TEXT_PADDING, 38.0)
 	_options_label.visible = false
 	add_child(_options_label)
 

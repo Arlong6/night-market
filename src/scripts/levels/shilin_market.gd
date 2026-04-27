@@ -99,7 +99,14 @@ const ITEM_DATA: Array[Dictionary] = [
 const COLOR_FLOOR_A: Color = Color("#3A1A0A")  ## warm dark brown
 const COLOR_FLOOR_B: Color = Color("#4A2412")  ## one shade lighter (rhythm)
 const COLOR_WALL: Color = Color("#2A1408")     ## near-black for walls
-const COLOR_HOME: Color = Color("#5A3220")     ## faint highlight on home cell
+const COLOR_HOME: Color = Color("#5A3220")     ## warm wood frame on home cell
+const COLOR_HOME_DOOR: Color = Color("#7A4A2A")  ## door panel
+const COLOR_HOME_DOOR_FRAME: Color = Color("#2A1408")  ## door frame ink
+const COLOR_DEBRIS: Color = Color("#5A3220")   ## scattered floor pebble dots
+
+## Deterministic pseudo-random debris dots scattered on floor cells. Same
+## (x,y) → same dot pattern across runs so the map has a consistent feel.
+const DEBRIS_CHANCE: int = 7  ## 1 in N floor cells gets a debris pixel
 
 # ---------------------------------------------------------------------------
 # Public state
@@ -338,6 +345,36 @@ func _draw_floor_and_walls() -> void:
 			)
 			var color: Color = _color_for_cell(x, y)
 			draw_rect(rect, color)
+			_draw_cell_decoration(x, y, px)
+
+
+## Per-cell extras: home-cell door, scattered debris pebbles on floor cells.
+func _draw_cell_decoration(x: int, y: int, px: Vector2) -> void:
+	# Home cell — render a small door panel framed in dark ink
+	if x == HOME_CELL.x and y == HOME_CELL.y:
+		# Door frame: 8×11 ink rect spanning most of the cell
+		draw_rect(Rect2(px.x - 4.0, px.y - 5.0, 8.0, 11.0), COLOR_HOME_DOOR_FRAME)
+		# Door panel: 6×9 wood inside the frame
+		draw_rect(Rect2(px.x - 3.0, px.y - 4.0, 6.0, 9.0), COLOR_HOME_DOOR)
+		# Doorknob: 1px gold dot
+		draw_rect(Rect2(px.x + 1.0, px.y, 1.0, 1.0), Color("#F2A227"))
+		return
+	# Walls / stalls / mum cells skip debris.
+	if x == 0 or x == GRID_W - 1 or y == 0 or y == GRID_H - 1:
+		return
+	for sc in STALL_CELLS:
+		if sc.x == x and sc.y == y:
+			return
+	if x == MOM_CELL.x and y == MOM_CELL.y:
+		return
+	# Deterministic debris speckle: hash position to decide dot placement.
+	# Same (x,y) → same hash → same dot every run, no pop-in randomness.
+	var h: int = (x * 73856093) ^ (y * 19349663)
+	if (h % DEBRIS_CHANCE) == 0:
+		# 1px dot at a deterministic offset within the cell.
+		var dx: float = float((h >> 8) & 7) - 3.5
+		var dy: float = float((h >> 16) & 7) - 3.5
+		draw_rect(Rect2(px.x + dx, px.y + dy, 1.0, 1.0), COLOR_DEBRIS)
 
 
 func _color_for_cell(x: int, y: int) -> Color:

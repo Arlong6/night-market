@@ -38,6 +38,8 @@ var _bargained: bool = false
 
 const COLOR_STALL_BODY: Color = Color("#D94F2B")  ## stall red (vendor)
 const COLOR_STALL_TOP: Color = Color("#F2A227")   ## food highlight stripe
+const COLOR_AWNING_A: Color = Color("#C2241A")    ## awning stripe — deep red
+const COLOR_AWNING_B: Color = Color("#F5EDDA")    ## awning stripe — cream
 
 # ---------------------------------------------------------------------------
 # State
@@ -66,19 +68,32 @@ const FOOD_ICON_COLOR: Dictionary = {
 
 
 func _draw() -> void:
-	# Body fill
 	var half: float = NPC_SIZE / 2.0
 	var bob_y: float = _idle_bob_offset()
+
+	# Body fill (the stall counter)
 	draw_rect(Rect2(-half, -half + bob_y, NPC_SIZE, NPC_SIZE), COLOR_STALL_BODY)
 	# Top stripe (food highlight, 2px tall) — sits on top of body
 	draw_rect(Rect2(-half, -half + bob_y, NPC_SIZE, 2.0), COLOR_STALL_TOP)
+	# Wood-grain highlight: 1px horizontal lighter strip mid-counter
+	draw_rect(Rect2(-half + 1.0, 4.0 + bob_y, NPC_SIZE - 2.0, 1.0),
+		COLOR_STALL_BODY.lightened(0.2))
 
-	# Floating food icon — a 4×4 colored chip 4px above the body
+	# Awning — 2 angled cream/red stripes hovering above the stall, evoking
+	# canvas-tarp covers you'd see at every Taiwan night-market booth.
+	var awning_y: float = -half - 4.0 + bob_y
+	for i in 4:
+		var x: float = -half + float(i) * 4.0
+		var c: Color = COLOR_AWNING_A if i % 2 == 0 else COLOR_AWNING_B
+		draw_rect(Rect2(x, awning_y, 4.0, 2.0), c)
+	# Awning bottom hem — 1px dark line for definition
+	draw_rect(Rect2(-half, awning_y + 2.0, NPC_SIZE, 1.0), Color("#2A1A0A"))
+
+	# Floating food icon — a 4×4 colored chip suspended below the awning
 	var icon_color: Color = FOOD_ICON_COLOR.get(ingredient_id, Color("#FFFFFF"))
-	# Icon also bobs but with a small phase offset to feel alive
-	var icon_y: float = -half - 6.0 + bob_y
+	var icon_y: float = awning_y + 4.0
 	draw_rect(Rect2(-2.0, icon_y, 4.0, 4.0), icon_color)
-	# Icon outline (1px ink border)
+	# Icon outline (1px ink border, top + bottom)
 	draw_rect(Rect2(-2.0, icon_y, 4.0, 1.0), Color("#2A1A0A"))
 	draw_rect(Rect2(-2.0, icon_y + 3.0, 4.0, 1.0), Color("#2A1A0A"))
 
@@ -142,7 +157,9 @@ func _on_choice(index: int) -> void:
 
 func _start_bargain() -> void:
 	_bargained = true
-	var success: bool = randf() < 0.5
+	# v0.7.1: bumped 50%→60% so the bargain isn't punishing under the new
+	# tighter $180 budget — players need it to close the $10 gap reliably.
+	var success: bool = randf() < 0.6
 	if success:
 		discount = maxf(discount * 0.8, 0.5)  # never below 50%
 		var line: String = "好啦好啦，再 20%% 給你！"  # %% renders one %
