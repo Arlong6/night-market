@@ -35,7 +35,8 @@ func on_bumped() -> void:
 		# the freshly-updated record (and detect "new record" via Game.last_run_was_record).
 		Game.last_run_was_record = HiScore.try_record(Game.session_time)
 		Sfx.play_win()
-		var on_done: Callable = func() -> void: Game.goto_level("end_win")
+		# Win path now routes through the kitchen cutscene before end_win.
+		var on_done: Callable = func() -> void: Game.goto_level("kitchen")
 		Dialogue.show(lines, on_done)
 	else:
 		var missing: int = Inventory.REQUIRED_COUNT - Inventory.ingredient_count()

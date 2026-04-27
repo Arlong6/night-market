@@ -55,8 +55,9 @@ func test_mom_bump_with_all_ingredients_triggers_win() -> void:
 	Dialogue._box._advance()  # close + on_done
 	await get_tree().process_frame
 
-	assert_eq(Game.current_area, "end_win",
-		"goto_level should have been called with 'end_win' — got '%s'" % Game.current_area)
+	# v0.8: win path now routes through the kitchen cutscene first.
+	assert_eq(Game.current_area, "kitchen",
+		"goto_level should route to 'kitchen' on win — got '%s'" % Game.current_area)
 
 
 func test_mom_bump_without_all_ingredients_no_level_change() -> void:
@@ -79,6 +80,8 @@ func test_mom_bump_without_all_ingredients_no_level_change() -> void:
 	Dialogue._box._advance()  # close (no on_done in incomplete path)
 	await get_tree().process_frame
 
+	assert_ne(Game.current_area, "kitchen",
+		"current_area should NOT be kitchen when ingredients incomplete")
 	assert_ne(Game.current_area, "end_win",
 		"current_area should NOT be end_win when ingredients incomplete")
 
