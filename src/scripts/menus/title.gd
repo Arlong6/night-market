@@ -168,7 +168,8 @@ func _draw_lantern(cx: float, cy: float) -> void:
 func _on_start_pressed() -> void:
 	Inventory.reset()
 	Game.reset_run()
-	Game.goto_level("shilin")
+	# v0.11: route through the home intro before the market.
+	Game.goto_level("home_intro")
 
 
 func _make_label(text: String, font_size: int, color: Color) -> Label:

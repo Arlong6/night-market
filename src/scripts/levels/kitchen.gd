@@ -117,8 +117,13 @@ const FLAVOR_LINE: Dictionary = {
 # State machine
 # ---------------------------------------------------------------------------
 
-enum Stage { OPENING, DROP, STIR_PROMPT, STIR, PLATE, CLOSING, DONE }
+enum Stage { OPENING, DROP, STIR_PROMPT, STIR, PLATE, CLOSING, DONE,
+			 INTRO_OPENING, INTRO_KID_WALK, INTRO_DONE }
 var _stage: Stage = Stage.OPENING
+
+## v0.11: when true, scene runs the "home before market" intro instead of
+## the post-shopping cook sequence. Set by the home_intro.tscn wrapper.
+@export var is_intro: bool = false
 
 # Drop
 var _placed_ingredients: Array[Dictionary] = []  ## { id, x, y } each
@@ -126,6 +131,9 @@ var _placed_ingredients: Array[Dictionary] = []  ## { id, x, y } each
 # Stir
 var _stir_count: int = 0
 var _wok_rock_t: float = 0.0  ## decreases each frame; while > 0 wok visibly rocks
+
+# Intro
+var _kid_x_offset: float = 0.0  ## tween offset for kid walking out the right side
 
 # Animation accumulators
 var _flame_t: float = 0.0
@@ -138,9 +146,12 @@ var _kid_t: float = 0.0
 # ---------------------------------------------------------------------------
 
 func _ready() -> void:
-	Game.current_area = "kitchen"
+	Game.current_area = "home_intro" if is_intro else "kitchen"
 	set_process_unhandled_input(true)
-	_run_sequence()
+	if is_intro:
+		_run_intro_sequence()
+	else:
+		_run_sequence()
 
 
 func _process(delta: float) -> void:
@@ -159,6 +170,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if _stage == Stage.STIR and event.is_action_pressed("interact"):
 		_do_stir()
+		get_viewport().set_input_as_handled()
+		return
+	# Intro: any interact press fast-forwards through to the market.
+	if is_intro and event.is_action_pressed("interact") and _stage != Stage.INTRO_DONE:
+		_skip_intro()
 		get_viewport().set_input_as_handled()
 
 
@@ -251,6 +267,56 @@ func _do_stir() -> void:
 	add_child(burst)
 
 
+# ---------------------------------------------------------------------------
+# Intro sequence (v0.11) — runs when is_intro=true, before the market.
+# ---------------------------------------------------------------------------
+
+func _run_intro_sequence() -> void:
+	_stage = Stage.INTRO_OPENING
+	Dialogue.show(["寶貝！幫媽媽去夜市買菜～"])
+	await get_tree().create_timer(1.4).timeout
+	if _stage == Stage.INTRO_DONE:
+		return
+	if Dialogue._active and Dialogue._box != null:
+		Dialogue._box._close()
+	Dialogue.show(["蔥 蛋 雞肉 高麗菜 醬油 豆腐 香菇 — 任選 5 樣！"])
+	await get_tree().create_timer(2.0).timeout
+	if _stage == Stage.INTRO_DONE:
+		return
+	if Dialogue._active and Dialogue._box != null:
+		Dialogue._box._close()
+	Dialogue.show(["給你 NT$180… 記得試試 殺價！"])
+	await get_tree().create_timer(1.6).timeout
+	if _stage == Stage.INTRO_DONE:
+		return
+
+	# Kid walks out toward the right edge.
+	_stage = Stage.INTRO_KID_WALK
+	if Dialogue._active and Dialogue._box != null:
+		Dialogue._box._close()
+	var tween: Tween = create_tween()
+	tween.tween_property(self, "_kid_x_offset", 130.0, 1.4)
+	await tween.finished
+
+	if _stage != Stage.INTRO_DONE:
+		_stage = Stage.INTRO_DONE
+		Game.goto_level("shilin")
+
+
+## Fast-forwards intro: closes any line + jumps the kid offscreen + transition.
+func _skip_intro() -> void:
+	if _stage == Stage.INTRO_DONE:
+		return
+	_stage = Stage.INTRO_DONE
+	if Dialogue._active and Dialogue._box != null:
+		Dialogue._box._close()
+	Game.goto_level("shilin")
+
+
+# ---------------------------------------------------------------------------
+# Outro helpers
+# ---------------------------------------------------------------------------
+
 func _closing_line_for_time(t: float) -> String:
 	if t < 90.0:
 		return "好快！馬上開動～"
@@ -280,10 +346,31 @@ func _draw() -> void:
 	_draw_stove()
 	_draw_prep_counter()
 	_draw_table()
+	if is_intro:
+		_draw_exit_door()
 	_draw_mom()
 	_draw_kid()
 	if _stage == Stage.STIR:
 		_draw_stir_meter()
+
+
+## Draw a door on the right wall during intro — the kid's destination.
+func _draw_exit_door() -> void:
+	var dx: int = VIEWPORT_W - 28
+	var dy: int = 75
+	# Frame
+	draw_rect(Rect2(dx - 1, dy - 1, 22, 56), COLOR_FRIDGE_INK)
+	# Door panel
+	draw_rect(Rect2(dx, dy, 20, 54), Color("#7A4A2A"))
+	# Cross-panel relief
+	draw_rect(Rect2(dx, dy + 26, 20, 1.0), COLOR_FRIDGE_INK)
+	# Knob
+	draw_rect(Rect2(dx + 2, dy + 28, 2, 2), Color("#F2A227"))
+	# Sky strip beyond the door (only visible during the walk)
+	if _stage == Stage.INTRO_KID_WALK:
+		draw_rect(Rect2(dx, dy, 20, 54), Color("#1A2A4A"))
+		# Tiny moon glimpse
+		draw_rect(Rect2(dx + 12, dy + 8, 4, 3), Color("#F5EDDA"))
 
 
 func _draw_window() -> void:
@@ -480,7 +567,7 @@ func _draw_mom() -> void:
 func _draw_kid() -> void:
 	var bob: float = sin((_kid_t / 0.55) * TAU)
 	var bob_y: float = -1.0 if bob > 0.0 else 0.0
-	var x: int = KID_X
+	var x: float = float(KID_X) + _kid_x_offset
 	var y: int = KID_Y
 	# Hair
 	draw_rect(Rect2(x - 3, y - 7 + bob_y, 6, 2), Color("#3A1A0A"))

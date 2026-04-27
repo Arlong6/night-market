@@ -36,6 +36,7 @@ var test_mode: bool = false
 
 const LEVEL_PATHS: Dictionary[String, String] = {
 	"title": "res://scenes/menus/title.tscn",
+	"home_intro": "res://scenes/levels/home_intro.tscn",
 	"shilin": "res://scenes/levels/shilin_market.tscn",
 	"kitchen": "res://scenes/levels/kitchen.tscn",
 	"end_win": "res://scenes/menus/end_screen.tscn",
