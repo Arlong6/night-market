@@ -59,6 +59,18 @@ func _build_ui() -> void:
 	time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(time_label)
 
+	# Best-time / new-record badge
+	if Game.last_run_was_record:
+		var badge: Label = _make_label("★ 新紀錄！", 12, Color("#F2A227"))
+		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(badge)
+	elif HiScore.has_record():
+		var best: Label = _make_label(
+			"最佳 %s" % HiScore.format_best(), 9, Color("#888888")
+		)
+		best.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(best)
+
 	# Continue prompt
 	var prompt: Label = _make_label("按任何鍵回到首頁", 10, Color("#888888"))
 	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -88,4 +100,7 @@ func _make_label(text: String, font_size: int, color: Color) -> Label:
 
 
 func _make_cjk_font() -> FontFile:
-	return CjkFont.make()
+	var f: FontFile = load("res://assets/fonts/jf-openhuninn-2.1.ttf") as FontFile
+	f.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
+	f.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
+	return f

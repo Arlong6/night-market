@@ -263,4 +263,7 @@ func _build_ui() -> void:
 
 
 func _make_cjk_font() -> FontFile:
-	return CjkFont.make()
+	var f: FontFile = load("res://assets/fonts/jf-openhuninn-2.1.ttf") as FontFile
+	f.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
+	f.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
+	return f

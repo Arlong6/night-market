@@ -48,6 +48,14 @@ func _build_ui() -> void:
 	quest.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(quest)
 
+	# Best-time line — only shows once a record exists.
+	if HiScore.has_record():
+		var best: Label = _make_label(
+			"最佳記錄 %s" % HiScore.format_best(), 8, Color("#C8E66D")
+		)
+		best.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(best)
+
 	# Spacer
 	var spacer2: Control = Control.new()
 	spacer2.custom_minimum_size = Vector2(0, 8)
@@ -80,4 +88,7 @@ func _make_label(text: String, font_size: int, color: Color) -> Label:
 
 
 func _make_cjk_font() -> FontFile:
-	return CjkFont.make()
+	var f: FontFile = load("res://assets/fonts/jf-openhuninn-2.1.ttf") as FontFile
+	f.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
+	f.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
+	return f

@@ -20,6 +20,9 @@ func _draw_color() -> Color:
 func on_bumped() -> void:
 	if Inventory.has_all_required():
 		var lines: Array[String] = _success_lines_for_time(Game.session_time)
+		# Persist best time BEFORE the level transition so end_screen can read
+		# the freshly-updated record (and detect "new record" via Game.last_run_was_record).
+		Game.last_run_was_record = HiScore.try_record(Game.session_time)
 		Sfx.play_win()
 		var on_done: Callable = func() -> void: Game.goto_level("end_win")
 		Dialogue.show(lines, on_done)

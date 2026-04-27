@@ -19,6 +19,10 @@ var in_dialogue: bool = false
 ## only while the market scene is loaded (not on title or end screens).
 var session_time: float = 0.0
 
+## True iff the most recent successful run set a new HiScore record.
+## Read by the end screen to show "新紀錄！" badge. Cleared by reset_run().
+var last_run_was_record: bool = false
+
 # ---------------------------------------------------------------------------
 # Test-mode flag — when true, scene-changing helpers no-op so unit tests
 # can call them without unloading the test harness scene.
@@ -67,3 +71,4 @@ func reset_run() -> void:
 	session_time = 0.0
 	current_area = ""
 	in_dialogue = false
+	last_run_was_record = false
