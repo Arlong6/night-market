@@ -1,86 +1,188 @@
-## End screen for Night Market Shopping (R-008 / R-009).
+## End screen for Night Market Shopping.
 ##
-## Shows: thank-you header, money remaining (with bounce tween), the 5
-## ingredients ticked off, total session time, "press any key to return"
-## prompt. Any input returns to the title screen.
+## v0.6 drama pass: builds the full layout up-front (so it settles) but
+## fades each row in on a staggered schedule, popping a sparkle ParticleBurst
+## next to each ingredient as it appears. Player can press any key once to
+## skip the animation; a second press returns to the title.
 class_name EndScreen
 extends Control
 
 const VIEWPORT_W: int = 320
 const VIEWPORT_H: int = 180
 
+## How long the full reveal takes from header to prompt.
+const REVEAL_TOTAL: float = 3.0
+
+## Color of each row's sparkle on appear.
+const SPARKLE_COLOR: Color = Color("#F2A227")
+
+# ---------------------------------------------------------------------------
+# State
+# ---------------------------------------------------------------------------
+
+## Children of the vbox keyed by reveal order — each is faded in by
+## `_reveal_at(i, delay)`. ParticleBurst spawned for ingredient rows only.
+var _reveal_targets: Array[Control] = []
+var _ingredient_targets: Array[Control] = []
+var _animation_complete: bool = false
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle
+# ---------------------------------------------------------------------------
 
 func _ready() -> void:
 	anchor_right = 1.0
 	anchor_bottom = 1.0
-	Music.stop()  # win arpeggio plays from MomNPC; let the silence land here
+	Music.stop()
 	_build_ui()
+	_start_reveal_sequence()
 	set_process_unhandled_input(true)
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEvent and event.is_pressed():
+	if not (event is InputEvent and event.is_pressed()):
+		return
+	# First press: skip animation. Second press: return to title.
+	if not _animation_complete:
+		_skip_to_end()
+	else:
 		Game.goto_level("title")
 
+
+# ---------------------------------------------------------------------------
+# UI construction (builds everything, hides for staggered reveal)
+# ---------------------------------------------------------------------------
 
 func _build_ui() -> void:
 	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	vbox.size = Vector2(VIEWPORT_W, VIEWPORT_H)
 	vbox.position = Vector2(0, 0)
-	vbox.add_theme_constant_override("separation", 6)
+	vbox.add_theme_constant_override("separation", 4)
 	add_child(vbox)
 
-	# Header
-	var header: Label = _make_label("謝謝，今晚加菜！", 16, Color("#F5EDDA"))
-	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(header)
+	_add_revealable(vbox, _make_label("謝謝，今晚加菜！", 16, Color("#F5EDDA")))
 
-	# Money remaining (bounce-tweened from 0 to actual value)
-	var money: Label = _make_label("剩 $0", 12, Color("#F2A227"))
-	money.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(money)
-	_bounce_money(money, Inventory.money)
-
-	# Ingredients list (each as a row with checkmark)
+	# Ingredient checklist — each row tracked separately so we can sparkle it.
 	for id in Inventory.REQUIRED_INGREDIENTS:
 		var row: Label = _make_label(
-			"  ✓ %s" % Inventory.display_name(id),
-			10, Color("#C8E66D")
+			"  ✓ %s" % Inventory.display_name(id), 10, Color("#C8E66D")
 		)
 		row.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		vbox.add_child(row)
+		_add_revealable(vbox, row)
+		_ingredient_targets.append(row)
 
-	# Elapsed time
-	var time_label: Label = _make_label(
-		"用時 %.1fs" % Game.session_time,
-		10, Color("#F5EDDA")
-	)
-	time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(time_label)
+	_add_revealable(vbox, _make_label(
+		"今晚的料理：醬油雞炒蔥蛋高麗菜", 9, Color("#F2A227")
+	))
 
-	# Best-time / new-record badge
+	# Money remaining (bounce-tweened from 0 to actual value when revealed).
+	var money: Label = _make_label("剩 $0", 12, Color("#F2A227"))
+	_add_revealable(vbox, money)
+	_money_label_for_bounce = money
+
+	_add_revealable(vbox, _make_label(
+		"用時 %.1fs" % Game.session_time, 10, Color("#F5EDDA")
+	))
+
 	if Game.last_run_was_record:
-		var badge: Label = _make_label("★ 新紀錄！", 12, Color("#F2A227"))
-		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		vbox.add_child(badge)
+		_add_revealable(vbox, _make_label("★ 新紀錄！", 12, Color("#F2A227")))
 	elif HiScore.has_record():
-		var best: Label = _make_label(
+		_add_revealable(vbox, _make_label(
 			"最佳 %s" % HiScore.format_best(), 9, Color("#888888")
-		)
-		best.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		vbox.add_child(best)
+		))
 
-	# Continue prompt
-	var prompt: Label = _make_label("按任何鍵回到首頁", 10, Color("#888888"))
-	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(prompt)
+	_add_revealable(vbox, _make_label("按任何鍵回到首頁", 10, Color("#888888")))
 
+
+var _money_label_for_bounce: Label = null
+
+
+## Centred label + adds it to vbox; hidden initially via modulate.a=0.
+func _add_revealable(parent: VBoxContainer, label: Label) -> void:
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.modulate = Color(1, 1, 1, 0)
+	parent.add_child(label)
+	_reveal_targets.append(label)
+
+
+# ---------------------------------------------------------------------------
+# Reveal sequencing
+# ---------------------------------------------------------------------------
+
+func _start_reveal_sequence() -> void:
+	var n: int = _reveal_targets.size()
+	if n == 0:
+		_animation_complete = true
+		return
+	var step: float = REVEAL_TOTAL / float(n)
+	for i in n:
+		_schedule_reveal(_reveal_targets[i], i * step)
+	# Mark complete a hair after the last reveal.
+	get_tree().create_timer(REVEAL_TOTAL + 0.1).timeout.connect(
+		func() -> void:
+			_animation_complete = true
+	)
+
+
+func _schedule_reveal(target: Control, delay: float) -> void:
+	# Use a timer instead of tween_delay so the await is cancellable on skip.
+	var timer: SceneTreeTimer = get_tree().create_timer(delay)
+	timer.timeout.connect(func() -> void:
+		if not is_instance_valid(target) or target.modulate.a >= 0.99:
+			return
+		_reveal_one(target)
+	)
+
+
+func _reveal_one(target: Control) -> void:
+	# Fade in.
+	var t: Tween = create_tween()
+	t.tween_property(target, "modulate:a", 1.0, 0.25)
+	# Money line gets the bounce as it appears.
+	if target == _money_label_for_bounce:
+		_bounce_money(_money_label_for_bounce, Inventory.money)
+	# Ingredient rows pop a sparkle next to their leading checkmark.
+	if target in _ingredient_targets:
+		_pop_sparkle_at(target)
+
+
+## Spawns a 4-particle gold burst at the label's left-of-text position.
+func _pop_sparkle_at(label: Control) -> void:
+	var burst: ParticleBurst = ParticleBurst.new()
+	# Anchor under the label, biased left where the checkmark sits.
+	var local: Vector2 = label.global_position + Vector2(
+		label.size.x / 2.0 - 30.0, label.size.y / 2.0
+	)
+	burst.position = local
+	burst.count = 4
+	burst.color = SPARKLE_COLOR
+	burst.speed_min = 25.0
+	burst.speed_max = 60.0
+	burst.particle_size = 2.0
+	burst.lifetime = 0.30
+	burst.gravity_scale = 0.4
+	burst.upward_bias = 0.6
+	add_child(burst)
+
+
+## Skips remaining reveals — snaps every label to fully visible.
+func _skip_to_end() -> void:
+	for target in _reveal_targets:
+		if not is_instance_valid(target):
+			continue
+		target.modulate = Color(1, 1, 1, 1)
+	if _money_label_for_bounce != null:
+		_money_label_for_bounce.text = "剩 $%d" % Inventory.money
+	_animation_complete = true
+
+
+# ---------------------------------------------------------------------------
+# Helpers (unchanged from v0.5)
+# ---------------------------------------------------------------------------
 
 func _bounce_money(label: Label, target: int) -> void:
-	# Tween a temporary float from 0 → target with EASE_OUT + TRANS_BOUNCE,
-	# updating label.text each step.
-	var holder: Array[float] = [0.0]
 	var t: Tween = create_tween()
 	t.set_ease(Tween.EASE_OUT)
 	t.set_trans(Tween.TRANS_BOUNCE)
