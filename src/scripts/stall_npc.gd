@@ -161,6 +161,7 @@ func _attempt_buy() -> void:
 	if Inventory.buy(ingredient_id, pay):
 		_sold = true
 		_spawn_sparkle()
+		Sfx.play_buy()
 		Dialogue.show(["好喔，多謝！"])
 
 

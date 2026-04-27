@@ -233,6 +233,10 @@ func _on_player_bumped(target_cell: Vector2i) -> void:
 	var npc: NPC = _npcs_by_cell.get(target_cell, null)
 	if npc != null:
 		npc.on_bumped()
+	else:
+		# Wall thunk — only when there's no NPC, so dialogue intros don't
+		# get a redundant bump cue stacked under the typewriter blips.
+		Sfx.play_bump()
 
 
 func _process(_delta: float) -> void:

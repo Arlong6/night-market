@@ -41,6 +41,9 @@ const COLOR_TEXT: Color = Color("#2A1A0A")   ## ink black
 var _lines: Array[String] = []
 var _line_index: int = 0
 var _visible_chars_float: float = 0.0
+## Last typewriter character index that played a blip — gates so we only
+## fire SFX when a NEW char is revealed (not every frame).
+var _last_blip_chars: int = 0
 var _label: Label = null
 var _options_label: Label = null  ## rendered below the question in choice mode
 var _bg: ColorRect = null
@@ -67,7 +70,12 @@ func _process(delta: float) -> void:
 		return
 	# Advance typewriter timer.
 	_visible_chars_float += CHARS_PER_SECOND * delta
-	_label.visible_characters = mini(int(_visible_chars_float), _current_line_length())
+	var new_chars: int = mini(int(_visible_chars_float), _current_line_length())
+	# Fire a blip every 2 new chars so 30 cps → ~15 blips/sec (gentler).
+	if new_chars > _last_blip_chars and (new_chars - _last_blip_chars) >= 2:
+		Sfx.play_blip()
+		_last_blip_chars = new_chars
+	_label.visible_characters = new_chars
 	# Reveal the options once the question typewriter completes.
 	if _choice_mode and _typewriter_complete() and _options_label != null:
 		_options_label.visible = true
@@ -84,11 +92,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		elif _typewriter_complete():
 			if event.is_action_pressed("ui_up"):
+				var prev: int = _option_index
 				_option_index = max(0, _option_index - 1)
+				if _option_index != prev:
+					Sfx.play_choice()
 				_update_options_label()
 				get_viewport().set_input_as_handled()
 			elif event.is_action_pressed("ui_down"):
+				var prev: int = _option_index
 				_option_index = min(_options.size() - 1, _option_index + 1)
+				if _option_index != prev:
+					Sfx.play_choice()
 				_update_options_label()
 				get_viewport().set_input_as_handled()
 		return
@@ -144,6 +158,7 @@ func current_line_index() -> int:
 
 func _show_current_line() -> void:
 	_visible_chars_float = 0.0
+	_last_blip_chars = 0
 	_label.text = _lines[_line_index] if _line_index < _lines.size() else ""
 	_label.visible_characters = 0
 

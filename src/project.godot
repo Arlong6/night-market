@@ -19,6 +19,7 @@ config/features=PackedStringArray("4.6", "GL Compatibility")
 Game="*res://autoloads/game.gd"
 Inventory="*res://autoloads/inventory.gd"
 Dialogue="*res://autoloads/dialogue.gd"
+Sfx="*res://autoloads/sfx.gd"
 
 [display]
 

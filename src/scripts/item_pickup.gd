@@ -48,6 +48,7 @@ func collect() -> bool:
 	Inventory.money += value
 	Inventory.money_changed.emit(Inventory.money)
 	_spawn_sparkle()
+	Sfx.play_pickup()
 	if pickup_line != "" and not Dialogue.is_active():
 		Dialogue.show([pickup_line])
 	queue_free()
