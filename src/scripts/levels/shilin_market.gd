@@ -95,6 +95,11 @@ const ITEM_DATA: Array[Dictionary] = [
 	{"cell": Vector2i(22, 11), "value": 10, "line": "撿到 NT$10！"},
 ]
 
+## Bonus pickup tuning — spawned at a random walkable cell each run.
+const BONUS_VALUE: int = 15
+const BONUS_LINE: String = "★ 哎呀，地上有人掉的 NT$15！"
+const BONUS_COLOR: Color = Color("#7AC940")  # green — distinct from gold
+
 # Palette
 const COLOR_FLOOR_A: Color = Color("#3A1A0A")  ## warm dark brown
 const COLOR_FLOOR_B: Color = Color("#4A2412")  ## one shade lighter (rhythm)
@@ -129,6 +134,11 @@ var _npcs_by_cell: Dictionary[Vector2i, NPC] = {}
 
 ## Floor pickups indexed by cell. Removed when collected.
 var _items_by_cell: Dictionary[Vector2i, ItemPickup] = {}
+
+## Camera shake state — triggered on wall bumps. Decays linearly to 0.
+var _shake_t: float = 0.0
+const SHAKE_DURATION: float = 0.15
+const SHAKE_AMPLITUDE: float = 2.0
 
 # ---------------------------------------------------------------------------
 # Built-in virtual methods
@@ -169,12 +179,20 @@ func _spawn_lanterns() -> void:
 
 
 func _spawn_stalls() -> void:
-	# Pick one stall per run to discount by 20% (replayability touch).
-	var discount_idx: int = randi() % STALL_CELLS.size()
-	for i in STALL_CELLS.size():
-		var data: Dictionary = STALL_DATA[i]
+	# v0.9: shuffle which ingredient lands at which cell. Each (id, price,
+	# intro) tuple stays intact — only the position assignment varies. This
+	# means players can't memorise "蔥 is always at the top-left", they have
+	# to look at each stall's awning icon to plan.
+	var indices: Array[int] = []
+	for i in STALL_DATA.size():
+		indices.append(i)
+	indices.shuffle()
+	# Pick one stall slot (post-shuffle) to discount by 20%.
+	var discount_slot: int = randi() % STALL_CELLS.size()
+	for slot in STALL_CELLS.size():
+		var data: Dictionary = STALL_DATA[indices[slot]]
 		var stall: StallNPC = StallNPC.new()
-		stall.cell = STALL_CELLS[i]
+		stall.cell = STALL_CELLS[slot]
 		stall.ingredient_id = data["id"]
 		stall.price = data["price"]
 		# Explicit typed-array assign: dict literal stored as untyped Array,
@@ -182,7 +200,7 @@ func _spawn_stalls() -> void:
 		var intro: Array[String] = []
 		intro.assign(data["intro"])
 		stall.intro_lines = intro
-		if i == discount_idx:
+		if slot == discount_slot:
 			stall.discount = 0.8
 		register_npc(stall)
 
@@ -212,6 +230,35 @@ func _spawn_items() -> void:
 		item.pickup_line = data["line"]
 		add_child(item)
 		_items_by_cell[c] = item
+	_spawn_bonus_pickup()
+
+
+## v0.9: one extra coin per run at a random walkable cell. Distinct green
+## colour so it reads as "rare find" vs the standard gold pickups.
+func _spawn_bonus_pickup() -> void:
+	# Build the candidate cell list once: walkable + not home + not mom +
+	# not already an item + not directly under the player spawn.
+	var candidates: Array[Vector2i] = []
+	for y in range(1, GRID_H - 1):
+		for x in range(1, GRID_W - 1):
+			var c: Vector2i = Vector2i(x, y)
+			if not is_walkable(c):
+				continue
+			if c == HOME_CELL or c == MOM_CELL:
+				continue
+			if _items_by_cell.has(c):
+				continue
+			candidates.append(c)
+	if candidates.is_empty():
+		return
+	var pick: Vector2i = candidates[randi() % candidates.size()]
+	var item: ItemPickup = ItemPickup.new()
+	item.cell = pick
+	item.value = BONUS_VALUE
+	item.pickup_line = BONUS_LINE
+	item.color = BONUS_COLOR
+	add_child(item)
+	_items_by_cell[pick] = item
 
 
 ## Called when the player finishes a step. Picks up any item on that cell.
@@ -250,9 +297,12 @@ func _on_player_bumped(target_cell: Vector2i) -> void:
 		# Wall thunk — only when there's no NPC, so dialogue intros don't
 		# get a redundant bump cue stacked under the typewriter blips.
 		Sfx.play_bump()
+		_shake_t = SHAKE_DURATION
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if _shake_t > 0.0:
+		_shake_t = maxf(_shake_t - delta, 0.0)
 	_update_camera()
 
 
@@ -326,6 +376,11 @@ func _update_camera() -> void:
 	var max_y: float = maxf(half_h, float(map_h) - half_h)
 	var cx: float = clampf(_player.position.x, half_w, max_x)
 	var cy: float = clampf(_player.position.y, half_h, max_y)
+	# Camera shake — fades linearly with _shake_t over SHAKE_DURATION.
+	if _shake_t > 0.0:
+		var fade: float = _shake_t / SHAKE_DURATION
+		cx += (randf() * 2.0 - 1.0) * SHAKE_AMPLITUDE * fade
+		cy += (randf() * 2.0 - 1.0) * SHAKE_AMPLITUDE * fade
 	_camera.position = Vector2(roundf(cx), roundf(cy))
 
 
