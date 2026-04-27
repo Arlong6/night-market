@@ -1,59 +1,98 @@
-## Kitchen cutscene for Night Market Shopping (v0.8).
+## Kitchen scene — v0.10 expanded into a bigger space with a stir minigame.
 ##
-## Bridges the win bump and the stat dump on end_win. Shows mum at the stove
-## while the ingredients you actually bought drop onto the table one by one,
-## each with a sparkle + the ingredient's name called out. After all are
-## placed, mum says one closing line and the scene auto-transitions to
-## end_win. Pressing any key skips ahead.
+## Stages: OPENING → DROP → STIR → PLATE → CLOSING → DONE
+## - OPENING: mum's "讓我看看你買到什麼" line
+## - DROP: each owned ingredient lands on the prep counter with sparkle + line
+## - STIR: player presses SPACE 6 times to "翻炒" — each press rocks the wok,
+##   puffs steam, fills a 6-cell meter
+## - PLATE: dish renders on the dining table; mum's closing line plays
+## - DONE: auto-transition to end_win
 ##
-## All visuals are programmatic ColorRect / _draw shapes consistent with the
-## rest of the game — no bitmap assets.
+## All visuals programmatic. Skipping is intentionally limited during STIR
+## (6 quick taps clears it) so the cooking beat lands.
 class_name Kitchen
 extends Node2D
 
 # ---------------------------------------------------------------------------
-# Layout constants — viewport is 320×180
+# Layout — viewport 320×180. Pack a fridge / stove / prep / table all in.
 # ---------------------------------------------------------------------------
 
 const VIEWPORT_W: int = 320
 const VIEWPORT_H: int = 180
 
-const FLOOR_Y: int = 130            ## y-coord where the floor stripe sits
-const STOVE_X: int = 90             ## stove anchor centre
+const FLOOR_Y: int = 130
+const WALL_Y: int = 4
+
+# X anchor points
+const FRIDGE_X: int = 30
+const STOVE_X: int = 100
+const PREP_X: int = 160
+const TABLE_X: int = 230
+
+# Y anchor points
 const STOVE_Y: int = 90
-const TABLE_X: int = 220            ## table anchor centre
-const TABLE_Y: int = 100
-const MOM_X: int = 90
+const PREP_Y: int = 100
+const TABLE_Y: int = 110
+
+# Character anchors
+const MOM_X: int = 100
 const MOM_Y: int = 75
-const KID_X: int = 175
+const KID_X: int = 195
 const KID_Y: int = 110
 
-## How long between each ingredient's drop on the table.
-const INGREDIENT_INTERVAL: float = 0.7
-
-## Delay before the first drop (lets the opening line settle).
+# Cooking pacing
 const OPENING_DELAY: float = 0.6
-
-## How long mum's closing line stays before auto-advancing to end_win.
+const INGREDIENT_INTERVAL: float = 0.55
+const STIR_TARGET: int = 6
+const STIR_PROMPT_DELAY: float = 0.3
+const PLATE_HOLD: float = 1.0
 const CLOSING_HOLD: float = 1.4
+const WOK_ROCK_DURATION: float = 0.18
 
 # ---------------------------------------------------------------------------
 # Palette
 # ---------------------------------------------------------------------------
 
 const COLOR_BG: Color = Color("#2A1408")
-const COLOR_FLOOR: Color = Color("#4A2412")
-const COLOR_WALL: Color = Color("#3A1A0A")
+const COLOR_WALL_TOP: Color = Color("#3A1A0A")
+const COLOR_WALL_TILE: Color = Color("#4A2412")
+const COLOR_FLOOR: Color = Color("#5A3220")
+const COLOR_FLOOR_LINE: Color = Color("#3A1A0A")
+
+# Fridge
+const COLOR_FRIDGE_BODY: Color = Color("#A8C8E8")
+const COLOR_FRIDGE_HANDLE: Color = Color("#888888")
+const COLOR_FRIDGE_INK: Color = Color("#2A1A0A")
+
+# Stove
 const COLOR_STOVE_BODY: Color = Color("#5A3220")
 const COLOR_BURNER: Color = Color("#2A1A0A")
-const COLOR_FLAME: Color = Color("#F2A227")
-const COLOR_POT: Color = Color("#888888")
-const COLOR_POT_RIM: Color = Color("#444444")
+const COLOR_FLAME_A: Color = Color("#F2A227")
+const COLOR_FLAME_B: Color = Color("#C2241A")
+const COLOR_WOK: Color = Color("#3A2A1A")
+const COLOR_WOK_RIM: Color = Color("#1A1208")
+
+# Prep counter
+const COLOR_PREP_BODY: Color = Color("#7A4A2A")
+const COLOR_BOARD: Color = Color("#A0784A")
+const COLOR_KNIFE: Color = Color("#C8C8C8")
+
+# Dining table
 const COLOR_TABLE: Color = Color("#7A4A2A")
 const COLOR_TABLE_EDGE: Color = Color("#3A1A0A")
-const COLOR_STEAM: Color = Color("#F5EDDA")
+const COLOR_PLATE: Color = Color("#F5EDDA")
+const COLOR_PLATE_RIM: Color = Color("#888888")
 
-# Stall food icon colours (mirrored from StallNPC) — keyed by ingredient_id.
+# Misc
+const COLOR_STEAM: Color = Color("#F5EDDA")
+const COLOR_METER_FRAME: Color = Color("#F5EDDA")
+const COLOR_METER_FILL: Color = Color("#F2A227")
+const COLOR_WINDOW_FRAME: Color = Color("#3A1A0A")
+const COLOR_WINDOW_NIGHT: Color = Color("#1A2A4A")
+const COLOR_WINDOW_MOON: Color = Color("#F5EDDA")
+const COLOR_UTENSIL: Color = Color("#888888")
+
+# Stall food icon colours mirrored from StallNPC for dish composition.
 const FOOD_COLOR: Dictionary = {
 	"scallion":  Color("#7AC940"),
 	"egg":       Color("#FFE9B0"),
@@ -64,7 +103,6 @@ const FOOD_COLOR: Dictionary = {
 	"mushroom":  Color("#7A4A2A"),
 }
 
-# Per-ingredient flavour line shown when it lands on the table.
 const FLAVOR_LINE: Dictionary = {
 	"scallion":  "蔥！很新鮮～",
 	"egg":       "雞蛋！打個蛋花。",
@@ -76,15 +114,23 @@ const FLAVOR_LINE: Dictionary = {
 }
 
 # ---------------------------------------------------------------------------
-# State
+# State machine
 # ---------------------------------------------------------------------------
 
-var _placed_ingredients: Array[Dictionary] = []  ## { id, x, y } per dropped chip
+enum Stage { OPENING, DROP, STIR_PROMPT, STIR, PLATE, CLOSING, DONE }
+var _stage: Stage = Stage.OPENING
+
+# Drop
+var _placed_ingredients: Array[Dictionary] = []  ## { id, x, y } each
+
+# Stir
+var _stir_count: int = 0
+var _wok_rock_t: float = 0.0  ## decreases each frame; while > 0 wok visibly rocks
+
+# Animation accumulators
 var _flame_t: float = 0.0
 var _steam_t: float = 0.0
-var _kid_t: float = 0.0  # for kid bob
-var _done: bool = false
-var _skipped: bool = false
+var _kid_t: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -93,8 +139,6 @@ var _skipped: bool = false
 
 func _ready() -> void:
 	Game.current_area = "kitchen"
-	# Music keeps playing from the market — let the win arpeggio that already
-	# fired from MomNPC.on_bumped() carry into here. Stop only at end_win.
 	set_process_unhandled_input(true)
 	_run_sequence()
 
@@ -103,16 +147,19 @@ func _process(delta: float) -> void:
 	_flame_t += delta
 	_steam_t += delta
 	_kid_t += delta
+	if _wok_rock_t > 0.0:
+		_wok_rock_t = maxf(_wok_rock_t - delta, 0.0)
 	queue_redraw()
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# During STIR, SPACE/Z/Enter advance the cook meter. Outside STIR, any
+	# "interact" press skips ahead to the next stage's end.
 	if not (event is InputEvent and event.is_pressed()):
 		return
-	# Any input skips the cutscene straight to end_win.
-	if not _skipped:
-		_skipped = true
-		_skip_to_end()
+	if _stage == Stage.STIR and event.is_action_pressed("interact"):
+		_do_stir()
+		get_viewport().set_input_as_handled()
 
 
 # ---------------------------------------------------------------------------
@@ -120,60 +167,88 @@ func _unhandled_input(event: InputEvent) -> void:
 # ---------------------------------------------------------------------------
 
 func _run_sequence() -> void:
-	# Opening line
+	_stage = Stage.OPENING
 	Dialogue.show(["終於回來了！讓我看看你買到什麼好東西…"])
 	await get_tree().create_timer(OPENING_DELAY).timeout
-	if _skipped:
-		return
 
-	# Drop each owned ingredient onto the table, one at a time.
+	_stage = Stage.DROP
 	var owned: PackedStringArray = Inventory.owned_ingredients()
 	for i in owned.size():
-		if _skipped:
-			return
 		_drop_ingredient(owned[i], i)
 		await get_tree().create_timer(INGREDIENT_INTERVAL).timeout
 
-	if _skipped:
-		return
+	_stage = Stage.STIR_PROMPT
+	if Dialogue._active and Dialogue._box != null:
+		Dialogue._box._close()
+	Dialogue.show(["全部下鍋！按 SPACE 翻炒～"])
+	await get_tree().create_timer(STIR_PROMPT_DELAY).timeout
+	_stage = Stage.STIR
+	# Wait until _stir_count reaches STIR_TARGET — driven by player input.
+	while _stir_count < STIR_TARGET:
+		await get_tree().process_frame
 
-	# Closing line based on time tier — same buckets as MomNPC.
-	var line: String = _closing_line_for_time(Game.session_time)
-	Dialogue.show([line])
+	_stage = Stage.PLATE
+	if Dialogue._active and Dialogue._box != null:
+		Dialogue._box._close()
+	Dialogue.show(["完成！上桌囉～"])
+	await get_tree().create_timer(PLATE_HOLD).timeout
+
+	_stage = Stage.CLOSING
+	if Dialogue._active and Dialogue._box != null:
+		Dialogue._box._close()
+	Dialogue.show([_closing_line_for_time(Game.session_time)])
 	await get_tree().create_timer(CLOSING_HOLD).timeout
 
-	if not _skipped:
-		_done = true
-		Game.goto_level("end_win")
+	_stage = Stage.DONE
+	if Dialogue._active and Dialogue._box != null:
+		Dialogue._box._close()
+	Game.goto_level("end_win")
 
 
 func _drop_ingredient(id: String, idx: int) -> void:
-	# 7 ingredient slots arranged in a 2-row grid on the table top.
+	# Land on the prep counter top in 2 staggered rows.
 	var col: int = idx % 4
 	var row: int = idx / 4
-	var slot_x: float = float(TABLE_X) - 18.0 + float(col) * 12.0
-	var slot_y: float = float(TABLE_Y) - 6.0 + float(row) * 8.0
-	_placed_ingredients.append({
-		"id": id, "x": slot_x, "y": slot_y,
-	})
-	# Sparkle pop on landing.
+	var slot_x: float = float(PREP_X) - 14.0 + float(col) * 10.0
+	var slot_y: float = float(PREP_Y) - 6.0 + float(row) * 6.0
+	_placed_ingredients.append({"id": id, "x": slot_x, "y": slot_y})
+	# Sparkle pop on landing
 	var burst: ParticleBurst = ParticleBurst.new()
 	burst.position = Vector2(slot_x, slot_y)
-	burst.count = 5
+	burst.count = 4
 	burst.color = Color("#F2A227")
-	burst.speed_min = 30.0
-	burst.speed_max = 60.0
+	burst.speed_min = 28.0
+	burst.speed_max = 55.0
 	burst.particle_size = 1.5
-	burst.lifetime = 0.35
+	burst.lifetime = 0.32
 	burst.gravity_scale = 0.4
 	burst.upward_bias = 0.7
 	add_child(burst)
 	Sfx.play_pickup()
-	# Show the flavour line for this ingredient (interrupts opening line).
 	var flavor: String = FLAVOR_LINE.get(id, Inventory.display_name(id))
 	if Dialogue._active and Dialogue._box != null:
 		Dialogue._box._close()
 	Dialogue.show([flavor])
+
+
+func _do_stir() -> void:
+	if _stir_count >= STIR_TARGET:
+		return
+	_stir_count += 1
+	_wok_rock_t = WOK_ROCK_DURATION
+	Sfx.play_choice()
+	# Steam puff out the wok on each stir.
+	var burst: ParticleBurst = ParticleBurst.new()
+	burst.position = Vector2(STOVE_X, STOVE_Y - 12)
+	burst.count = 5
+	burst.color = COLOR_STEAM
+	burst.speed_min = 25.0
+	burst.speed_max = 65.0
+	burst.particle_size = 2.0
+	burst.lifetime = 0.5
+	burst.gravity_scale = 0.0
+	burst.upward_bias = 0.95
+	add_child(burst)
 
 
 func _closing_line_for_time(t: float) -> String:
@@ -184,117 +259,240 @@ func _closing_line_for_time(t: float) -> String:
 	return "等你好久了～開飯！"
 
 
-func _skip_to_end() -> void:
-	if _done:
-		return
-	_done = true
-	if Dialogue._active and Dialogue._box != null:
-		Dialogue._box._close()
-	Game.goto_level("end_win")
-
-
 # ---------------------------------------------------------------------------
-# Drawing — programmatic kitchen scene
+# Drawing
 # ---------------------------------------------------------------------------
 
 func _draw() -> void:
-	# Backdrop fill (dark wall) + floor stripe
-	draw_rect(Rect2(0, 0, VIEWPORT_W, VIEWPORT_H), COLOR_BG)
+	# Backdrop wall fills first, then floor, then furniture stacked over it.
+	draw_rect(Rect2(0, 0, VIEWPORT_W, VIEWPORT_H), COLOR_WALL_TOP)
+	# Wall tile band — a few horizontal accent stripes for texture
+	for y in [40, 60, 80]:
+		draw_rect(Rect2(0, y, VIEWPORT_W, 1.0), COLOR_WALL_TILE)
+	# Floor stripe
 	draw_rect(Rect2(0, FLOOR_Y, VIEWPORT_W, VIEWPORT_H - FLOOR_Y), COLOR_FLOOR)
-	# Wall trim — 2px highlight strip at the floor join
-	draw_rect(Rect2(0, FLOOR_Y, VIEWPORT_W, 1.0), COLOR_WALL.lightened(0.2))
+	# Skirting board
+	draw_rect(Rect2(0, FLOOR_Y, VIEWPORT_W, 1.0), COLOR_FLOOR_LINE)
 
+	_draw_window()
+	_draw_hanging_utensils()
+	_draw_fridge()
 	_draw_stove()
+	_draw_prep_counter()
 	_draw_table()
 	_draw_mom()
 	_draw_kid()
+	if _stage == Stage.STIR:
+		_draw_stir_meter()
+
+
+func _draw_window() -> void:
+	# Window above the prep counter — small night-sky framed pane
+	var wx: int = PREP_X - 16
+	var wy: int = 26
+	draw_rect(Rect2(wx - 2, wy - 2, 36, 28), COLOR_WINDOW_FRAME)
+	draw_rect(Rect2(wx, wy, 32, 24), COLOR_WINDOW_NIGHT)
+	# Crossbars
+	draw_rect(Rect2(wx + 15, wy, 2, 24), COLOR_WINDOW_FRAME)
+	draw_rect(Rect2(wx, wy + 11, 32, 2), COLOR_WINDOW_FRAME)
+	# Moon (top-right pane)
+	draw_rect(Rect2(wx + 22, wy + 3, 6, 5), COLOR_WINDOW_MOON)
+	# Stars (pixel dots)
+	draw_rect(Rect2(wx + 4, wy + 4, 1, 1), COLOR_WINDOW_MOON)
+	draw_rect(Rect2(wx + 11, wy + 7, 1, 1), COLOR_WINDOW_MOON)
+	draw_rect(Rect2(wx + 25, wy + 17, 1, 1), COLOR_WINDOW_MOON)
+
+
+func _draw_hanging_utensils() -> void:
+	# Above the stove — 3 utensils hanging from a ledge
+	var lx: int = STOVE_X - 18
+	var ly: int = 50
+	draw_rect(Rect2(lx, ly, 36, 1.0), COLOR_FRIDGE_INK)
+	for i in 3:
+		var x: float = float(lx + 6 + i * 12)
+		# Hook line
+		draw_rect(Rect2(x, ly, 1.0, 4.0), COLOR_FRIDGE_INK)
+		# Utensil head varies per slot — pan / spatula / ladle
+		match i:
+			0:
+				# Pan circle (rect approximation)
+				draw_rect(Rect2(x - 3, ly + 4, 7, 5), COLOR_UTENSIL)
+				draw_rect(Rect2(x + 3, ly + 5, 4, 1), COLOR_UTENSIL)
+			1:
+				# Spatula
+				draw_rect(Rect2(x - 1, ly + 4, 2, 6), COLOR_UTENSIL)
+				draw_rect(Rect2(x - 2, ly + 9, 4, 2), COLOR_UTENSIL)
+			2:
+				# Ladle
+				draw_rect(Rect2(x - 1, ly + 4, 2, 5), COLOR_UTENSIL)
+				draw_rect(Rect2(x - 3, ly + 8, 5, 3), COLOR_UTENSIL)
+
+
+func _draw_fridge() -> void:
+	# Tall fridge on the far left
+	draw_rect(Rect2(FRIDGE_X - 12, 60, 24, 70), COLOR_FRIDGE_INK)
+	draw_rect(Rect2(FRIDGE_X - 11, 61, 22, 68), COLOR_FRIDGE_BODY)
+	# Door split horizontal line
+	draw_rect(Rect2(FRIDGE_X - 11, 88, 22, 1.0), COLOR_FRIDGE_INK)
+	# Handles
+	draw_rect(Rect2(FRIDGE_X + 7, 70, 2, 12), COLOR_FRIDGE_HANDLE)
+	draw_rect(Rect2(FRIDGE_X + 7, 96, 2, 16), COLOR_FRIDGE_HANDLE)
+	# Magnet decoration: a small note on the upper door
+	draw_rect(Rect2(FRIDGE_X - 6, 70, 6, 4), Color("#F2A227"))
+	draw_rect(Rect2(FRIDGE_X - 5, 71, 4, 2), COLOR_FRIDGE_INK)
 
 
 func _draw_stove() -> void:
 	# Stove body
-	draw_rect(Rect2(STOVE_X - 18, STOVE_Y - 12, 36, 30), COLOR_STOVE_BODY)
+	draw_rect(Rect2(STOVE_X - 18, STOVE_Y - 4, 36, 38), COLOR_STOVE_BODY)
 	# Burner ring
-	draw_rect(Rect2(STOVE_X - 12, STOVE_Y - 4, 24, 6), COLOR_BURNER)
-	# Pot on the burner
-	draw_rect(Rect2(STOVE_X - 10, STOVE_Y - 14, 20, 10), COLOR_POT)
-	draw_rect(Rect2(STOVE_X - 11, STOVE_Y - 15, 22, 1), COLOR_POT_RIM)
-	# Animated flame peek out the burner sides
-	var flame_phase: float = sin((_flame_t / 0.15) * TAU)
+	draw_rect(Rect2(STOVE_X - 12, STOVE_Y, 24, 4), COLOR_BURNER)
+	# Wok rocks left/right when _wok_rock_t > 0; rock fades over its duration
+	var rock_x: float = 0.0
+	if _wok_rock_t > 0.0:
+		var phase: float = (1.0 - _wok_rock_t / WOK_ROCK_DURATION) * TAU
+		rock_x = sin(phase * 2.0) * 2.0
+	# Wok body (wider than the old pot, with curved rim approximation)
+	draw_rect(Rect2(STOVE_X - 14 + rock_x, STOVE_Y - 12, 28, 12), COLOR_WOK)
+	# Wok rim — 1px darker top and bottom edges
+	draw_rect(Rect2(STOVE_X - 14 + rock_x, STOVE_Y - 13, 28, 1.0), COLOR_WOK_RIM)
+	# Wok handle (right side)
+	draw_rect(Rect2(STOVE_X + 14 + rock_x, STOVE_Y - 8, 6, 2), COLOR_WOK_RIM)
+	# Animated flame slits both sides of the burner — alternating colors
+	var flame_phase: float = sin((_flame_t / 0.12) * TAU)
 	var flame_h: float = 2.0 + (1.0 if flame_phase > 0.0 else 0.0)
-	draw_rect(Rect2(STOVE_X - 11, STOVE_Y, 4, flame_h), COLOR_FLAME)
-	draw_rect(Rect2(STOVE_X + 7, STOVE_Y, 4, flame_h), COLOR_FLAME)
-	# Steam puffs rising — 2 dots cycling up
-	var steam_y0: float = float(STOVE_Y) - 18.0 - fmod(_steam_t * 14.0, 18.0)
-	var steam_y1: float = float(STOVE_Y) - 18.0 - fmod(_steam_t * 14.0 + 9.0, 18.0)
-	var steam_alpha0: float = 1.0 - fmod(_steam_t * 14.0, 18.0) / 18.0
-	var steam_alpha1: float = 1.0 - fmod(_steam_t * 14.0 + 9.0, 18.0) / 18.0
-	var c0: Color = COLOR_STEAM
-	c0.a = clampf(steam_alpha0, 0.0, 1.0)
-	var c1: Color = COLOR_STEAM
-	c1.a = clampf(steam_alpha1, 0.0, 1.0)
-	draw_rect(Rect2(STOVE_X - 2, steam_y0, 2, 2), c0)
-	draw_rect(Rect2(STOVE_X + 1, steam_y1, 2, 2), c1)
+	var flame_color: Color = COLOR_FLAME_A if flame_phase > 0.0 else COLOR_FLAME_B
+	draw_rect(Rect2(STOVE_X - 11, STOVE_Y, 4, flame_h), flame_color)
+	draw_rect(Rect2(STOVE_X + 7, STOVE_Y, 4, flame_h), flame_color)
+	# Steam puffs cycling up while cooking
+	if _stage == Stage.STIR or _stage == Stage.PLATE or _stage == Stage.CLOSING:
+		var s_y0: float = float(STOVE_Y) - 18.0 - fmod(_steam_t * 16.0, 22.0)
+		var s_y1: float = float(STOVE_Y) - 18.0 - fmod(_steam_t * 16.0 + 11.0, 22.0)
+		var a0: float = clampf(1.0 - fmod(_steam_t * 16.0, 22.0) / 22.0, 0.0, 1.0)
+		var a1: float = clampf(1.0 - fmod(_steam_t * 16.0 + 11.0, 22.0) / 22.0, 0.0, 1.0)
+		var c0: Color = COLOR_STEAM
+		var c1: Color = COLOR_STEAM
+		c0.a = a0
+		c1.a = a1
+		draw_rect(Rect2(STOVE_X - 2, s_y0, 2, 2), c0)
+		draw_rect(Rect2(STOVE_X + 2, s_y1, 2, 2), c1)
 
 
-func _draw_table() -> void:
-	# Table top (large rect) + edge ink
-	draw_rect(Rect2(TABLE_X - 30, TABLE_Y - 10, 60, 18), COLOR_TABLE)
-	draw_rect(Rect2(TABLE_X - 30, TABLE_Y - 10, 60, 1), COLOR_TABLE_EDGE)
-	draw_rect(Rect2(TABLE_X - 30, TABLE_Y + 7, 60, 1), COLOR_TABLE_EDGE)
-	# Legs
-	draw_rect(Rect2(TABLE_X - 28, TABLE_Y + 8, 2, 12), COLOR_TABLE)
-	draw_rect(Rect2(TABLE_X + 26, TABLE_Y + 8, 2, 12), COLOR_TABLE)
+func _draw_prep_counter() -> void:
+	# Counter under the window (where ingredients drop)
+	draw_rect(Rect2(PREP_X - 22, PREP_Y - 4, 44, 30), COLOR_PREP_BODY)
+	draw_rect(Rect2(PREP_X - 22, PREP_Y - 5, 44, 1.0), COLOR_TABLE_EDGE)
+	# Cutting board on top
+	draw_rect(Rect2(PREP_X - 10, PREP_Y - 4, 20, 4), COLOR_BOARD)
+	# Knife resting on board (left side)
+	draw_rect(Rect2(PREP_X - 9, PREP_Y - 3, 1.0, 2.0), COLOR_KNIFE)
+	draw_rect(Rect2(PREP_X - 9, PREP_Y - 3, 6, 1.0), COLOR_KNIFE)
 
-	# Placed ingredient chips
+	# Ingredient chips placed during DROP stage
 	for ing in _placed_ingredients:
 		var c: Color = FOOD_COLOR.get(ing["id"], Color.WHITE)
 		var x: float = ing["x"] - 2.0
 		var y: float = ing["y"] - 2.0
 		draw_rect(Rect2(x, y, 4, 4), c)
-		draw_rect(Rect2(x, y, 4, 1), Color("#2A1A0A"))
-		draw_rect(Rect2(x, y + 3, 4, 1), Color("#2A1A0A"))
+		draw_rect(Rect2(x, y, 4, 1.0), COLOR_TABLE_EDGE)
+		draw_rect(Rect2(x, y + 3, 4, 1.0), COLOR_TABLE_EDGE)
+
+
+func _draw_table() -> void:
+	# Dining table — wider than v0.8 since we have horizontal real estate
+	draw_rect(Rect2(TABLE_X - 36, TABLE_Y - 8, 72, 16), COLOR_TABLE)
+	draw_rect(Rect2(TABLE_X - 36, TABLE_Y - 8, 72, 1.0), COLOR_TABLE_EDGE)
+	draw_rect(Rect2(TABLE_X - 36, TABLE_Y + 7, 72, 1.0), COLOR_TABLE_EDGE)
+	# Legs
+	draw_rect(Rect2(TABLE_X - 34, TABLE_Y + 8, 2, 14), COLOR_TABLE)
+	draw_rect(Rect2(TABLE_X + 32, TABLE_Y + 8, 2, 14), COLOR_TABLE)
+
+	# Plated dish — only shown during PLATE / CLOSING
+	if _stage == Stage.PLATE or _stage == Stage.CLOSING or _stage == Stage.DONE:
+		_draw_dish_on_plate()
+
+
+func _draw_dish_on_plate() -> void:
+	# Plate (oval-ish via rounded rect approximation)
+	var px: int = TABLE_X
+	var py: int = TABLE_Y - 4
+	# Plate rim
+	draw_rect(Rect2(px - 14, py - 5, 28, 10), COLOR_PLATE_RIM)
+	# Plate face
+	draw_rect(Rect2(px - 13, py - 4, 26, 8), COLOR_PLATE)
+	# Dish — cluster of ingredient-colored dots representing the cooked food
+	var owned: PackedStringArray = Inventory.owned_ingredients()
+	# Lay out up to 6 ingredient chips in a compact 3×2 grid on the plate
+	for i in mini(owned.size(), 6):
+		var col: int = i % 3
+		var row: int = i / 3
+		var dx: float = float(px) - 7.0 + float(col) * 5.0
+		var dy: float = float(py) - 2.0 + float(row) * 4.0
+		var c: Color = FOOD_COLOR.get(owned[i], Color.WHITE)
+		draw_rect(Rect2(dx, dy, 3, 3), c)
+
+
+func _draw_stir_meter() -> void:
+	# 6-cell meter floating above the wok
+	var bar_x: int = STOVE_X - 16
+	var bar_y: int = STOVE_Y - 30
+	draw_rect(Rect2(bar_x - 1, bar_y - 1, 34, 8), COLOR_METER_FRAME)
+	draw_rect(Rect2(bar_x, bar_y, 32, 6), COLOR_BG)
+	for i in STIR_TARGET:
+		var cx: float = float(bar_x) + 1.0 + float(i) * 5.0
+		var filled: bool = i < _stir_count
+		if filled:
+			draw_rect(Rect2(cx, bar_y + 1, 4, 4), COLOR_METER_FILL)
+		else:
+			draw_rect(Rect2(cx, bar_y + 1, 4, 4), COLOR_METER_FRAME.darkened(0.6))
 
 
 func _draw_mom() -> void:
-	# Mum at the stove — same silhouette logic as MomNPC but inline since
-	# we're not extending NPC here. Stationary (no bob — she's working).
+	# Stationary, manning the wok — slight bob in time with stir
 	var x: int = MOM_X
 	var y: int = MOM_Y
-	# Hair top
-	draw_rect(Rect2(x - 3, y - 7, 6, 2), Color("#3A1A0A"))
-	# Hair bun
-	draw_rect(Rect2(x - 2, y - 8, 4, 2), Color("#3A1A0A"))
+	var rock: float = 0.0
+	if _wok_rock_t > 0.0:
+		# Mum tilts in opposite direction to wok, like she's stirring
+		var phase: float = (1.0 - _wok_rock_t / WOK_ROCK_DURATION) * TAU
+		rock = -sin(phase * 2.0) * 1.0
+	# Hair top + bun
+	draw_rect(Rect2(x - 3 + rock, y - 7, 6, 2), Color("#3A1A0A"))
+	draw_rect(Rect2(x - 2 + rock, y - 8, 4, 2), Color("#3A1A0A"))
 	# Head
-	draw_rect(Rect2(x - 3, y - 5, 6, 4), Color("#F2D6A8"))
+	draw_rect(Rect2(x - 3 + rock, y - 5, 6, 4), Color("#F2D6A8"))
 	# Eyes
-	draw_rect(Rect2(x - 2, y - 3, 1, 1), Color("#2A1A0A"))
-	draw_rect(Rect2(x + 1, y - 3, 1, 1), Color("#2A1A0A"))
+	draw_rect(Rect2(x - 2 + rock, y - 3, 1, 1), Color("#2A1A0A"))
+	draw_rect(Rect2(x + 1 + rock, y - 3, 1, 1), Color("#2A1A0A"))
 	# Body (purple)
-	draw_rect(Rect2(x - 4, y - 1, 8, 5), Color("#9A4A8A"))
-	# Apron (cream)
-	draw_rect(Rect2(x - 3, y + 1, 6, 3), Color("#F5EDDA"))
-	# Legs (darker purple)
-	draw_rect(Rect2(x - 3, y + 4, 2, 4), Color("#5A2A4A"))
-	draw_rect(Rect2(x + 1, y + 4, 2, 4), Color("#5A2A4A"))
+	draw_rect(Rect2(x - 4 + rock, y - 1, 8, 5), Color("#9A4A8A"))
+	# Apron
+	draw_rect(Rect2(x - 3 + rock, y + 1, 6, 3), Color("#F5EDDA"))
+	# Legs
+	draw_rect(Rect2(x - 3 + rock, y + 4, 2, 4), Color("#5A2A4A"))
+	draw_rect(Rect2(x + 1 + rock, y + 4, 2, 4), Color("#5A2A4A"))
+	# Arm extending toward the wok handle (right side of stove). Only visible
+	# in stir-y stages so the silhouette is recognisable as "cooking".
+	if _stage == Stage.STIR or _stage == Stage.PLATE:
+		draw_rect(Rect2(x + 4 + rock, y - 1, 4, 2), Color("#F2D6A8"))
 
 
 func _draw_kid() -> void:
-	# Kid by the table — alternating-foot bob from the same step parity as
-	# the gameplay walk cycle, so the silhouette feels consistent.
 	var bob: float = sin((_kid_t / 0.55) * TAU)
 	var bob_y: float = -1.0 if bob > 0.0 else 0.0
 	var x: int = KID_X
 	var y: int = KID_Y
-	# Hair top
+	# Hair
 	draw_rect(Rect2(x - 3, y - 7 + bob_y, 6, 2), Color("#3A1A0A"))
 	# Head
 	draw_rect(Rect2(x - 3, y - 5 + bob_y, 6, 4), Color("#F2D6A8"))
-	# Eyes (looking up at the food being placed)
-	draw_rect(Rect2(x - 2, y - 3 + bob_y, 1, 1), Color("#2A1A0A"))
-	draw_rect(Rect2(x + 1, y - 3 + bob_y, 1, 1), Color("#2A1A0A"))
+	# Eyes (looking left toward stove during cooking, forward at end)
+	var eye_shift: float = -1.0 if _stage <= Stage.STIR else 0.0
+	draw_rect(Rect2(x - 2 + eye_shift, y - 3 + bob_y, 1, 1), Color("#2A1A0A"))
+	draw_rect(Rect2(x + 1 + eye_shift, y - 3 + bob_y, 1, 1), Color("#2A1A0A"))
 	# Yellow shirt
 	draw_rect(Rect2(x - 4, y - 1 + bob_y, 8, 5), Color("#E8F542"))
-	draw_rect(Rect2(x - 4, y - 1 + bob_y, 8, 1), Color("#E8F542").darkened(0.25))
+	draw_rect(Rect2(x - 4, y - 1 + bob_y, 8, 1.0), Color("#E8F542").darkened(0.25))
 	# Blue shorts
 	draw_rect(Rect2(x - 3, y + 4 + bob_y, 2, 3), Color("#3A4A8A"))
 	draw_rect(Rect2(x + 1, y + 4 + bob_y, 2, 3), Color("#3A4A8A"))
