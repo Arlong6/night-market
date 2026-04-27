@@ -1,7 +1,11 @@
 ## Player money + ingredient inventory for Night Market Shopping (R-005).
 ##
+## v0.7: 7 stalls in the market, but mum only needs ANY 5 — the player
+## chooses what mix to buy. STARTING_MONEY = 180 forces at least one
+## successful 殺價 (or skipping the most expensive items) to make budget.
+##
 ## Pure state class. The HUD subscribes to its signals; StallNPC mutates
-## via `buy()`; MomNPC checks `has_all_required()` for the win condition.
+## via `buy()`; MomNPC checks `has_enough()` for the win condition.
 extends Node
 
 # ---------------------------------------------------------------------------
@@ -15,12 +19,16 @@ signal ingredient_added(ingredient_id: String)
 # Constants — tuning per design/gdd/game-concept-rpg.md §7
 # ---------------------------------------------------------------------------
 
-const STARTING_MONEY: int = 200
+const STARTING_MONEY: int = 180
 
-## The 5 ingredients the player must collect to win.
-const REQUIRED_INGREDIENTS: PackedStringArray = [
-	"scallion", "egg", "cabbage", "chicken", "soy_sauce"
+## All sellable ingredients in the market. The player can buy any of them
+## but only needs REQUIRED_COUNT of them to complete the quest.
+const ALL_INGREDIENTS: PackedStringArray = [
+	"scallion", "egg", "cabbage", "chicken", "soy_sauce", "tofu", "mushroom"
 ]
+
+## How many distinct ingredients mum demands. Win condition: count() >= this.
+const REQUIRED_COUNT: int = 5
 
 ## CJK display names for the ingredient ids above.
 const INGREDIENT_DISPLAY: Dictionary = {
@@ -29,6 +37,8 @@ const INGREDIENT_DISPLAY: Dictionary = {
 	"cabbage": "高麗菜",
 	"chicken": "雞肉",
 	"soy_sauce": "醬油",
+	"tofu": "豆腐",
+	"mushroom": "香菇",
 }
 
 # ---------------------------------------------------------------------------
@@ -74,12 +84,25 @@ func ingredient_count() -> int:
 	return ingredients.size()
 
 
-## True iff every id in REQUIRED_INGREDIENTS has been collected.
+## True iff the player has bought at least REQUIRED_COUNT ingredients.
+## (Pre-v0.7 this was `has_all_required()` — kept as alias below.)
+func has_enough() -> bool:
+	return ingredient_count() >= REQUIRED_COUNT
+
+
+## Legacy alias used by older callsites/tests. Same semantics as has_enough().
 func has_all_required() -> bool:
-	for id in REQUIRED_INGREDIENTS:
-		if not has(id):
-			return false
-	return true
+	return has_enough()
+
+
+## Returns owned ingredient ids (in ALL_INGREDIENTS order, not insertion order),
+## handy for the end-screen ingredient list.
+func owned_ingredients() -> PackedStringArray:
+	var out: PackedStringArray = PackedStringArray()
+	for id in ALL_INGREDIENTS:
+		if has(id):
+			out.append(id)
+	return out
 
 
 ## Resets money and inventory back to the start of a fresh run.

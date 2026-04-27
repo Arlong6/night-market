@@ -60,6 +60,8 @@ const FOOD_ICON_COLOR: Dictionary = {
 	"cabbage":   Color("#9EE070"),  # pale green
 	"chicken":   Color("#C58A4A"),  # tan
 	"soy_sauce": Color("#3A1A0A"),  # dark brown
+	"tofu":      Color("#F8F0D8"),  # off-white tofu
+	"mushroom":  Color("#7A4A2A"),  # mushroom brown
 }
 
 

@@ -106,7 +106,7 @@ func _refresh_money() -> void:
 func _refresh_progress() -> void:
 	_progress_label.text = "%d/%d" % [
 		Inventory.ingredient_count(),
-		Inventory.REQUIRED_INGREDIENTS.size()
+		Inventory.REQUIRED_COUNT
 	]
 
 

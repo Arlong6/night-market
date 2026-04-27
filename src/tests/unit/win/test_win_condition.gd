@@ -34,12 +34,14 @@ func _make_mom() -> MomNPC:
 # ---------------------------------------------------------------------------
 
 func test_mom_bump_with_all_ingredients_triggers_win() -> void:
-	# Buy all 5 required ingredients.
+	# v0.7: STARTING_MONEY=180 is below the 5-cheapest sum, so for this
+	# test we top money up to skip the bargain dance and just verify the win flow.
+	Inventory.money = 1000
 	for id_price in [["scallion", 20], ["egg", 30], ["cabbage", 40],
 					 ["chicken", 50], ["soy_sauce", 50]]:
 		assert_true(Inventory.buy(id_price[0], id_price[1]))
 	assert_true(Inventory.has_all_required(),
-		"Pre-condition: should have all required")
+		"Pre-condition: 5 collected should satisfy has_all_required")
 
 	var mom: MomNPC = await _make_mom()
 	mom.on_bumped()

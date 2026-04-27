@@ -9,7 +9,9 @@ func before_each() -> void:
 
 func test_inventory_starts_with_starting_money() -> void:
 	assert_eq(Inventory.money, Inventory.STARTING_MONEY,
-		"Money should start at STARTING_MONEY (200)")
+		"Money should start at STARTING_MONEY")
+	assert_eq(Inventory.STARTING_MONEY, 180,
+		"v0.7 difficulty target — must bargain or skip dearer items to make budget")
 
 
 func test_inventory_starts_empty() -> void:
@@ -18,8 +20,8 @@ func test_inventory_starts_empty() -> void:
 
 
 func test_inventory_can_afford_when_money_sufficient() -> void:
-	assert_true(Inventory.can_afford(50), "200 >= 50 should be affordable")
-	assert_true(Inventory.can_afford(200), "200 >= 200 should be affordable (boundary)")
+	assert_true(Inventory.can_afford(50), "180 >= 50 should be affordable")
+	assert_true(Inventory.can_afford(180), "180 >= 180 should be affordable (boundary)")
 
 
 func test_inventory_cannot_afford_when_money_insufficient() -> void:
@@ -31,7 +33,7 @@ func test_inventory_cannot_afford_when_money_insufficient() -> void:
 func test_inventory_buy_succeeds_when_affordable_and_new() -> void:
 	var ok: bool = Inventory.buy("egg", 30)
 	assert_true(ok, "buy should succeed when affordable + new")
-	assert_eq(Inventory.money, 170, "Money should decrement by price")
+	assert_eq(Inventory.money, 150, "Money should decrement by price (180 - 30)")
 	assert_true(Inventory.has("egg"), "ingredient should be owned after buy")
 
 
@@ -56,27 +58,32 @@ func test_inventory_buy_fails_when_already_owned() -> void:
 	assert_true(Inventory.buy("egg", 30), "first buy succeeds")
 	var second: bool = Inventory.buy("egg", 30)
 	assert_false(second, "second buy of same item should fail")
-	assert_eq(Inventory.money, 170,
+	assert_eq(Inventory.money, 150,
 		"Money should only decrement once even after duplicate attempt")
 
 
-func test_inventory_has_all_required_false_when_partial() -> void:
-	# Buy 4 of 5 required
+func test_inventory_has_enough_false_when_partial() -> void:
+	# Buy only 4 ingredients — below REQUIRED_COUNT (5)
 	assert_true(Inventory.buy("scallion", 20))
 	assert_true(Inventory.buy("egg", 30))
 	assert_true(Inventory.buy("cabbage", 40))
 	assert_true(Inventory.buy("chicken", 50))
-	assert_false(Inventory.has_all_required(),
-		"4/5 collected should not satisfy has_all_required")
+	assert_false(Inventory.has_enough(),
+		"4/5 collected should not satisfy has_enough()")
 
 
-func test_inventory_has_all_required_true_when_complete() -> void:
+func test_inventory_has_enough_true_when_threshold_reached() -> void:
+	# v0.7: any 5 out of 7 satisfies the win condition. Top up money so the
+	# test isn't gated by the new $180 budget — buying 5-of-7 is the focus.
+	Inventory.money = 1000
 	for id_price in [["scallion", 20], ["egg", 30], ["cabbage", 40],
-					 ["chicken", 50], ["soy_sauce", 50]]:
+					 ["chicken", 50], ["tofu", 60]]:
 		assert_true(Inventory.buy(id_price[0], id_price[1]),
 			"Buy %s should succeed" % id_price[0])
+	assert_true(Inventory.has_enough(),
+		"5 collected (any of the 7) should satisfy has_enough()")
 	assert_true(Inventory.has_all_required(),
-		"All 5 collected should satisfy has_all_required")
+		"Legacy alias has_all_required() should match has_enough()")
 
 
 func test_inventory_reset_returns_to_starting_state() -> void:
@@ -95,16 +102,19 @@ func test_inventory_display_name_returns_cjk_label() -> void:
 	assert_eq(Inventory.display_name("chicken"), "雞肉")
 
 
-func test_inventory_total_required_prices_within_starting_money() -> void:
-	# Sanity: the 5 required ingredients sum should be ≤ STARTING_MONEY
-	# so a player who never wastes money can win.
-	var prices: Dictionary = {
-		"scallion": 20, "egg": 30, "cabbage": 40,
-		"chicken": 50, "soy_sauce": 50,
-	}
-	var total: int = 0
-	for id in Inventory.REQUIRED_INGREDIENTS:
-		total += prices.get(id, 0)
-	assert_true(total <= Inventory.STARTING_MONEY,
-		"Total required ingredient prices (%s) must be ≤ STARTING_MONEY (%s)" %
-			[total, Inventory.STARTING_MONEY])
+func test_inventory_difficulty_forces_engagement_with_bargain() -> void:
+	# v0.7 design: the 5 cheapest ingredients sum to MORE than STARTING_MONEY
+	# so a player who never bargains can't just buy all the cheap stuff.
+	# (Cheapest 5 of [20,30,40,50,50,60,70] = 190; STARTING_MONEY = 180)
+	var prices: Array[int] = [20, 30, 40, 50, 50, 60, 70]
+	prices.sort()
+	var cheapest_5_total: int = 0
+	for i in Inventory.REQUIRED_COUNT:
+		cheapest_5_total += prices[i]
+	assert_gt(cheapest_5_total, Inventory.STARTING_MONEY,
+		"Cheapest %d ingredients (%d) must exceed STARTING_MONEY (%d) so the player must bargain" %
+			[Inventory.REQUIRED_COUNT, cheapest_5_total, Inventory.STARTING_MONEY])
+	# But not by so much that bargain success can't close the gap.
+	# Best bargain: 0.8x on the most expensive of the 5 = roughly 50 → 40 = saves 10.
+	assert_lt(cheapest_5_total - Inventory.STARTING_MONEY, 30,
+		"Gap between budget and cheap 5 must be closeable with one or two bargains")

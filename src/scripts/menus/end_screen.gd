@@ -64,8 +64,9 @@ func _build_ui() -> void:
 
 	_add_revealable(vbox, _make_label("謝謝，今晚加菜！", 16, Color("#F5EDDA")))
 
-	# Ingredient checklist — each row tracked separately so we can sparkle it.
-	for id in Inventory.REQUIRED_INGREDIENTS:
+	# Ingredient checklist — only the ingredients the player actually bought.
+	# (Each row tracked separately so we can sparkle it during the reveal.)
+	for id in Inventory.owned_ingredients():
 		var row: Label = _make_label(
 			"  ✓ %s" % Inventory.display_name(id), 10, Color("#C8E66D")
 		)

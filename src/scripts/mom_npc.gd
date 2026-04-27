@@ -6,7 +6,9 @@
 class_name MomNPC
 extends NPC
 
-const COLOR_MOM: Color = Color("#9A4A8A")  ## purple — distinct from vendor brown / kid yellow
+const COLOR_MOM: Color = Color("#9A4A8A")  ## purple shirt — distinct from vendor brown / kid yellow
+const COLOR_APRON: Color = Color("#F5EDDA")  ## cream apron over the shirt
+const COLOR_MOM_HAIR: Color = Color("#3A1A0A")  ## tied-back dark brown hair
 
 ## Time thresholds (seconds) for the success-line tier.
 const FAST_THRESHOLD: float = 90.0
@@ -15,6 +17,15 @@ const SLOW_THRESHOLD: float = 240.0
 
 func _draw_color() -> Color:
 	return COLOR_MOM
+
+
+func _draw() -> void:
+	var bob: float = _idle_bob_offset()
+	_draw_person(COLOR_MOM, bob)
+	# Apron stripe — 6×2 cream band over the torso, makes mum legible at a glance
+	draw_rect(Rect2(-3.0, 1.0 + bob, 6.0, 3.0), COLOR_APRON)
+	# Hair bun — small 4×2 dark cap on top of the standard hair stripe
+	draw_rect(Rect2(-2.0, -8.0 + bob, 4.0, 2.0), COLOR_MOM_HAIR)
 
 
 func on_bumped() -> void:
@@ -27,7 +38,9 @@ func on_bumped() -> void:
 		var on_done: Callable = func() -> void: Game.goto_level("end_win")
 		Dialogue.show(lines, on_done)
 	else:
-		var missing: int = Inventory.REQUIRED_INGREDIENTS.size() - Inventory.ingredient_count()
+		var missing: int = Inventory.REQUIRED_COUNT - Inventory.ingredient_count()
+		if missing < 0:
+			missing = 0
 		var lines: Array[String] = [
 			"回來啦？讓我看看…",
 			"還差 %d 樣，再去看看吧。" % missing,

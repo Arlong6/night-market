@@ -12,6 +12,9 @@ extends Node2D
 
 const NPC_SIZE: float = 14.0
 const COLOR_BODY: Color = Color("#7A3A2A")  ## vendor brown placeholder
+const COLOR_SKIN: Color = Color("#F2D6A8")  ## warm skin tone
+const COLOR_HAIR: Color = Color("#2A1A0A")  ## near-black hair / outline
+const COLOR_EYE: Color = Color("#2A1A0A")   ## near-black eyes
 
 # ---------------------------------------------------------------------------
 # Exports
@@ -46,9 +49,32 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var half: float = NPC_SIZE / 2.0
-	var bob_y: float = _idle_bob_offset()
-	draw_rect(Rect2(-half, -half + bob_y, NPC_SIZE, NPC_SIZE), _draw_color())
+	var bob: float = _idle_bob_offset()
+	_draw_person(_draw_color(), bob)
+
+
+## Multi-rect "person" silhouette — head, body, legs, eyes — centred on the
+## cell origin. Subclasses can override _draw() entirely for non-humanoid
+## shapes (StallNPC) or override _draw_color() to recolour the shirt.
+##
+## Pixel layout in a 14×14 footprint (origin centre):
+##   y=-7..-2: 6px head (skin) with hair stripe + eye dots
+##   y=-2..+3: 5px torso (body color)
+##   y=+3..+7: 4px legs split
+func _draw_person(body_color: Color, bob: float) -> void:
+	# Head — 6×6 skin square at top
+	draw_rect(Rect2(-3.0, -7.0 + bob, 6.0, 6.0), COLOR_SKIN)
+	# Hair stripe — 6×2 dark band capping the head
+	draw_rect(Rect2(-3.0, -7.0 + bob, 6.0, 2.0), COLOR_HAIR)
+	# Eyes — 1px dots, symmetric
+	draw_rect(Rect2(-2.0, -4.0 + bob, 1.0, 1.0), COLOR_EYE)
+	draw_rect(Rect2(1.0, -4.0 + bob, 1.0, 1.0), COLOR_EYE)
+	# Torso — 8×5 body color
+	draw_rect(Rect2(-4.0, -1.0 + bob, 8.0, 5.0), body_color)
+	# Legs — two 2×4 rects split by 2px gap, slightly darker than body
+	var legs: Color = body_color.darkened(0.35)
+	draw_rect(Rect2(-3.0, 4.0 + bob, 2.0, 3.0), legs)
+	draw_rect(Rect2(1.0, 4.0 + bob, 2.0, 3.0), legs)
 
 
 ## Pixel-snapped sin-based bob — rounds to {-1, 0, 1} so motion stays crisp.

@@ -35,7 +35,10 @@ signal bumped(target_cell: Vector2i)
 const STEP_DURATION: float = 0.18
 
 const PLAYER_SIZE: float = 14.0       ## drawn body edge length (px)
-const PLAYER_COLOR: Color = Color("#E8F542")  ## same yellow as v0.1 kid
+const PLAYER_COLOR: Color = Color("#E8F542")  ## same yellow shirt as v0.1 kid
+const PLAYER_SKIN: Color = Color("#F2D6A8")
+const PLAYER_HAIR: Color = Color("#3A1A0A")
+const PLAYER_PANTS: Color = Color("#3A4A8A")  ## blue shorts
 
 ## Maps Godot input action names → cardinal direction vectors.
 const DIRS: Dictionary = {
@@ -111,26 +114,36 @@ func _process(_delta: float) -> void:
 
 
 func _draw() -> void:
-	# Body centred on cell origin so the rect lands in the 1px gutter.
-	var half: float = PLAYER_SIZE / 2.0
-
 	# Walk bob: when stepping, alternating-foot lift via _step_count parity.
 	# Body lifts 1px on even-numbered steps; stays low on odd ones. Combined
 	# with the position tween it reads as a Pokémon-style 2-frame walk cycle.
-	var bob_y: float = 0.0
+	var bob: float = 0.0
 	if is_stepping and _step_count % 2 == 0:
-		bob_y = -1.0
+		bob = -1.0
 
-	# Body
-	draw_rect(Rect2(-half, -half + bob_y, PLAYER_SIZE, PLAYER_SIZE), PLAYER_COLOR)
+	# Head — 6×6 skin square with hair cap on top
+	draw_rect(Rect2(-3.0, -7.0 + bob, 6.0, 6.0), PLAYER_SKIN)
+	draw_rect(Rect2(-3.0, -7.0 + bob, 6.0, 2.0), PLAYER_HAIR)
 
-	# Facing dot — small dark "eye" 4px towards facing direction. Lives on
-	# the body so it inherits the walk bob.
-	var eye_centre: Vector2 = Vector2(facing) * 4.0 + Vector2(0.0, bob_y)
-	draw_rect(
-		Rect2(eye_centre.x - 1.0, eye_centre.y - 1.0, 2.0, 2.0),
-		Color("#2A1A0A")
-	)
+	# Eyes — pair of dots, biased toward facing.x for left/right look.
+	# When facing up/down, eyes stay centred (1px each side of midline).
+	var face_shift: float = signf(facing.x) * 1.0  # -1, 0, or +1
+	draw_rect(Rect2(-2.0 + face_shift, -4.0 + bob, 1.0, 1.0), Color("#2A1A0A"))
+	draw_rect(Rect2(1.0 + face_shift, -4.0 + bob, 1.0, 1.0), Color("#2A1A0A"))
+
+	# Yellow shirt body — 8×5 rect
+	draw_rect(Rect2(-4.0, -1.0 + bob, 8.0, 5.0), PLAYER_COLOR)
+	# Shirt collar accent — 1px darker strip across the top of the torso
+	draw_rect(Rect2(-4.0, -1.0 + bob, 8.0, 1.0), PLAYER_COLOR.darkened(0.25))
+
+	# Blue shorts — split legs with a 2px gap, alternating "foot lift" matching
+	# the walk-cycle bob (one leg slightly down, the other slightly up).
+	var step_phase: bool = _step_count % 2 == 0 and is_stepping
+	var left_lift: float = 0.0 if not step_phase else -1.0
+	var right_lift: float = 0.0 if step_phase else -1.0
+	draw_rect(Rect2(-3.0, 4.0 + bob + left_lift, 2.0, 3.0 + (1.0 if left_lift == 0.0 else 0.0)), PLAYER_PANTS)
+	draw_rect(Rect2(1.0, 4.0 + bob + right_lift, 2.0, 3.0 + (1.0 if right_lift == 0.0 else 0.0)), PLAYER_PANTS)
+
 	queue_redraw()
 
 # ---------------------------------------------------------------------------

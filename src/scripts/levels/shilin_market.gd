@@ -24,23 +24,28 @@ const VIEWPORT_H: int = 180
 const HOME_CELL: Vector2i = Vector2i(2, 11)
 const MOM_CELL: Vector2i = Vector2i(3, 11)
 
-## Cells reserved for stall NPCs. R-006 spawns StallNPC instances here.
+## Cells reserved for stall NPCs. v0.7 expanded to 7 stalls.
 const STALL_CELLS: Array[Vector2i] = [
 	Vector2i(6, 3),
 	Vector2i(12, 3),
 	Vector2i(18, 3),
 	Vector2i(6, 8),
+	Vector2i(12, 8),
 	Vector2i(18, 8),
+	Vector2i(20, 5),
 ]
 
 ## Per-stall configuration — one entry per STALL_CELLS index.
-## Order matches REQUIRED_INGREDIENTS prices (20/30/40/50/50).
+## Total cheapest 5 = 190; with STARTING_MONEY=180 the player MUST bargain
+## successfully at least once OR pick the cheapest 5 and skip the dearer two.
 const STALL_DATA: Array[Dictionary] = [
 	{"id": "scallion",  "price": 20, "intro": ["新鮮蔥阿，要買嗎？"]},
 	{"id": "egg",       "price": 30, "intro": ["雞蛋一盒30元！"]},
 	{"id": "cabbage",   "price": 40, "intro": ["高麗菜，自家種的！"]},
 	{"id": "chicken",   "price": 50, "intro": ["雞肉新鮮現宰！"]},
 	{"id": "soy_sauce", "price": 50, "intro": ["陳年醬油，一瓶50！"]},
+	{"id": "tofu",      "price": 60, "intro": ["手工嫩豆腐！"]},
+	{"id": "mushroom",  "price": 70, "intro": ["山上採的香菇，補！"]},
 ]
 
 ## Chatter NPC slots — atmospheric world-flavour, no shop.
