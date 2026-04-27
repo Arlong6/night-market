@@ -39,6 +39,7 @@ dist/
 .godot/
 *.translation
 export_presets.cfg
+!src/export_presets.cfg
 # Uncomment if using Godot:
 # *.import
 
