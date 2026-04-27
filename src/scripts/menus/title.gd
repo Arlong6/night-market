@@ -19,6 +19,7 @@ func _ready() -> void:
 	anchor_right = 1.0
 	anchor_bottom = 1.0
 	Game.current_area = "title"
+	Music.stop()  # silent title; market loop kicks in on START
 	_build_ui()
 
 

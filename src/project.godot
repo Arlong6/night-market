@@ -20,6 +20,7 @@ Game="*res://autoloads/game.gd"
 Inventory="*res://autoloads/inventory.gd"
 Dialogue="*res://autoloads/dialogue.gd"
 Sfx="*res://autoloads/sfx.gd"
+Music="*res://autoloads/music.gd"
 
 [display]
 

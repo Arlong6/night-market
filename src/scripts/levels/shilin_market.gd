@@ -135,6 +135,7 @@ func _ready() -> void:
 	_spawn_lanterns()
 	_player.bumped.connect(_on_player_bumped)
 	_player.cell_changed.connect(_on_player_cell_changed)
+	Music.play_market()
 
 
 func _spawn_mom() -> void:

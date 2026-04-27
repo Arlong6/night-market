@@ -40,15 +40,17 @@ func _ready() -> void:
 	for i in POLYPHONY:
 		var p: AudioStreamPlayer = AudioStreamPlayer.new()
 		p.bus = "Master"
-		p.volume_db = -6.0
+		p.volume_db = 6.0   # +6dB headroom — 8-bit retro beeps need to cut through
 		add_child(p)
 		_players.append(p)
-	_bump = _make_tone(110.0, 0.08, "square", 0.6)
-	_pickup = _make_sweep(600.0, 1200.0, 0.12, 0.5)
-	_buy = _make_two_tone(700.0, 1100.0, 0.18, 0.5)
-	_blip = _make_tone(1500.0, 0.012, "square", 0.18)
-	_win = _make_arpeggio([523.25, 659.25, 784.0, 1046.5], 0.10, 0.55)
-	_choice = _make_tone(900.0, 0.04, "sine", 0.35)
+	# Loud, clearly-audible defaults. Each beep is short so peak amp can sit high.
+	_bump = _make_tone(140.0, 0.10, "square", 0.95)
+	_pickup = _make_sweep(500.0, 1400.0, 0.16, 0.85)
+	_buy = _make_two_tone(660.0, 990.0, 0.22, 0.85)
+	_blip = _make_tone(1400.0, 0.018, "square", 0.6)
+	_win = _make_arpeggio([523.25, 659.25, 784.0, 1046.5], 0.13, 0.85)
+	_choice = _make_tone(880.0, 0.05, "square", 0.6)
+	print("[Sfx] ready — 6 streams baked, volume_db=+6")
 
 
 # ---------------------------------------------------------------------------

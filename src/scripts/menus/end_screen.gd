@@ -13,6 +13,7 @@ const VIEWPORT_H: int = 180
 func _ready() -> void:
 	anchor_right = 1.0
 	anchor_bottom = 1.0
+	Music.stop()  # win arpeggio plays from MomNPC; let the silence land here
 	_build_ui()
 	set_process_unhandled_input(true)
 
