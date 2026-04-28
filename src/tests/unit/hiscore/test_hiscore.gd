@@ -58,3 +58,58 @@ func test_hiscore_persists_across_clear_and_reload() -> void:
 	HiScore._load()
 	assert_almost_eq(HiScore.best_time, 90.0, 0.001,
 		"saved record should round-trip via ConfigFile")
+
+
+# ---------------------------------------------------------------------------
+# v0.12 — record_run aggregates best-time + counters
+# ---------------------------------------------------------------------------
+
+func test_hiscore_record_run_increments_total_wins() -> void:
+	HiScore.record_run(60.0, false, true)
+	HiScore.record_run(80.0, false, true)
+	assert_eq(HiScore.total_wins, 2,
+		"every record_run() call should increment total_wins")
+
+
+func test_hiscore_record_run_perfect_increments_perfect_runs() -> void:
+	var result: Dictionary = HiScore.record_run(60.0, true, false)
+	assert_eq(HiScore.perfect_runs, 1)
+	assert_true(result["first_perfect"],
+		"first ever perfect should report first_perfect=true")
+	HiScore.record_run(70.0, true, true)
+	assert_eq(HiScore.perfect_runs, 2)
+
+
+func test_hiscore_record_run_no_bargain_counts_only_when_unused() -> void:
+	HiScore.record_run(60.0, false, true)   # bargained
+	HiScore.record_run(60.0, false, false)  # didn't bargain
+	HiScore.record_run(60.0, false, true)   # bargained
+	assert_eq(HiScore.no_bargain_wins, 1,
+		"only the run with bargained=false should count")
+
+
+func test_hiscore_record_run_returns_new_record_flag() -> void:
+	var first: Dictionary = HiScore.record_run(120.0, false, false)
+	assert_true(first["new_record"], "first run sets a new record")
+	var faster: Dictionary = HiScore.record_run(90.0, false, false)
+	assert_true(faster["new_record"], "faster run sets a new record")
+	var slower: Dictionary = HiScore.record_run(150.0, false, false)
+	assert_false(slower["new_record"], "slower run does NOT")
+
+
+func test_hiscore_has_stats_only_after_first_win() -> void:
+	assert_false(HiScore.has_stats(),
+		"Fresh HiScore should report has_stats() == false")
+	HiScore.record_run(60.0, false, true)
+	assert_true(HiScore.has_stats())
+
+
+func test_hiscore_toggle_mute_flips_and_persists() -> void:
+	assert_false(HiScore.muted, "Pre-condition: muted starts false")
+	var after: bool = HiScore.toggle_mute()
+	assert_true(after, "toggle_mute() should return new state (true)")
+	assert_true(HiScore.muted)
+	# Round-trip through file
+	HiScore.muted = false
+	HiScore._load()
+	assert_true(HiScore.muted, "muted should persist via ConfigFile")

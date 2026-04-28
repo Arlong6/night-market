@@ -82,6 +82,14 @@ func stop() -> void:
 		_player.stop()
 
 
+## v0.12: applied by HiScore on startup + on M-key toggle. Mutes by dropping
+## the bus volume to -80 dB; un-mutes restores VOLUME_DB.
+func set_muted(muted: bool) -> void:
+	if _player == null:
+		return
+	_player.volume_db = -80.0 if muted else VOLUME_DB
+
+
 # ---------------------------------------------------------------------------
 # Internals
 # ---------------------------------------------------------------------------

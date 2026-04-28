@@ -23,6 +23,14 @@ var session_time: float = 0.0
 ## Read by the end screen to show "新紀錄！" badge. Cleared by reset_run().
 var last_run_was_record: bool = false
 
+## v0.12: true iff the most recent successful run bought ALL 7 ingredients
+## (滿漢全席 perfect run). Cleared by reset_run().
+var last_run_perfect: bool = false
+
+## v0.12: number of times the player invoked 殺價 during this run. Used by
+## the no-bargain achievement. Cleared by reset_run().
+var bargain_count: int = 0
+
 # ---------------------------------------------------------------------------
 # Test-mode flag — when true, scene-changing helpers no-op so unit tests
 # can call them without unloading the test harness scene.
@@ -51,6 +59,17 @@ func _process(delta: float) -> void:
 	if current_area == "shilin":
 		session_time += delta
 
+
+## v0.12: M key globally toggles audio mute (Sfx + Music). Handled at
+## autoload level so it works across every scene without per-scene wiring.
+func _unhandled_input(event: InputEvent) -> void:
+	if not (event is InputEventKey):
+		return
+	var ke: InputEventKey = event
+	if ke.pressed and not ke.echo and ke.physical_keycode == KEY_M:
+		HiScore.toggle_mute()
+		get_viewport().set_input_as_handled()
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -74,3 +93,5 @@ func reset_run() -> void:
 	current_area = ""
 	in_dialogue = false
 	last_run_was_record = false
+	last_run_perfect = false
+	bargain_count = 0

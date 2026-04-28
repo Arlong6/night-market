@@ -157,6 +157,7 @@ func _on_choice(index: int) -> void:
 
 func _start_bargain() -> void:
 	_bargained = true
+	Game.bargain_count += 1   # v0.12: tracks for no-bargain achievement
 	# v0.7.1: bumped 50%→60% so the bargain isn't punishing under the new
 	# tighter $180 budget — players need it to close the $10 gap reliably.
 	var success: bool = randf() < 0.6

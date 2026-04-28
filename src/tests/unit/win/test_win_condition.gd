@@ -10,6 +10,9 @@ func _reset() -> void:
 	Game.test_mode = true
 	Game.reset_run()
 	Inventory.reset()
+	# v0.12: mom.on_bumped() now writes to HiScore via record_run; clear so
+	# wins from one test don't leak counters into the next.
+	HiScore.clear()
 
 
 func before_each() -> void:

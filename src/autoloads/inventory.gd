@@ -95,6 +95,12 @@ func has_all_required() -> bool:
 	return has_enough()
 
 
+## v0.12: true iff every single ingredient (all 7) has been bought.
+## Triggers the 滿漢全席 perfect ending branch.
+func has_all() -> bool:
+	return ingredient_count() >= ALL_INGREDIENTS.size()
+
+
 ## Returns owned ingredient ids (in ALL_INGREDIENTS order, not insertion order),
 ## handy for the end-screen ingredient list.
 func owned_ingredients() -> PackedStringArray:

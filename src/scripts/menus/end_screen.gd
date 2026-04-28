@@ -87,6 +87,11 @@ func _build_ui() -> void:
 		"用時 %.1fs" % Game.session_time, 10, Color("#F5EDDA")
 	))
 
+	# v0.12: perfect run takes priority — even bigger badge, gold tint.
+	if Game.last_run_perfect:
+		_add_revealable(vbox, _make_label(
+			"★ 滿漢全席！", 14, Color("#F2A227")
+		))
 	if Game.last_run_was_record:
 		_add_revealable(vbox, _make_label("★ 新紀錄！", 12, Color("#F2A227")))
 	elif HiScore.has_record():

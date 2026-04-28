@@ -30,12 +30,21 @@ func _draw() -> void:
 
 func on_bumped() -> void:
 	if Inventory.has_all_required():
-		var lines: Array[String] = _success_lines_for_time(Game.session_time)
-		# Persist best time BEFORE the level transition so end_screen can read
-		# the freshly-updated record (and detect "new record" via Game.last_run_was_record).
-		Game.last_run_was_record = HiScore.try_record(Game.session_time)
+		var perfect: bool = Inventory.has_all()
+		Game.last_run_perfect = perfect
+		var lines: Array[String]
+		if perfect:
+			lines = _perfect_success_lines()
+		else:
+			lines = _success_lines_for_time(Game.session_time)
+		# Record the run (best time + counters), then set last_run_was_record
+		# so end_screen can show the new-record badge.
+		var bargained: bool = Game.bargain_count > 0
+		var result: Dictionary = HiScore.record_run(
+			Game.session_time, perfect, bargained
+		)
+		Game.last_run_was_record = bool(result.get("new_record", false))
 		Sfx.play_win()
-		# Win path now routes through the kitchen cutscene before end_win.
 		var on_done: Callable = func() -> void: Game.goto_level("kitchen")
 		Dialogue.show(lines, on_done)
 	else:
@@ -58,3 +67,12 @@ func _success_lines_for_time(t: float) -> Array[String]:
 		return ["謝謝你！", "今晚加菜囉～"]
 	else:
 		return ["怎麼這麼久才回來啊？", "餓死我了～加菜吧。"]
+
+
+## v0.12: lines used when the player bought all 7 ingredients — the perfect
+## "滿漢全席" branch.
+func _perfect_success_lines() -> Array[String]:
+	return [
+		"我的天～你全部都買回來了！",
+		"今晚吃滿漢全席囉！",
+	]

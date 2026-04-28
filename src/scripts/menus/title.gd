@@ -29,6 +29,7 @@ const COLOR_ROPE: Color = Color("#3A1A0A")
 var _t: float = 0.0  # accumulator for animations
 var _title_label: Label = null
 var _start_label: Label = null
+var _mute_indicator: Label = null
 
 
 # ---------------------------------------------------------------------------
@@ -54,6 +55,9 @@ func _process(delta: float) -> void:
 	# Start prompt blink: 0.6s on, 0.6s off via floored modulo.
 	if _start_label != null:
 		_start_label.visible = (int(_t * 2.0) % 2) == 0
+	# Mute indicator follows current mute state (M key may flip it any time).
+	if _mute_indicator != null:
+		_mute_indicator.visible = HiScore.muted
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -108,6 +112,15 @@ func _build_ui() -> void:
 		best.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		vbox.add_child(best)
 
+	# v0.12: stats panel — only shows once the player has at least one win.
+	if HiScore.has_stats():
+		var stats_text: String = "通關 %d 次　滿漢全席 %d 次　不殺價 %d 次" % [
+			HiScore.total_wins, HiScore.perfect_runs, HiScore.no_bargain_wins
+		]
+		var stats: Label = _make_label(stats_text, 8, Color("#888888"))
+		stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(stats)
+
 	var spacer2: Control = Control.new()
 	spacer2.custom_minimum_size = Vector2(0, 8)
 	vbox.add_child(spacer2)
@@ -120,12 +133,20 @@ func _build_ui() -> void:
 
 	# Bottom hint pinned at bottom of viewport, NOT in the vbox flow.
 	var hint: Label = _make_label(
-		"方向鍵 移動 　空白鍵 互動 　 試試 殺價 ！", 8, COLOR_HINT
+		"方向鍵 移動 　空白鍵 互動 　M 靜音 　 試試 殺價 ！", 8, COLOR_HINT
 	)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.size = Vector2(VIEWPORT_W, 12)
 	hint.position = Vector2(0, VIEWPORT_H - 14)
 	add_child(hint)
+
+	# Tiny mute indicator pinned top-right, only when muted.
+	_mute_indicator = _make_label("🔇 靜音", 8, Color("#F2A227"))
+	_mute_indicator.position = Vector2(VIEWPORT_W - 50, 4)
+	_mute_indicator.size = Vector2(46, 12)
+	_mute_indicator.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_mute_indicator.visible = HiScore.muted
+	add_child(_mute_indicator)
 
 
 # ---------------------------------------------------------------------------

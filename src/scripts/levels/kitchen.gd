@@ -318,6 +318,9 @@ func _skip_intro() -> void:
 # ---------------------------------------------------------------------------
 
 func _closing_line_for_time(t: float) -> String:
+	# v0.12: perfect runs override the time-tier line with the 滿漢全席 closer.
+	if Game.last_run_perfect:
+		return "滿漢全席！吃飽飽～"
 	if t < 90.0:
 		return "好快！馬上開動～"
 	elif t < 240.0:
@@ -500,23 +503,34 @@ func _draw_table() -> void:
 
 
 func _draw_dish_on_plate() -> void:
-	# Plate (oval-ish via rounded rect approximation)
+	# Plate — perfect runs get a wider gold-rimmed plate to telegraph the
+	# 滿漢全席 ending. Standard plate stays cream/grey.
 	var px: int = TABLE_X
 	var py: int = TABLE_Y - 4
-	# Plate rim
-	draw_rect(Rect2(px - 14, py - 5, 28, 10), COLOR_PLATE_RIM)
-	# Plate face
-	draw_rect(Rect2(px - 13, py - 4, 26, 8), COLOR_PLATE)
-	# Dish — cluster of ingredient-colored dots representing the cooked food
+	var perfect: bool = Game.last_run_perfect
+	if perfect:
+		# Gold rim, slightly larger
+		draw_rect(Rect2(px - 18, py - 6, 36, 12), Color("#F2A227"))
+		draw_rect(Rect2(px - 17, py - 5, 34, 10), COLOR_PLATE)
+	else:
+		draw_rect(Rect2(px - 14, py - 5, 28, 10), COLOR_PLATE_RIM)
+		draw_rect(Rect2(px - 13, py - 4, 26, 8), COLOR_PLATE)
+	# Dish — cluster of ingredient-colored chips. Perfect run shows all 7
+	# in a 4+3 layout; standard shows up to 6 in a 3×2.
 	var owned: PackedStringArray = Inventory.owned_ingredients()
-	# Lay out up to 6 ingredient chips in a compact 3×2 grid on the plate
-	for i in mini(owned.size(), 6):
-		var col: int = i % 3
-		var row: int = i / 3
-		var dx: float = float(px) - 7.0 + float(col) * 5.0
+	var per_row: int = 4 if perfect else 3
+	var max_chips: int = 7 if perfect else 6
+	for i in mini(owned.size(), max_chips):
+		var col: int = i % per_row
+		var row: int = i / per_row
+		var dx_off: float = -float(per_row - 1) * 2.5
+		var dx: float = float(px) + dx_off + float(col) * 5.0
 		var dy: float = float(py) - 2.0 + float(row) * 4.0
 		var c: Color = FOOD_COLOR.get(owned[i], Color.WHITE)
 		draw_rect(Rect2(dx, dy, 3, 3), c)
+	# Perfect runs get a single ★ pixel sitting above the plate
+	if perfect:
+		draw_rect(Rect2(px - 1, py - 9, 2, 2), Color("#F2A227"))
 
 
 func _draw_stir_meter() -> void:
