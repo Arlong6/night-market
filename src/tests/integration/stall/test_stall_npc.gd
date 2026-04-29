@@ -8,6 +8,9 @@ func _reset() -> void:
 	Dialogue._active = false
 	Game.in_dialogue = false
 	Inventory.reset()
+	# v0.20: stall buys mutate HiScore.purchase_count + the loyalty-tier
+	# greeting on subsequent visits. Clear so each test sees tier 0.
+	HiScore.clear()
 
 
 func before_each() -> void:

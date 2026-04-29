@@ -147,3 +147,51 @@ func test_hiscore_clear_resets_day_to_one() -> void:
 	HiScore.clear()
 	assert_eq(HiScore.day, 1,
 		"clear() should reset the day counter to 1")
+
+
+# ---------------------------------------------------------------------------
+# v0.20 — vendor loyalty / purchase counts
+# ---------------------------------------------------------------------------
+
+func test_hiscore_purchase_count_starts_at_zero() -> void:
+	assert_eq(HiScore.purchase_count("chicken"), 0,
+		"purchase_count should default to 0 for unknown ingredients")
+
+
+func test_hiscore_record_purchase_increments_count() -> void:
+	HiScore.record_purchase("chicken")
+	HiScore.record_purchase("chicken")
+	HiScore.record_purchase("chicken")
+	assert_eq(HiScore.purchase_count("chicken"), 3,
+		"3 record_purchase calls should yield count = 3")
+
+
+func test_hiscore_record_purchase_isolates_per_ingredient() -> void:
+	HiScore.record_purchase("chicken")
+	HiScore.record_purchase("egg")
+	HiScore.record_purchase("egg")
+	assert_eq(HiScore.purchase_count("chicken"), 1)
+	assert_eq(HiScore.purchase_count("egg"), 2)
+	assert_eq(HiScore.purchase_count("scallion"), 0,
+		"untouched ingredients should remain at 0")
+
+
+func test_hiscore_vendor_purchases_persist_via_config_file() -> void:
+	HiScore.record_purchase("chicken")
+	HiScore.record_purchase("chicken")
+	HiScore.record_purchase("egg")
+	# Wipe in-memory and reload
+	HiScore.vendor_purchases = {}
+	HiScore._load()
+	assert_eq(HiScore.purchase_count("chicken"), 2,
+		"vendor_purchases should round-trip via the ConfigFile")
+	assert_eq(HiScore.purchase_count("egg"), 1)
+
+
+func test_hiscore_clear_wipes_vendor_purchases() -> void:
+	HiScore.record_purchase("chicken")
+	HiScore.record_purchase("egg")
+	HiScore.clear()
+	assert_eq(HiScore.purchase_count("chicken"), 0,
+		"clear() should drop loyalty counts to 0")
+	assert_eq(HiScore.purchase_count("egg"), 0)

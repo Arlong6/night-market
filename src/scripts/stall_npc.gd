@@ -33,6 +33,29 @@ extends NPC
 var _bargained: bool = false
 
 # ---------------------------------------------------------------------------
+# v0.20 — vendor loyalty (across runs)
+# ---------------------------------------------------------------------------
+
+## Loyalty thresholds — `purchase_count >= threshold` selects this tier.
+## Tier 0 = stranger, tier 3 = old friend. Discount is multiplicative on top
+## of the per-run `discount` and any bargain result.
+const LOYALTY_THRESHOLDS: PackedInt32Array = [0, 1, 3, 6]
+const LOYALTY_DISCOUNTS: PackedFloat32Array = [1.0, 0.95, 0.90, 0.85]
+
+## Greeting line per tier — overrides the configured intro_lines on bump
+## when the player has visited before. Tier 0 falls through to intro_lines.
+const LOYALTY_GREETINGS: Array[String] = [
+	"",                       # 0 — first visit, use intro_lines
+	"啊，上次來過齁～",        # 1 — recognised
+	"又是你～小弟弟。",        # 2 — semi-regular
+	"老朋友來啦！算你便宜～",  # 3 — regular
+]
+
+## Color of the heart marker that floats above stalls where the player
+## hits tier ≥ 1 — small visual cue that this stall remembers them.
+const COLOR_LOYALTY_HEART: Color = Color("#F2A227")
+
+# ---------------------------------------------------------------------------
 # Constants — visual identity
 # ---------------------------------------------------------------------------
 
@@ -105,6 +128,18 @@ func _draw() -> void:
 		# Diagonal strikethrough — a 2-pixel line across the icon.
 		draw_rect(Rect2(-2.0, icon_y + 1.0, 4.0, 1.0), Color("#2A1A0A"))
 
+	# v0.20: regulars get a small heart sitting above the awning so the
+	# player can see at a glance which stalls remember them. Heart bobs
+	# in time with the awning so it looks attached.
+	var tier: int = _loyalty_tier()
+	if tier >= 1:
+		var heart_y: float = awning_y - 4.0
+		# 3-pixel stylised heart — two top dots + a bottom point
+		draw_rect(Rect2(-2.0, heart_y, 1.0, 1.0), COLOR_LOYALTY_HEART)
+		draw_rect(Rect2(0.0, heart_y, 1.0, 1.0), COLOR_LOYALTY_HEART)
+		draw_rect(Rect2(-2.0, heart_y + 1.0, 3.0, 1.0), COLOR_LOYALTY_HEART)
+		draw_rect(Rect2(-1.0, heart_y + 2.0, 1.0, 1.0), COLOR_LOYALTY_HEART)
+
 
 # ---------------------------------------------------------------------------
 # Bump handler
@@ -114,9 +149,44 @@ func on_bumped() -> void:
 	if _sold:
 		Dialogue.show(sold_out_lines)
 		return
-	# Show intro then chain into the buy choice via on_done callback.
+	# v0.20: regulars get a personalised greeting before the buy prompt
+	# instead of the generic intro_lines.
+	var greeting_lines: Array[String] = _greeting_lines_for_tier(_loyalty_tier())
 	var on_intro_done: Callable = func() -> void: _open_buy_choice()
-	Dialogue.show(intro_lines, on_intro_done)
+	Dialogue.show(greeting_lines, on_intro_done)
+
+
+## v0.20: maps the current cross-run purchase count to one of 4 loyalty tiers.
+## Tier 0 = first visit, tier 3 = old friend. Used for both greeting and
+## discount selection.
+func _loyalty_tier() -> int:
+	var count: int = HiScore.purchase_count(ingredient_id)
+	var tier: int = 0
+	for i in LOYALTY_THRESHOLDS.size():
+		if count >= LOYALTY_THRESHOLDS[i]:
+			tier = i
+	return tier
+
+
+## v0.20: multiplier applied on top of `discount` and bargain results so
+## the regular keeps getting a small extra cut off the listed price.
+func _loyalty_discount() -> float:
+	var tier: int = _loyalty_tier()
+	if tier < LOYALTY_DISCOUNTS.size():
+		return LOYALTY_DISCOUNTS[tier]
+	return 1.0
+
+
+## Returns the dialogue lines used as the bump intro for the current
+## loyalty tier. Tier 0 falls through to the configured intro_lines.
+func _greeting_lines_for_tier(tier: int) -> Array[String]:
+	if tier <= 0 or tier >= LOYALTY_GREETINGS.size():
+		return intro_lines
+	var line: String = LOYALTY_GREETINGS[tier]
+	if line.is_empty():
+		return intro_lines
+	var out: Array[String] = [line]
+	return out
 
 
 func _open_buy_choice() -> void:
@@ -137,9 +207,11 @@ func _open_buy_choice() -> void:
 	Dialogue.ask_choice(question, options, _on_choice)
 
 
-## Current price after the discount multiplier (rounded to integer NT$).
+## Current price after the discount + loyalty multipliers (rounded to NT$).
+## v0.20: loyalty discount stacks multiplicatively on top of `discount`
+## (which itself stacks the daily-special slot + any bargain success).
 func effective_price() -> int:
-	return int(roundf(float(price) * discount))
+	return int(roundf(float(price) * discount * _loyalty_discount()))
 
 
 func _on_choice(index: int) -> void:
@@ -190,6 +262,8 @@ func _attempt_buy() -> void:
 		_sold = true
 		_spawn_sparkle()
 		Sfx.play_buy()
+		# v0.20: bump the cross-run loyalty count for this vendor.
+		HiScore.record_purchase(ingredient_id)
 		Dialogue.show(["好喔，多謝！"])
 
 

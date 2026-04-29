@@ -24,6 +24,7 @@ const KEY_PERFECT: String = "perfect_runs"
 const KEY_NO_BARGAIN: String = "no_bargain_wins"
 const KEY_MUTED: String = "muted"
 const KEY_DAY: String = "day"
+const KEY_VENDOR_PURCHASES: String = "vendor_purchases"
 
 ## Sentinel for "no record yet" — easier than a separate Optional flag.
 const NO_RECORD: float = INF
@@ -43,6 +44,11 @@ var muted: bool = false
 ## day so the player gets to retry. Drives the daily-theme rotation in
 ## Inventory.current_theme().
 var day: int = 1
+
+## v0.20: how many times the player has bought from the vendor selling each
+## ingredient. Drives the loyalty-tier greeting + discount in StallNPC.
+## Persists via ConfigFile alongside the other counters.
+var vendor_purchases: Dictionary[String, int] = {}
 
 # ---------------------------------------------------------------------------
 # Lifecycle
@@ -135,6 +141,20 @@ func has_stats() -> bool:
 # Public API — mute preference
 # ---------------------------------------------------------------------------
 
+## v0.20: increments the loyalty count for the named ingredient and saves.
+## Called by StallNPC after a successful purchase.
+func record_purchase(ingredient_id: String) -> void:
+	var prev: int = vendor_purchases.get(ingredient_id, 0)
+	vendor_purchases[ingredient_id] = prev + 1
+	_save()
+
+
+## v0.20: how many times the player has bought this ingredient across all
+## runs. 0 if never. Used to derive the vendor-loyalty tier.
+func purchase_count(ingredient_id: String) -> int:
+	return vendor_purchases.get(ingredient_id, 0)
+
+
 ## Toggles the global mute flag, persists, and pushes the change to Sfx + Music.
 func toggle_mute() -> bool:
 	muted = not muted
@@ -158,7 +178,8 @@ func _apply_mute() -> void:
 # Test helpers
 # ---------------------------------------------------------------------------
 
-## Wipes ALL state (record + counters + mute + day) and the on-disk file.
+## Wipes ALL state (record + counters + mute + day + loyalty) and the
+## on-disk file.
 func clear() -> void:
 	best_time = NO_RECORD
 	total_wins = 0
@@ -166,6 +187,7 @@ func clear() -> void:
 	no_bargain_wins = 0
 	muted = false
 	day = 1
+	vendor_purchases = {}
 	if FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 
@@ -188,6 +210,12 @@ func _load() -> void:
 	no_bargain_wins = int(cfg.get_value(SECTION, KEY_NO_BARGAIN, 0))
 	muted = bool(cfg.get_value(SECTION, KEY_MUTED, false))
 	day = maxi(1, int(cfg.get_value(SECTION, KEY_DAY, 1)))
+	# v0.20: loyalty counts come back as a generic Dictionary; cast each
+	# value back to int so consumers can rely on the typed get_int_default.
+	vendor_purchases = {}
+	var raw: Dictionary = cfg.get_value(SECTION, KEY_VENDOR_PURCHASES, {})
+	for k in raw.keys():
+		vendor_purchases[String(k)] = int(raw[k])
 	# Push restored mute state to audio autoloads on next frame so they have
 	# finished their own _ready (autoload init order may not guarantee it).
 	call_deferred("_apply_mute")
@@ -201,6 +229,7 @@ func _save() -> void:
 	cfg.set_value(SECTION, KEY_NO_BARGAIN, no_bargain_wins)
 	cfg.set_value(SECTION, KEY_MUTED, muted)
 	cfg.set_value(SECTION, KEY_DAY, day)
+	cfg.set_value(SECTION, KEY_VENDOR_PURCHASES, vendor_purchases)
 	var err: Error = cfg.save(SAVE_PATH)
 	if err != OK:
 		push_warning("[HiScore] save failed (err=%d)" % err)

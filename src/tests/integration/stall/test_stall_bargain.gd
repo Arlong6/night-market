@@ -8,6 +8,10 @@ func _reset() -> void:
 	Dialogue._active = false
 	Game.in_dialogue = false
 	Inventory.reset()
+	# v0.20: stall buys now bump HiScore.purchase_count, which mutates
+	# effective_price via the loyalty discount. Clear so each bargain test
+	# sees a fresh "stranger tier 0 = full price" baseline.
+	HiScore.clear()
 
 
 func before_each() -> void:
