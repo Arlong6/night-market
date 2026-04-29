@@ -32,6 +32,19 @@ func _make_mom() -> MomNPC:
 	return mom
 
 
+## v0.14.1: bumping mum opens a "煮嗎？" choice prompt before the cook flow.
+## Test helper that walks past the prompt by selecting `option_index`.
+## option_index 0 = 是 (commit), 1 = 否 (cancel).
+func _confirm_mom_choice(option_index: int) -> void:
+	# Snap the typewriter so the option list is visible
+	Dialogue._box._advance()
+	# Pick the requested option (default _option_index is 0 = 是)
+	Dialogue._box._option_index = option_index
+	# Confirm
+	Dialogue._box._advance()
+	await get_tree().process_frame
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -51,6 +64,8 @@ func test_mom_bump_with_all_ingredients_triggers_win() -> void:
 	var mom: MomNPC = await _make_mom()
 	mom.on_bumped()
 	await get_tree().process_frame
+	# v0.14.1: confirm the "回家煮嗎？" prompt with 是.
+	await _confirm_mom_choice(0)
 
 	# Mom shows 2 success lines based on session_time bucket; advance 4 times
 	# (snap1, next, snap2, close → on_done → goto_level).
@@ -83,6 +98,8 @@ func test_mom_bump_without_all_ingredients_routes_to_kitchen_messy() -> void:
 	var mom: MomNPC = await _make_mom()
 	mom.on_bumped()
 	await get_tree().process_frame
+	# v0.14.1: confirm the "現在就回家嗎？" prompt with 是.
+	await _confirm_mom_choice(0)
 	# Walk through the 2 incomplete lines (snap1, next, snap2, close + on_done).
 	Dialogue._box._advance()
 	Dialogue._box._advance()
@@ -106,6 +123,29 @@ func test_mom_bump_incomplete_shows_dialogue() -> void:
 	await get_tree().process_frame
 	assert_true(Dialogue.is_active(),
 		"Bumping mum with no ingredients should show a dialogue")
+
+
+func test_mom_bump_choice_no_keeps_player_in_market() -> void:
+	# v0.14.1: selecting 否 at the "回家煮嗎？" prompt should NOT change the
+	# scene and should NOT mutate any run flags. Player keeps shopping.
+	Inventory.required_ingredients = PackedStringArray([
+		"scallion", "egg", "cabbage", "chicken", "soy_sauce"
+	])
+	# Set up an arbitrary "in market" current_area so we can detect a change.
+	Game.current_area = "shilin"
+
+	var mom: MomNPC = await _make_mom()
+	mom.on_bumped()
+	await get_tree().process_frame
+	# Confirm the "現在就回家嗎？" prompt with 否 (index 1).
+	await _confirm_mom_choice(1)
+
+	assert_eq(Game.current_area, "shilin",
+		"Choosing 否 should NOT route away from the market — got '%s'" % Game.current_area)
+	assert_false(Game.last_run_incomplete,
+		"Choosing 否 should NOT flip last_run_incomplete")
+	assert_false(Dialogue.is_active(),
+		"Dialogue should be closed after the cancel choice")
 
 
 func test_mom_bump_complete_clears_incomplete_flag() -> void:

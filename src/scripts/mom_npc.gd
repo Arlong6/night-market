@@ -28,34 +28,58 @@ func _draw() -> void:
 	draw_rect(Rect2(-2.0, -8.0 + bob, 4.0, 2.0), COLOR_MOM_HAIR)
 
 
+## v0.14.1: bumping mum opens a "確定要回家煮嗎？" yes/no first instead of
+## immediately committing. Walking past mum by accident no longer ends the
+## run — only confirming with 是 does.
 func on_bumped() -> void:
+	var question: String
 	if Inventory.has_all_required():
-		var perfect: bool = Inventory.has_all()
-		Game.last_run_perfect = perfect
-		var lines: Array[String]
-		if perfect:
-			lines = _perfect_success_lines()
-		else:
-			lines = _success_lines_for_time(Game.session_time)
-		# Record the run (best time + counters), then set last_run_was_record
-		# so end_screen can show the new-record badge.
-		var bargained: bool = Game.bargain_count > 0
-		var result: Dictionary = HiScore.record_run(
-			Game.session_time, perfect, bargained
-		)
-		Game.last_run_was_record = bool(result.get("new_record", false))
-		Sfx.play_win()
-		var on_done: Callable = func() -> void: Game.goto_level("kitchen")
-		Dialogue.show(lines, on_done)
+		question = "都買齊了！要回家煮飯嗎？"
 	else:
-		# v0.14: kid bumps mum without all required ingredients — sympathetic
-		# "湊合著煮吧" route. Still cooks (so the player gets a payoff) but
-		# the run is flagged incomplete and HiScore is NOT touched.
-		Game.last_run_incomplete = true
-		Game.last_run_perfect = false
-		Game.last_run_was_record = false
-		var on_done: Callable = func() -> void: Game.goto_level("kitchen")
-		Dialogue.show(_incomplete_lines(), on_done)
+		var missing: int = Inventory.required_ingredients.size() - Inventory.required_owned_count()
+		question = "還差 %d 樣⋯現在就回家嗎？" % missing
+	Dialogue.ask_choice(question, ["是", "否"], _on_confirm_cook)
+
+
+## Choice handler for the "回家煮嗎？" prompt. 0 = 是 → commit to ending the
+## run via the matching cook flow. Any other index = 否 → no state change,
+## the player keeps shopping.
+func _on_confirm_cook(index: int) -> void:
+	if index != 0:
+		return
+	if Inventory.has_all_required():
+		_do_complete_flow()
+	else:
+		_do_incomplete_flow()
+
+
+## v0.14.1 (extracted): full / perfect win flow. Records the run, sets the
+## end-screen flags, then plays mum's success lines on the way to kitchen.
+func _do_complete_flow() -> void:
+	var perfect: bool = Inventory.has_all()
+	Game.last_run_perfect = perfect
+	var lines: Array[String] = (
+		_perfect_success_lines() if perfect
+		else _success_lines_for_time(Game.session_time)
+	)
+	var bargained: bool = Game.bargain_count > 0
+	var result: Dictionary = HiScore.record_run(
+		Game.session_time, perfect, bargained
+	)
+	Game.last_run_was_record = bool(result.get("new_record", false))
+	Sfx.play_win()
+	var on_done: Callable = func() -> void: Game.goto_level("kitchen")
+	Dialogue.show(lines, on_done)
+
+
+## v0.14.1 (extracted): "湊合著煮吧" path. Flags the run incomplete so the
+## kitchen + end screen pick the messy variant; HiScore is NOT touched.
+func _do_incomplete_flow() -> void:
+	Game.last_run_incomplete = true
+	Game.last_run_perfect = false
+	Game.last_run_was_record = false
+	var on_done: Callable = func() -> void: Game.goto_level("kitchen")
+	Dialogue.show(_incomplete_lines(), on_done)
 
 
 ## v0.14: lines used when kid comes home without the full required-list.
