@@ -61,14 +61,60 @@ const COLOR_LOYALTY_HEART: Color = Color("#F2A227")
 
 const COLOR_STALL_BODY: Color = Color("#D94F2B")  ## stall red (vendor)
 const COLOR_STALL_TOP: Color = Color("#F2A227")   ## food highlight stripe
+
+## Default awning stripes — used when an ingredient has no entry in
+## AWNING_PALETTE. Match the original v0.5 chicken stall.
 const COLOR_AWNING_A: Color = Color("#C2241A")    ## awning stripe — deep red
 const COLOR_AWNING_B: Color = Color("#F5EDDA")    ## awning stripe — cream
+
+## v0.26: per-ingredient awning palette so the market reads as variety,
+## not "rows of red boxes". Each entry is [stripe_a, stripe_b]; stripe_a
+## is the heavier / saturated one, stripe_b the lighter alternate. Picked
+## to evoke each ingredient's identity (e.g. tofu = cream + grey, chicken
+## = red + amber, soy_sauce = dark brown + amber).
+const AWNING_PALETTE: Dictionary = {
+	"chicken":   [Color("#C2241A"), Color("#F5EDDA")],  # red + cream (signature)
+	"egg":       [Color("#F2A227"), Color("#FFE9B0")],  # amber + pale yolk
+	"scallion":  [Color("#3A6A2A"), Color("#C8E66D")],  # forest + scallion-green
+	"cabbage":   [Color("#5A8030"), Color("#B8E890")],  # mid-green + leaf-light
+	"tofu":      [Color("#888888"), Color("#F5EDDA")],  # grey + cream (clean)
+	"soy_sauce": [Color("#3A1A0A"), Color("#F2A227")],  # dark brown + amber
+	"mushroom":  [Color("#5A3018"), Color("#A06A4A")],  # mushroom dark + tan
+}
+
+# ---------------------------------------------------------------------------
+# v0.26 — hanging price tag
+# ---------------------------------------------------------------------------
+
+const COLOR_TAG_BG: Color = Color("#F5EDDA")        ## tag cream
+const COLOR_TAG_BORDER: Color = Color("#3A1A0A")    ## tag border ink
+const COLOR_TAG_TEXT: Color = Color("#3A1A0A")      ## price text ink
+const COLOR_TAG_SOLD_BG: Color = Color("#5A4030")   ## tag faded brown when sold
+const COLOR_TAG_SOLD_TEXT: Color = Color("#888888") ## sold text grey
+
+const TAG_WIDTH: int = 18
+const TAG_HEIGHT: int = 9
 
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
 
 var _sold: bool = false
+
+## Cached CJK font for the price-tag draw call. Loaded once in _ready so
+## `_draw` doesn't pay the load cost every frame. Test mode skips load.
+var _tag_font: FontFile = null
+
+
+func _ready() -> void:
+	super._ready()
+	if not Game.test_mode:
+		_tag_font = load("res://assets/fonts/jf-openhuninn-2.1.ttf") as FontFile
+		if _tag_font != null:
+			_tag_font.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
+			_tag_font.subpixel_positioning = (
+				TextServer.SUBPIXEL_POSITIONING_DISABLED
+			)
 
 # ---------------------------------------------------------------------------
 # Override draw — stall body + 2px gold top stripe
@@ -102,12 +148,16 @@ func _draw() -> void:
 	draw_rect(Rect2(-half + 1.0, 4.0 + bob_y, NPC_SIZE - 2.0, 1.0),
 		COLOR_STALL_BODY.lightened(0.2))
 
-	# Awning — 2 angled cream/red stripes hovering above the stall, evoking
+	# Awning — 2 angled striped panels hovering above the stall, evoking the
 	# canvas-tarp covers you'd see at every Taiwan night-market booth.
+	# v0.26: stripe pair varies per ingredient via AWNING_PALETTE.
 	var awning_y: float = -half - 4.0 + bob_y
+	var palette: Array = _awning_palette()
+	var stripe_a: Color = palette[0]
+	var stripe_b: Color = palette[1]
 	for i in 4:
 		var x: float = -half + float(i) * 4.0
-		var c: Color = COLOR_AWNING_A if i % 2 == 0 else COLOR_AWNING_B
+		var c: Color = stripe_a if i % 2 == 0 else stripe_b
 		draw_rect(Rect2(x, awning_y, 4.0, 2.0), c)
 	# Awning bottom hem — 1px dark line for definition
 	draw_rect(Rect2(-half, awning_y + 2.0, NPC_SIZE, 1.0), Color("#2A1A0A"))
@@ -127,6 +177,11 @@ func _draw() -> void:
 	if _sold:
 		# Diagonal strikethrough — a 2-pixel line across the icon.
 		draw_rect(Rect2(-2.0, icon_y + 1.0, 4.0, 1.0), Color("#2A1A0A"))
+
+	# v0.26: hanging price tag mounted on the lower half of the counter.
+	# Reads NT$XX while available, "完售" + brown bg once sold. Drawn after
+	# the body so it occludes the wood-grain stripe.
+	_draw_price_tag(bob_y)
 
 	# v0.20: regulars get a small heart sitting above the awning so the
 	# player can see at a glance which stalls remember them. Heart bobs
@@ -297,6 +352,47 @@ func _attempt_buy() -> void:
 		# v0.20: bump the cross-run loyalty count for this vendor.
 		HiScore.record_purchase(ingredient_id)
 		Dialogue.show(["好喔，多謝！"])
+
+
+## v0.26: returns this stall's awning stripe pair as [stripe_a, stripe_b].
+## Falls back to the default red+cream when ingredient_id has no entry —
+## defensive against unknown IDs.
+func _awning_palette() -> Array:
+	if AWNING_PALETTE.has(ingredient_id):
+		return AWNING_PALETTE[ingredient_id]
+	return [COLOR_AWNING_A, COLOR_AWNING_B]
+
+
+## v0.26: hanging price-tag draw. Mounts on the bottom half of the counter
+## with the current effective price, swaps to "完售" once `_sold` flips.
+## Skips the text in test_mode (font isn't loaded then) so headless tests
+## don't pay for the draw_string call.
+func _draw_price_tag(bob_y: float) -> void:
+	var tag_w: float = float(TAG_WIDTH)
+	var tag_h: float = float(TAG_HEIGHT)
+	var tag_x: float = -tag_w * 0.5
+	var tag_y: float = 0.0 + bob_y
+	var bg: Color = COLOR_TAG_SOLD_BG if _sold else COLOR_TAG_BG
+	# Border (1px ink frame around the tag)
+	draw_rect(Rect2(tag_x - 1.0, tag_y - 1.0, tag_w + 2.0, tag_h + 2.0),
+		COLOR_TAG_BORDER)
+	# Tag body
+	draw_rect(Rect2(tag_x, tag_y, tag_w, tag_h), bg)
+	# Mounting nails — two 1×1 dots on the corners for a hand-painted feel
+	draw_rect(Rect2(tag_x + 1.0, tag_y + 1.0, 1.0, 1.0), COLOR_TAG_BORDER)
+	draw_rect(Rect2(tag_x + tag_w - 2.0, tag_y + 1.0, 1.0, 1.0), COLOR_TAG_BORDER)
+	# Text — centred horizontally; vertical alignment via baseline at tag bottom
+	if _tag_font == null:
+		return
+	var text: String = "完售" if _sold else "NT$%d" % effective_price()
+	var text_color: Color = COLOR_TAG_SOLD_TEXT if _sold else COLOR_TAG_TEXT
+	draw_string(_tag_font,
+		Vector2(tag_x, tag_y + tag_h - 1.0),
+		text,
+		HORIZONTAL_ALIGNMENT_CENTER,
+		tag_w,
+		7,
+		text_color)
 
 
 ## Spawns a 6-particle gold burst at this stall's position. Particles are
