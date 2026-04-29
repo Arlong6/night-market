@@ -113,6 +113,19 @@ const FLAVOR_LINE: Dictionary = {
 	"mushroom":  "香菇！增添香氣。",
 }
 
+## v0.25: per-dish closing line. Mum recognises the dish on the plate and
+## reacts. Falls through to the time-tier line when the recipe set is empty
+## (messy run) or mum has nothing to say about the dish.
+const DISH_PRAISE: Dictionary = {
+	"三杯雞":         "三杯雞！我最愛這個～香！",
+	"醬油雞":         "醬油雞色香味俱全～",
+	"蔥蛋":           "蔥蛋金黃酥脆～配飯一級棒！",
+	"香菇炒蛋":       "香菇炒蛋香氣四溢！",
+	"紅燒豆腐":       "紅燒豆腐入味好下飯～",
+	"豆腐高麗菜湯":   "湯頭清甜，喝一口暖呼呼～",
+	"清炒高麗菜":     "清炒高麗菜爽口！剛好。",
+}
+
 # ---------------------------------------------------------------------------
 # State machine
 # ---------------------------------------------------------------------------
@@ -214,8 +227,16 @@ func _run_sequence() -> void:
 	# v0.24: cookbook journal — every dish that landed on the plate this run
 	# permanently unlocks (and increments) in HiScore. Done at PLATE start so
 	# the entry exists before the closing line / end_win.
+	# v0.25: capture first-time unlocks BEFORE recording so cook_count==0 still
+	# reads true. Stored on Game so end_screen + closing line can react.
+	var new_dishes: PackedStringArray = PackedStringArray()
 	for d in Inventory.cooked_dishes():
+		if HiScore.cook_count(d) == 0:
+			new_dishes.append(d)
 		HiScore.record_cooked_dish(d)
+	Game.last_run_new_dishes = new_dishes
+	if not new_dishes.is_empty():
+		_pop_new_dish_celebration()
 	if Dialogue._active and Dialogue._box != null:
 		Dialogue._box._close()
 	Dialogue.show(["完成！上桌囉～"])
@@ -365,14 +386,45 @@ func _closing_line_for_time(t: float) -> String:
 	# mum's closer reflects "made do" rather than praise.
 	if Game.last_run_incomplete:
 		return "勉強OK啦…下次認真點～"
+	# v0.25: first-time-ever dish unlock takes priority — the moment is rare
+	# and worth telegraphing. Two new dishes get a plural celebration line.
+	var new_dishes: PackedStringArray = Game.last_run_new_dishes
+	if new_dishes.size() == 1:
+		return "哇！第一次吃到 %s ～" % new_dishes[0]
+	if new_dishes.size() >= 2:
+		return "哇！%s 都是第一次！" % "、".join(new_dishes)
 	# v0.12: perfect runs override the time-tier line with the 滿漢全席 closer.
 	if Game.last_run_perfect:
 		return "滿漢全席！吃飽飽～"
+	# v0.25: when only one dish was cooked and mum knows it, give her the
+	# dish-specific reaction. (Multi-dish runs fall through to the time tier
+	# so mum doesn't gush about every plate.)
+	var dishes: PackedStringArray = Inventory.cooked_dishes()
+	if dishes.size() == 1 and DISH_PRAISE.has(dishes[0]):
+		return DISH_PRAISE[dishes[0]]
 	if t < 90.0:
 		return "好快！馬上開動～"
 	elif t < 240.0:
 		return "好菜上桌囉～"
 	return "等你好久了～開飯！"
+
+
+## v0.25: extra particle burst over the plate when a new dish unlocks.
+## Brighter + more particles than the regular per-ingredient sparkle so the
+## moment feels distinctive. Called at PLATE stage start.
+func _pop_new_dish_celebration() -> void:
+	var burst: ParticleBurst = ParticleBurst.new()
+	burst.position = Vector2(TABLE_X, TABLE_Y - 8)
+	burst.count = 16
+	burst.color = Color("#F2A227")
+	burst.speed_min = 35.0
+	burst.speed_max = 90.0
+	burst.particle_size = 2.0
+	burst.lifetime = 0.8
+	burst.gravity_scale = 0.3
+	burst.upward_bias = 0.5
+	add_child(burst)
+	Sfx.play_pickup()
 
 
 # ---------------------------------------------------------------------------

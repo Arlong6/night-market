@@ -36,6 +36,12 @@ var bargain_count: int = 0
 ## the kitchen and suppresses HiScore recording. Cleared by reset_run().
 var last_run_incomplete: bool = false
 
+## v0.25: dishes the player cooked for the first time ever during this run.
+## Populated in kitchen at PLATE stage by checking HiScore.cook_count BEFORE
+## recording. Drives celebration lines + the end screen "新解鎖" badge.
+## Cleared by reset_run().
+var last_run_new_dishes: PackedStringArray = PackedStringArray()
+
 # ---------------------------------------------------------------------------
 # Test-mode flag — when true, scene-changing helpers no-op so unit tests
 # can call them without unloading the test harness scene.
@@ -120,3 +126,4 @@ func reset_run() -> void:
 	last_run_perfect = false
 	last_run_incomplete = false
 	bargain_count = 0
+	last_run_new_dishes = PackedStringArray()

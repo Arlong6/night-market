@@ -91,6 +91,16 @@ func _build_ui() -> void:
 		dish_text = "今晚的料理：" + "、".join(dishes)
 	_add_revealable(vbox, _make_label(dish_text, 9, Color("#F2A227")))
 
+	# v0.25: any first-time dish unlocks this run get a celebration row right
+	# below the dish list. Gold tint + ★ marker so it pops against the regular
+	# stats. Multi-unlocks join with 、 — usually just one but a perfect run
+	# from a fresh save can stack several.
+	if not Game.last_run_new_dishes.is_empty():
+		var unlock_text: String = "★ 新料理解鎖：" + "、".join(
+			Game.last_run_new_dishes
+		)
+		_add_revealable(vbox, _make_label(unlock_text, 10, Color("#F2A227")))
+
 	# Money remaining (bounce-tweened from 0 to actual value when revealed).
 	var money: Label = _make_label("剩 $0", 12, Color("#F2A227"))
 	_add_revealable(vbox, money)

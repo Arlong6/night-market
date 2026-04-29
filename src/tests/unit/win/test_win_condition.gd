@@ -188,6 +188,18 @@ func test_reset_run_zeroes_session_time() -> void:
 	assert_false(Game.in_dialogue)
 
 
+func test_reset_run_clears_last_run_new_dishes() -> void:
+	# Arrange — populate v0.25 new-dish field
+	Game.last_run_new_dishes = PackedStringArray(["三杯雞", "蔥蛋"])
+
+	# Act
+	Game.reset_run()
+
+	# Assert
+	assert_eq(Game.last_run_new_dishes.size(), 0,
+		"reset_run() should empty last_run_new_dishes")
+
+
 func test_goto_level_unknown_key_is_safe() -> void:
 	# Should not crash; should not change current_area.
 	Game.current_area = "title"
