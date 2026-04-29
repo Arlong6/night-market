@@ -74,6 +74,60 @@ const RECIPES: Array[Dictionary] = [
 ## v0.15: cap the dish list shown in UI so a perfect run doesn't overflow.
 const MAX_DISHES_DISPLAYED: int = 3
 
+## v0.19: 7-day themed week. Each entry constrains how the random required
+## list is generated for that day — `must_include` ingredients are forced
+## into the list, `size` controls how many entries the list has total.
+##
+## Day-of-week is derived from `HiScore.day`: ((day - 1) % 7) → index here.
+##   index 0 = Mon (家常日)
+##   index 1 = Tue (湯品日)  …
+##   index 6 = Sun (滿漢日)
+const DAILY_THEMES: Array[Dictionary] = [
+	{
+		"key": "monday",   "label": "週一", "name": "家常日",
+		"blurb": "媽媽今天想煮家常菜。",
+		"must_include": [], "size": 5,
+	},
+	{
+		"key": "tuesday",  "label": "週二", "name": "湯品日",
+		"blurb": "今天想煮鍋暖湯。",
+		"must_include": ["tofu", "cabbage"], "size": 5,
+	},
+	{
+		"key": "wednesday","label": "週三", "name": "蛋日",
+		"blurb": "今天用蛋當主角。",
+		"must_include": ["egg"], "size": 5,
+	},
+	{
+		"key": "thursday", "label": "週四", "name": "雞肉日",
+		"blurb": "今天要煮雞肉。",
+		"must_include": ["chicken", "soy_sauce"], "size": 5,
+	},
+	{
+		"key": "friday",   "label": "週五", "name": "樸素日",
+		"blurb": "三樣就好，吃簡單一點。",
+		"must_include": [], "size": 3,
+	},
+	{
+		"key": "saturday", "label": "週六", "name": "大菜日",
+		"blurb": "週末多買幾樣加菜！",
+		"must_include": [], "size": 6,
+	},
+	{
+		"key": "sunday",   "label": "週日", "name": "滿漢日",
+		"blurb": "週日大餐，全買齊吧！",
+		"must_include": [], "size": 7,
+	},
+]
+
+## Fallback used by `current_theme()` when HiScore isn't reachable yet
+## (e.g. during autoload init order).
+const DEFAULT_THEME: Dictionary = {
+	"key": "monday", "label": "週一", "name": "家常日",
+	"blurb": "媽媽今天想煮家常菜。",
+	"must_include": [], "size": 5,
+}
+
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
@@ -171,17 +225,48 @@ func has_all() -> bool:
 	return ingredient_count() >= ALL_INGREDIENTS.size()
 
 
-## v0.13: shuffles ALL_INGREDIENTS and picks REQUIRED_COUNT of them as the
-## random shopping list for this run. Called on every `reset()`.
+## v0.13: picks the random shopping list for this run.
+## v0.19: list size + forced ingredients now come from the active day theme
+## (Mon = 5 items, Fri = 3 items, Sun = 7 items, Tue forces tofu+cabbage…).
+## Called on every `reset()`, after HiScore is ready.
 func randomize_required() -> void:
+	var theme: Dictionary = current_theme()
+	var must: Array = theme.get("must_include", [])
+	var size: int = clampi(int(theme.get("size", REQUIRED_COUNT)),
+		1, ALL_INGREDIENTS.size())
+
+	var picked: PackedStringArray = PackedStringArray()
+	# Forced ingredients first — preserve order so themes with two forced
+	# items always show them in the same position on the HUD.
+	for id in must:
+		picked.append(String(id))
+	# Pool of remaining ingredients, shuffled
 	var pool: Array[String] = []
 	for id in ALL_INGREDIENTS:
+		if id in picked:
+			continue
 		pool.append(id)
 	pool.shuffle()
-	var picked: PackedStringArray = PackedStringArray()
-	for i in REQUIRED_COUNT:
+	# Fill up to size from the shuffled pool
+	var needed: int = size - picked.size()
+	for i in needed:
+		if i >= pool.size():
+			break
 		picked.append(pool[i])
 	required_ingredients = picked
+
+
+## v0.19: returns the theme dict for the current `HiScore.day`. Falls back
+## to DEFAULT_THEME if HiScore isn't reachable (autoload init race).
+func current_theme() -> Dictionary:
+	var hs: Node = get_node_or_null("/root/HiScore")
+	if hs == null:
+		return DEFAULT_THEME
+	var d: int = int(hs.day)
+	if d < 1:
+		return DEFAULT_THEME
+	var idx: int = (d - 1) % DAILY_THEMES.size()
+	return DAILY_THEMES[idx]
 
 
 ## Returns owned ingredient ids (in ALL_INGREDIENTS order, not insertion order),

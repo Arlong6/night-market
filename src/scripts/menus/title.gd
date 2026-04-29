@@ -101,9 +101,19 @@ func _build_ui() -> void:
 	spacer.custom_minimum_size = Vector2(0, 8)
 	vbox.add_child(spacer)
 
-	var quest: Label = _make_label("媽媽叫你去夜市買 5 樣食材", 10, COLOR_QUEST)
+	# v0.19: today's day + theme replaces the old static quest line.
+	var theme: Dictionary = Inventory.current_theme()
+	var quest_text: String = "第 %d 天 · %s · %s" % [
+		HiScore.day, theme["label"], theme["name"]
+	]
+	var quest: Label = _make_label(quest_text, 10, COLOR_QUEST)
 	quest.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(quest)
+	var blurb: Label = _make_label(
+		String(theme["blurb"]), 8, Color("#C8E66D")
+	)
+	blurb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(blurb)
 
 	if HiScore.has_record():
 		var best: Label = _make_label(

@@ -120,9 +120,10 @@ func _refresh_money() -> void:
 func _refresh_progress() -> void:
 	# v0.13: progress counts ONLY the random required-list, not arbitrary
 	# extras the player might also buy for the perfect-run achievement.
+	# v0.19: total comes from the actual list size (varies 3..7 by theme).
 	_progress_label.text = "%d/%d" % [
 		Inventory.required_owned_count(),
-		Inventory.REQUIRED_COUNT
+		Inventory.required_ingredients.size()
 	]
 
 

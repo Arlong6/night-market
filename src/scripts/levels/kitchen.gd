@@ -286,6 +286,17 @@ func _run_intro_sequence() -> void:
 		return
 	if Dialogue._active and Dialogue._box != null:
 		Dialogue._box._close()
+	# v0.19: announce today's theme before the shopping list.
+	var theme: Dictionary = Inventory.current_theme()
+	var theme_line: String = "第 %d 天 · %s · %s — %s" % [
+		HiScore.day, theme["label"], theme["name"], theme["blurb"]
+	]
+	Dialogue.show([theme_line])
+	await get_tree().create_timer(2.0).timeout
+	if _stage == Stage.INTRO_DONE:
+		return
+	if Dialogue._active and Dialogue._box != null:
+		Dialogue._box._close()
 	# v0.13: list mum's actual random shopping list for this run.
 	Dialogue.show(["今天要：%s ～" % _format_required_list()])
 	await get_tree().create_timer(2.0).timeout

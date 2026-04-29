@@ -23,6 +23,7 @@ const KEY_TOTAL: String = "total_wins"
 const KEY_PERFECT: String = "perfect_runs"
 const KEY_NO_BARGAIN: String = "no_bargain_wins"
 const KEY_MUTED: String = "muted"
+const KEY_DAY: String = "day"
 
 ## Sentinel for "no record yet" — easier than a separate Optional flag.
 const NO_RECORD: float = INF
@@ -36,6 +37,12 @@ var total_wins: int = 0
 var perfect_runs: int = 0
 var no_bargain_wins: int = 0
 var muted: bool = false
+
+## v0.19: current in-game day number (1-indexed). Advances by 1 on every
+## successful run via record_run(). Incomplete / ESC'd runs keep the same
+## day so the player gets to retry. Drives the daily-theme rotation in
+## Inventory.current_theme().
+var day: int = 1
 
 # ---------------------------------------------------------------------------
 # Lifecycle
@@ -93,6 +100,10 @@ func record_run(elapsed: float, perfect: bool, bargained: bool) -> Dictionary:
 	if not bargained:
 		first_no_bargain = no_bargain_wins == 0
 		no_bargain_wins += 1
+	# v0.19: a successful run advances the calendar by one day so tomorrow's
+	# theme is different. Incomplete runs go through _do_incomplete_flow and
+	# never reach this function, so they leave `day` unchanged.
+	day += 1
 	_save()
 	return {
 		"new_record": was_record,
@@ -147,13 +158,14 @@ func _apply_mute() -> void:
 # Test helpers
 # ---------------------------------------------------------------------------
 
-## Wipes ALL state (record + counters + mute) and the on-disk file.
+## Wipes ALL state (record + counters + mute + day) and the on-disk file.
 func clear() -> void:
 	best_time = NO_RECORD
 	total_wins = 0
 	perfect_runs = 0
 	no_bargain_wins = 0
 	muted = false
+	day = 1
 	if FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 
@@ -175,6 +187,7 @@ func _load() -> void:
 	perfect_runs = int(cfg.get_value(SECTION, KEY_PERFECT, 0))
 	no_bargain_wins = int(cfg.get_value(SECTION, KEY_NO_BARGAIN, 0))
 	muted = bool(cfg.get_value(SECTION, KEY_MUTED, false))
+	day = maxi(1, int(cfg.get_value(SECTION, KEY_DAY, 1)))
 	# Push restored mute state to audio autoloads on next frame so they have
 	# finished their own _ready (autoload init order may not guarantee it).
 	call_deferred("_apply_mute")
@@ -187,6 +200,7 @@ func _save() -> void:
 	cfg.set_value(SECTION, KEY_PERFECT, perfect_runs)
 	cfg.set_value(SECTION, KEY_NO_BARGAIN, no_bargain_wins)
 	cfg.set_value(SECTION, KEY_MUTED, muted)
+	cfg.set_value(SECTION, KEY_DAY, day)
 	var err: Error = cfg.save(SAVE_PATH)
 	if err != OK:
 		push_warning("[HiScore] save failed (err=%d)" % err)

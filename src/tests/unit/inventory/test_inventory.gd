@@ -6,7 +6,10 @@ extends GutTest
 ## v0.13: reset() now randomises required_ingredients; tests that need a
 ## specific list assign it manually after reset (see explicit overrides
 ## below).
+## v0.19: pin HiScore.day = 1 (週一 / 家常日 / size 5) so randomization tests
+## get the expected list size by default.
 func before_each() -> void:
+	HiScore.day = 1
 	Inventory.reset()
 
 
@@ -274,3 +277,70 @@ func test_inventory_cooked_dishes_solo_ingredient_recipes_match() -> void:
 	var dishes: PackedStringArray = Inventory.cooked_dishes()
 	assert_true("清炒高麗菜" in dishes,
 		"清炒高麗菜 should match with just cabbage — got %s" % str(dishes))
+
+
+# ---------------------------------------------------------------------------
+# v0.19 — daily themes / calendar rotation
+# ---------------------------------------------------------------------------
+
+func test_inventory_current_theme_day_1_is_monday() -> void:
+	HiScore.day = 1
+	var theme: Dictionary = Inventory.current_theme()
+	assert_eq(theme["key"], "monday",
+		"day 1 should map to 週一 / 家常日 — got %s" % theme["key"])
+
+
+func test_inventory_current_theme_cycles_every_7_days() -> void:
+	HiScore.day = 8
+	var theme: Dictionary = Inventory.current_theme()
+	assert_eq(theme["key"], "monday",
+		"day 8 should cycle back to Monday — got %s" % theme["key"])
+	HiScore.day = 14
+	theme = Inventory.current_theme()
+	assert_eq(theme["key"], "sunday",
+		"day 14 should be Sunday — got %s" % theme["key"])
+
+
+func test_inventory_soup_day_forces_tofu_and_cabbage() -> void:
+	HiScore.day = 2  # 週二 湯品日 — forces tofu + cabbage
+	# Run randomize many times; every result must contain both forced items.
+	for _i in 20:
+		Inventory.randomize_required()
+		assert_true("tofu" in Inventory.required_ingredients,
+			"湯品日 must always include tofu — got %s" %
+				str(Inventory.required_ingredients))
+		assert_true("cabbage" in Inventory.required_ingredients,
+			"湯品日 must always include cabbage — got %s" %
+				str(Inventory.required_ingredients))
+		assert_eq(Inventory.required_ingredients.size(), 5,
+			"湯品日 list size should be 5")
+
+
+func test_inventory_friday_theme_has_smaller_list() -> void:
+	HiScore.day = 5  # 週五 樸素日 — only 3 items
+	Inventory.randomize_required()
+	assert_eq(Inventory.required_ingredients.size(), 3,
+		"樸素日 should generate a 3-item list — got %s" %
+			str(Inventory.required_ingredients))
+
+
+func test_inventory_sunday_theme_requires_all_seven() -> void:
+	HiScore.day = 7  # 週日 滿漢日 — all 7
+	Inventory.randomize_required()
+	assert_eq(Inventory.required_ingredients.size(), 7,
+		"滿漢日 should generate a 7-item list — got %s" %
+			str(Inventory.required_ingredients))
+	# Should equal ALL_INGREDIENTS as a set
+	for id in Inventory.ALL_INGREDIENTS:
+		assert_true(id in Inventory.required_ingredients,
+			"滿漢日 must include every ingredient (%s missing)" % id)
+
+
+func test_inventory_thursday_theme_forces_chicken_and_soy() -> void:
+	HiScore.day = 4  # 週四 雞肉日
+	for _i in 10:
+		Inventory.randomize_required()
+		assert_true("chicken" in Inventory.required_ingredients,
+			"雞肉日 must include chicken")
+		assert_true("soy_sauce" in Inventory.required_ingredients,
+			"雞肉日 must include soy_sauce")

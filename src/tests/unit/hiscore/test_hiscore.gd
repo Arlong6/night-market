@@ -113,3 +113,37 @@ func test_hiscore_toggle_mute_flips_and_persists() -> void:
 	HiScore.muted = false
 	HiScore._load()
 	assert_true(HiScore.muted, "muted should persist via ConfigFile")
+
+
+# ---------------------------------------------------------------------------
+# v0.19 — calendar / day counter
+# ---------------------------------------------------------------------------
+
+func test_hiscore_day_starts_at_one() -> void:
+	# clear() is called in before_each; day should default to 1.
+	assert_eq(HiScore.day, 1,
+		"day should default to 1 after a fresh HiScore.clear()")
+
+
+func test_hiscore_record_run_advances_day() -> void:
+	HiScore.day = 3
+	HiScore.record_run(60.0, false, true)
+	assert_eq(HiScore.day, 4,
+		"record_run should advance the day by 1")
+
+
+func test_hiscore_day_persists_via_config_file() -> void:
+	HiScore.day = 12
+	HiScore._save()
+	# Reset in-memory and reload from disk
+	HiScore.day = 1
+	HiScore._load()
+	assert_eq(HiScore.day, 12,
+		"day should round-trip through the ConfigFile")
+
+
+func test_hiscore_clear_resets_day_to_one() -> void:
+	HiScore.day = 17
+	HiScore.clear()
+	assert_eq(HiScore.day, 1,
+		"clear() should reset the day counter to 1")
