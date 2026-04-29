@@ -89,13 +89,21 @@ func _draw() -> void:
 	# Awning bottom hem — 1px dark line for definition
 	draw_rect(Rect2(-half, awning_y + 2.0, NPC_SIZE, 1.0), Color("#2A1A0A"))
 
-	# Floating food icon — a 4×4 colored chip suspended below the awning
-	var icon_color: Color = FOOD_ICON_COLOR.get(ingredient_id, Color("#FFFFFF"))
+	# Floating food icon — a 4×4 colored chip suspended below the awning.
+	# v0.17: when sold out, the chip greys out and gets a strikethrough so
+	# the player gets clear "already bought" feedback at a glance.
+	var raw_color: Color = FOOD_ICON_COLOR.get(ingredient_id, Color("#FFFFFF"))
+	var icon_color: Color = (
+		Color("#888888") if _sold else raw_color
+	)
 	var icon_y: float = awning_y + 4.0
 	draw_rect(Rect2(-2.0, icon_y, 4.0, 4.0), icon_color)
 	# Icon outline (1px ink border, top + bottom)
 	draw_rect(Rect2(-2.0, icon_y, 4.0, 1.0), Color("#2A1A0A"))
 	draw_rect(Rect2(-2.0, icon_y + 3.0, 4.0, 1.0), Color("#2A1A0A"))
+	if _sold:
+		# Diagonal strikethrough — a 2-pixel line across the icon.
+		draw_rect(Rect2(-2.0, icon_y + 1.0, 4.0, 1.0), Color("#2A1A0A"))
 
 
 # ---------------------------------------------------------------------------

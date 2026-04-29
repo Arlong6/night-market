@@ -88,6 +88,21 @@ const CHATTER_DATA: Array[Dictionary] = [
 	},
 ]
 
+## v0.17: ambient crowd — wander shoppers along 2 lanes for atmosphere.
+## Each entry seeds a WanderShopper instance. No interaction, just life.
+const SHOPPER_DATA: Array[Dictionary] = [
+	# Upper lane — walking right
+	{ "lane_y": 104.0, "direction":  1, "speed": 18.0,
+	  "body": Color("#3A5A8A"), "hat": Color("#2A1A0A") },  # blue shirt
+	{ "lane_y": 104.0, "direction":  1, "speed": 24.0,
+	  "body": Color("#9A4A3A"), "hat": Color("#3A1A0A") },  # red shirt
+	# Lower lane — walking left
+	{ "lane_y": 152.0, "direction": -1, "speed": 16.0,
+	  "body": Color("#5A8A4A"), "hat": Color("#3A1A0A") },  # green shirt
+	{ "lane_y": 152.0, "direction": -1, "speed": 22.0,
+	  "body": Color("#B86C30"), "hat": Color("#5A3A2A") },  # orange shirt
+]
+
 ## Item pickups scattered on the floor — free money / loose change.
 const ITEM_DATA: Array[Dictionary] = [
 	{"cell": Vector2i(11, 5), "value": 10, "line": "撿到 NT$10！"},
@@ -151,6 +166,7 @@ func _ready() -> void:
 	_spawn_camera()
 	_spawn_stalls()
 	_spawn_chatters()
+	_spawn_shoppers()
 	_spawn_items()
 	_spawn_mom()
 	_spawn_hud()
@@ -203,6 +219,29 @@ func _spawn_stalls() -> void:
 		if slot == discount_slot:
 			stall.discount = 0.8
 		register_npc(stall)
+
+
+## v0.17: spawns ambient wandering shoppers. Pure visual, no interaction.
+## Stagger their starting X across the map so they don't all clump on spawn.
+func _spawn_shoppers() -> void:
+	for i in SHOPPER_DATA.size():
+		var data: Dictionary = SHOPPER_DATA[i]
+		var s: WanderShopper = WanderShopper.new()
+		s.lane_y = float(data["lane_y"])
+		s.direction = int(data["direction"])
+		s.speed = float(data["speed"])
+		s.body_color = data["body"]
+		s.hat_color = data["hat"]
+		# Even spread along the X band — first shopper near left, last near right.
+		var spread: float = float(i) / float(SHOPPER_DATA.size())
+		s.position = Vector2(
+			lerpf(s.x_min, s.x_max, spread),
+			s.lane_y
+		)
+		# Seed _x to match the spread position so the wrap logic continues
+		# from there instead of snapping back to x_min on first _process tick.
+		s._x = s.position.x
+		add_child(s)
 
 
 ## Spawns the world-flavour NPCs (no shop, no quest blockers).
