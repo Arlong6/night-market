@@ -90,3 +90,68 @@ func test_stall_awning_palette_covers_all_seven_ingredients() -> void:
 	for ing in ingredients:
 		assert_true(StallNPC.AWNING_PALETTE.has(ing),
 			"ingredient '%s' should have a dedicated awning palette" % ing)
+
+
+# ---------------------------------------------------------------------------
+# v0.27 — vendor characters
+# ---------------------------------------------------------------------------
+
+func test_stall_vendor_data_returns_full_schema_for_known_ingredient() -> void:
+	# Arrange / Act
+	var stall: StallNPC = await _make_stall("chicken")
+	var data: Dictionary = stall._vendor_data()
+
+	# Assert: schema must include hair / accent / skin so _draw_vendor_head
+	# never has to handle missing keys.
+	assert_true(data.has("hair"), "vendor data missing 'hair'")
+	assert_true(data.has("accent"), "vendor data missing 'accent'")
+	assert_true(data.has("skin"), "vendor data missing 'skin'")
+	assert_true(data["hair"] is Color, "hair should be a Color")
+	assert_true(data["accent"] is Color, "accent should be a Color")
+	assert_true(data["skin"] is Color, "skin should be a Color")
+
+
+func test_stall_vendor_data_differs_between_ingredients() -> void:
+	# Arrange
+	var chicken_stall: StallNPC = await _make_stall("chicken")
+	var scallion_stall: StallNPC = await _make_stall("scallion")
+
+	# Act
+	var chicken_vendor: Dictionary = chicken_stall._vendor_data()
+	var scallion_vendor: Dictionary = scallion_stall._vendor_data()
+
+	# Assert: the chicken vendor (young guy, red scarf, dark hair) and the
+	# scallion granny (grey hair, green band) MUST differ on at least one
+	# field so the player can visually tell them apart.
+	var differs_on_any: bool = (
+		chicken_vendor["hair"] != scallion_vendor["hair"]
+		or chicken_vendor["accent"] != scallion_vendor["accent"]
+		or chicken_vendor["skin"] != scallion_vendor["skin"]
+	)
+	assert_true(differs_on_any,
+		"chicken vs scallion vendors should be visually distinct")
+
+
+func test_stall_vendor_data_falls_back_for_unknown_ingredient() -> void:
+	# Arrange / Act
+	var stall: StallNPC = await _make_stall("nonexistent_ingredient")
+	var data: Dictionary = stall._vendor_data()
+
+	# Assert: fallback uses NPC base palette so unknown ids stay drawable.
+	assert_eq(data["hair"], NPC.COLOR_HAIR,
+		"unknown ingredient should fall back to default NPC hair")
+	assert_eq(data["skin"], NPC.COLOR_SKIN,
+		"unknown ingredient should fall back to default NPC skin")
+
+
+func test_stall_vendor_data_covers_all_seven_ingredients() -> void:
+	# Arrange
+	var ingredients: Array[String] = [
+		"chicken", "egg", "scallion", "cabbage",
+		"tofu", "soy_sauce", "mushroom",
+	]
+
+	# Act / Assert
+	for ing in ingredients:
+		assert_true(StallNPC.VENDOR_DATA.has(ing),
+			"ingredient '%s' should have a dedicated vendor entry" % ing)

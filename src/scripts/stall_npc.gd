@@ -82,6 +82,53 @@ const AWNING_PALETTE: Dictionary = {
 	"mushroom":  [Color("#5A3018"), Color("#A06A4A")],  # mushroom dark + tan
 }
 
+## v0.27: per-ingredient vendor character. Each stall draws a small 5×5
+## head silhouette to the LEFT of the food icon — different hair / skin /
+## hat per vendor so the market reads as populated by people, not just
+## merchandise. Eyes are always near-black (COLOR_EYE).
+##
+## Schema: { hair: Color, accent: Color, skin: Color }
+##   * hair   — top of head (1 px stripe under the hat brim)
+##   * accent — hat / scarf brim (1 px above hair)
+##   * skin   — face fill (3 px tall under the hair)
+const VENDOR_DATA: Dictionary = {
+	"chicken":   {  # young guy with a red headscarf — chicken-stall classic
+		"hair":   Color("#3A1A0A"),
+		"accent": Color("#C2241A"),
+		"skin":   Color("#F2D6A8"),
+	},
+	"egg":       {  # cheerful auntie with a yellow band
+		"hair":   Color("#2A1A0A"),
+		"accent": Color("#F2A227"),
+		"skin":   Color("#FAE3BC"),
+	},
+	"scallion":  {  # grey-haired granny vendor
+		"hair":   Color("#888888"),
+		"accent": Color("#7AC940"),
+		"skin":   Color("#F2D6A8"),
+	},
+	"cabbage":   {  # farmer with a green produce cap
+		"hair":   Color("#5A3018"),
+		"accent": Color("#9EE070"),
+		"skin":   Color("#E8C088"),
+	},
+	"tofu":      {  # gentle vendor with a clean white head cover
+		"hair":   Color("#A07058"),
+		"accent": Color("#F5EDDA"),
+		"skin":   Color("#F8E5C8"),
+	},
+	"soy_sauce": {  # serious uncle with a dark cap
+		"hair":   Color("#1A1208"),
+		"accent": Color("#3A4A8A"),
+		"skin":   Color("#D4A878"),
+	},
+	"mushroom":  {  # weathered grandpa with a brown cap
+		"hair":   Color("#888888"),
+		"accent": Color("#7A4A2A"),
+		"skin":   Color("#E8C088"),
+	},
+}
+
 # ---------------------------------------------------------------------------
 # v0.26 — hanging price tag
 # ---------------------------------------------------------------------------
@@ -162,21 +209,29 @@ func _draw() -> void:
 	# Awning bottom hem — 1px dark line for definition
 	draw_rect(Rect2(-half, awning_y + 2.0, NPC_SIZE, 1.0), Color("#2A1A0A"))
 
-	# Floating food icon — a 4×4 colored chip suspended below the awning.
+	# v0.27: vendor head silhouette on the LEFT half of the body, food icon
+	# on the right. Side-by-side composition makes every stall feel manned
+	# instead of just being a colored box with a product chip.
+	_draw_vendor_head(bob_y)
+
+	# Floating food icon — a 4×4 colored chip showing the ingredient.
 	# v0.17: when sold out, the chip greys out and gets a strikethrough so
 	# the player gets clear "already bought" feedback at a glance.
+	# v0.27: shifted from center to right (x=+1..+5) to make room for the
+	# vendor head on the left.
 	var raw_color: Color = FOOD_ICON_COLOR.get(ingredient_id, Color("#FFFFFF"))
 	var icon_color: Color = (
 		Color("#888888") if _sold else raw_color
 	)
+	var icon_x: float = 1.0
 	var icon_y: float = awning_y + 4.0
-	draw_rect(Rect2(-2.0, icon_y, 4.0, 4.0), icon_color)
+	draw_rect(Rect2(icon_x, icon_y, 4.0, 4.0), icon_color)
 	# Icon outline (1px ink border, top + bottom)
-	draw_rect(Rect2(-2.0, icon_y, 4.0, 1.0), Color("#2A1A0A"))
-	draw_rect(Rect2(-2.0, icon_y + 3.0, 4.0, 1.0), Color("#2A1A0A"))
+	draw_rect(Rect2(icon_x, icon_y, 4.0, 1.0), Color("#2A1A0A"))
+	draw_rect(Rect2(icon_x, icon_y + 3.0, 4.0, 1.0), Color("#2A1A0A"))
 	if _sold:
 		# Diagonal strikethrough — a 2-pixel line across the icon.
-		draw_rect(Rect2(-2.0, icon_y + 1.0, 4.0, 1.0), Color("#2A1A0A"))
+		draw_rect(Rect2(icon_x, icon_y + 1.0, 4.0, 1.0), Color("#2A1A0A"))
 
 	# v0.26: hanging price tag mounted on the lower half of the counter.
 	# Reads NT$XX while available, "完售" + brown bg once sold. Drawn after
@@ -361,6 +416,48 @@ func _awning_palette() -> Array:
 	if AWNING_PALETTE.has(ingredient_id):
 		return AWNING_PALETTE[ingredient_id]
 	return [COLOR_AWNING_A, COLOR_AWNING_B]
+
+
+## v0.27: returns this stall's vendor data { hair, accent, skin }. Falls
+## back to a generic vendor (brown hair, cream accent, warm skin) when
+## ingredient_id has no entry.
+func _vendor_data() -> Dictionary:
+	if VENDOR_DATA.has(ingredient_id):
+		return VENDOR_DATA[ingredient_id]
+	return {
+		"hair":   COLOR_HAIR,
+		"accent": COLOR_AWNING_B,
+		"skin":   COLOR_SKIN,
+	}
+
+
+## v0.27: 5×5 vendor head silhouette drawn on the LEFT half of the stall
+## body, opposite the food icon. Drawn AFTER the body so the body's gold
+## top stripe is overdrawn in the vendor area — the vendor reads as
+## "leaning over the counter" rather than "floating above" it.
+##
+## Pixel layout in stall-local coords (x=-7 is body left edge):
+##   y=-6   accent (hat brim)             5 wide @ x=-6..-2
+##   y=-5   hair                          5 wide @ x=-6..-2
+##   y=-4   skin (forehead)               5 wide
+##   y=-3   skin + 2 eye dots @ x=-5,-3   5 wide
+##   y=-2   skin (chin)                   5 wide
+func _draw_vendor_head(bob_y: float) -> void:
+	var data: Dictionary = _vendor_data()
+	var hair: Color = data["hair"]
+	var accent: Color = data["accent"]
+	var skin: Color = data["skin"]
+	var x0: float = -6.0
+	var w: float = 5.0
+	# Accent (hat brim) — 1 px above the hair
+	draw_rect(Rect2(x0, -6.0 + bob_y, w, 1.0), accent)
+	# Hair — 1 px stripe across the top of the head
+	draw_rect(Rect2(x0, -5.0 + bob_y, w, 1.0), hair)
+	# Skin — 3 px tall face block (forehead, eyes, chin)
+	draw_rect(Rect2(x0, -4.0 + bob_y, w, 3.0), skin)
+	# Eye dots — symmetric, near-black
+	draw_rect(Rect2(x0 + 1.0, -3.0 + bob_y, 1.0, 1.0), COLOR_EYE)
+	draw_rect(Rect2(x0 + 3.0, -3.0 + bob_y, 1.0, 1.0), COLOR_EYE)
 
 
 ## v0.26: hanging price-tag draw. Mounts on the bottom half of the counter
