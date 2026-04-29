@@ -62,7 +62,14 @@ func _build_ui() -> void:
 	vbox.add_theme_constant_override("separation", 4)
 	add_child(vbox)
 
-	_add_revealable(vbox, _make_label("謝謝，今晚加菜！", 16, Color("#F5EDDA")))
+	# v0.14: incomplete runs swap the cheery header for a softer "made do" line.
+	var header_text: String = (
+		"湊合一頓～" if Game.last_run_incomplete else "謝謝，今晚加菜！"
+	)
+	var header_color: Color = (
+		Color("#888888") if Game.last_run_incomplete else Color("#F5EDDA")
+	)
+	_add_revealable(vbox, _make_label(header_text, 16, header_color))
 
 	# Ingredient checklist — only the ingredients the player actually bought.
 	# (Each row tracked separately so we can sparkle it during the reveal.)
@@ -74,9 +81,13 @@ func _build_ui() -> void:
 		_add_revealable(vbox, row)
 		_ingredient_targets.append(row)
 
-	_add_revealable(vbox, _make_label(
-		"今晚的料理：醬油雞炒蔥蛋高麗菜", 9, Color("#F2A227")
-	))
+	# v0.14: dish description changes when the kid came home short.
+	var dish_text: String = (
+		"今晚的料理：簡單炒一炒"
+		if Game.last_run_incomplete
+		else "今晚的料理：醬油雞炒蔥蛋高麗菜"
+	)
+	_add_revealable(vbox, _make_label(dish_text, 9, Color("#F2A227")))
 
 	# Money remaining (bounce-tweened from 0 to actual value when revealed).
 	var money: Label = _make_label("剩 $0", 12, Color("#F2A227"))

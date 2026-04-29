@@ -65,8 +65,9 @@ func test_mom_bump_with_all_ingredients_triggers_win() -> void:
 		"goto_level should route to 'kitchen' on win — got '%s'" % Game.current_area)
 
 
-func test_mom_bump_without_all_ingredients_no_level_change() -> void:
-	# v0.13: pin required so missing soy_sauce really does fail the check.
+func test_mom_bump_without_all_ingredients_routes_to_kitchen_messy() -> void:
+	# v0.14: incomplete runs no longer block — kid still cooks, but the run
+	# is flagged incomplete and HiScore is NOT touched.
 	Inventory.required_ingredients = PackedStringArray([
 		"scallion", "egg", "cabbage", "chicken", "soy_sauce"
 	])
@@ -75,24 +76,28 @@ func test_mom_bump_without_all_ingredients_no_level_change() -> void:
 	Inventory.buy("egg", 30)
 	Inventory.buy("cabbage", 40)
 	Inventory.buy("chicken", 50)
-	# Soy sauce is missing.
 	assert_false(Inventory.has_all_required(),
 		"Pre-condition: should NOT have all required")
 
+	var wins_before: int = HiScore.total_wins
 	var mom: MomNPC = await _make_mom()
 	mom.on_bumped()
 	await get_tree().process_frame
-	# Walk through both incomplete lines.
-	Dialogue._box._advance()  # snap line 1
-	Dialogue._box._advance()  # next line
-	Dialogue._box._advance()  # snap line 2
-	Dialogue._box._advance()  # close (no on_done in incomplete path)
+	# Walk through the 2 incomplete lines (snap1, next, snap2, close + on_done).
+	Dialogue._box._advance()
+	Dialogue._box._advance()
+	Dialogue._box._advance()
+	Dialogue._box._advance()
 	await get_tree().process_frame
 
-	assert_ne(Game.current_area, "kitchen",
-		"current_area should NOT be kitchen when ingredients incomplete")
-	assert_ne(Game.current_area, "end_win",
-		"current_area should NOT be end_win when ingredients incomplete")
+	assert_eq(Game.current_area, "kitchen",
+		"v0.14: incomplete runs still cook — should route to 'kitchen', got '%s'" % Game.current_area)
+	assert_true(Game.last_run_incomplete,
+		"last_run_incomplete should be set so kitchen + end_screen pick the messy variant")
+	assert_eq(HiScore.total_wins, wins_before,
+		"Incomplete runs must NOT touch HiScore.total_wins")
+	assert_false(Game.last_run_was_record,
+		"Incomplete runs cannot set last_run_was_record")
 
 
 func test_mom_bump_incomplete_shows_dialogue() -> void:
@@ -101,6 +106,17 @@ func test_mom_bump_incomplete_shows_dialogue() -> void:
 	await get_tree().process_frame
 	assert_true(Dialogue.is_active(),
 		"Bumping mum with no ingredients should show a dialogue")
+
+
+func test_mom_bump_complete_clears_incomplete_flag() -> void:
+	# Ensure the incomplete flag from a prior aborted run can't bleed into a
+	# successful one — Game.reset_run() should clear it, and a complete bump
+	# never sets it back.
+	Game.last_run_incomplete = true
+	Game.reset_run()
+	Inventory.reset()
+	assert_false(Game.last_run_incomplete,
+		"reset_run() should clear last_run_incomplete")
 
 
 func test_session_time_accumulates_during_market() -> void:

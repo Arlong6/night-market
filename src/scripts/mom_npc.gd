@@ -48,14 +48,23 @@ func on_bumped() -> void:
 		var on_done: Callable = func() -> void: Game.goto_level("kitchen")
 		Dialogue.show(lines, on_done)
 	else:
-		var missing: int = Inventory.REQUIRED_COUNT - Inventory.ingredient_count()
-		if missing < 0:
-			missing = 0
-		var lines: Array[String] = [
-			"回來啦？讓我看看…",
-			"還差 %d 樣，再去看看吧。" % missing,
-		]
-		Dialogue.show(lines)
+		# v0.14: kid bumps mum without all required ingredients — sympathetic
+		# "湊合著煮吧" route. Still cooks (so the player gets a payoff) but
+		# the run is flagged incomplete and HiScore is NOT touched.
+		Game.last_run_incomplete = true
+		Game.last_run_perfect = false
+		Game.last_run_was_record = false
+		var on_done: Callable = func() -> void: Game.goto_level("kitchen")
+		Dialogue.show(_incomplete_lines(), on_done)
+
+
+## v0.14: lines used when kid comes home without the full required-list.
+## Lightly disappointed but caring — mum still cooks with what she has.
+func _incomplete_lines() -> Array[String]:
+	return [
+		"嗯…就這幾樣啊？",
+		"沒關係，湊合著煮吧～",
+	]
 
 
 ## Picks the closing line based on how long the player took. Faster = more

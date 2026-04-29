@@ -31,6 +31,11 @@ var last_run_perfect: bool = false
 ## the no-bargain achievement. Cleared by reset_run().
 var bargain_count: int = 0
 
+## v0.14: true iff the most recent run finished without all required
+## ingredients — kid came home anyway. Drives the "messy cooking" path in
+## the kitchen and suppresses HiScore recording. Cleared by reset_run().
+var last_run_incomplete: bool = false
+
 # ---------------------------------------------------------------------------
 # Test-mode flag — when true, scene-changing helpers no-op so unit tests
 # can call them without unloading the test harness scene.
@@ -60,15 +65,28 @@ func _process(delta: float) -> void:
 		session_time += delta
 
 
-## v0.12: M key globally toggles audio mute (Sfx + Music). Handled at
-## autoload level so it works across every scene without per-scene wiring.
+## Global hotkeys handled at autoload level so they work across every scene
+## without per-scene wiring:
+##   * M  — toggle audio mute (v0.12)
+##   * ESC — abandon current run, return to title (v0.14)
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey):
 		return
 	var ke: InputEventKey = event
-	if ke.pressed and not ke.echo and ke.physical_keycode == KEY_M:
-		HiScore.toggle_mute()
-		get_viewport().set_input_as_handled()
+	if not ke.pressed or ke.echo:
+		return
+	match ke.physical_keycode:
+		KEY_M:
+			HiScore.toggle_mute()
+			get_viewport().set_input_as_handled()
+		KEY_ESCAPE:
+			# Skip ESC handling on the title itself (no run to abandon).
+			if current_area == "title":
+				return
+			Inventory.reset()
+			reset_run()
+			goto_level("title")
+			get_viewport().set_input_as_handled()
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -94,4 +112,5 @@ func reset_run() -> void:
 	in_dialogue = false
 	last_run_was_record = false
 	last_run_perfect = false
+	last_run_incomplete = false
 	bargain_count = 0

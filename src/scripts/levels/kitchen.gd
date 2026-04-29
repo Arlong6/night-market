@@ -184,7 +184,14 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _run_sequence() -> void:
 	_stage = Stage.OPENING
-	Dialogue.show(["終於回來了！讓我看看你買到什麼好東西…"])
+	# v0.14: incomplete runs get a resigned opening line; full/perfect runs
+	# get the cheery "let's see what you got" line.
+	var opening_line: String = (
+		"嗯…就這幾樣啊？湊合著煮吧～"
+		if Game.last_run_incomplete
+		else "終於回來了！讓我看看你買到什麼好東西…"
+	)
+	Dialogue.show([opening_line])
 	await get_tree().create_timer(OPENING_DELAY).timeout
 
 	_stage = Stage.DROP
@@ -330,6 +337,10 @@ func _skip_intro() -> void:
 # ---------------------------------------------------------------------------
 
 func _closing_line_for_time(t: float) -> String:
+	# v0.14: incomplete runs override everything — kid came home short, so
+	# mum's closer reflects "made do" rather than praise.
+	if Game.last_run_incomplete:
+		return "勉強OK啦…下次認真點～"
 	# v0.12: perfect runs override the time-tier line with the 滿漢全席 closer.
 	if Game.last_run_perfect:
 		return "滿漢全席！吃飽飽～"
@@ -520,6 +531,7 @@ func _draw_dish_on_plate() -> void:
 	var px: int = TABLE_X
 	var py: int = TABLE_Y - 4
 	var perfect: bool = Game.last_run_perfect
+	var incomplete: bool = Game.last_run_incomplete
 	if perfect:
 		# Gold rim, slightly larger
 		draw_rect(Rect2(px - 18, py - 6, 36, 12), Color("#F2A227"))
@@ -528,7 +540,8 @@ func _draw_dish_on_plate() -> void:
 		draw_rect(Rect2(px - 14, py - 5, 28, 10), COLOR_PLATE_RIM)
 		draw_rect(Rect2(px - 13, py - 4, 26, 8), COLOR_PLATE)
 	# Dish — cluster of ingredient-colored chips. Perfect run shows all 7
-	# in a 4+3 layout; standard shows up to 6 in a 3×2.
+	# in a 4+3 layout; standard shows up to 6 in a 3×2. v0.14 incomplete
+	# runs jitter each chip a couple px to telegraph "messy".
 	var owned: PackedStringArray = Inventory.owned_ingredients()
 	var per_row: int = 4 if perfect else 3
 	var max_chips: int = 7 if perfect else 6
@@ -538,6 +551,11 @@ func _draw_dish_on_plate() -> void:
 		var dx_off: float = -float(per_row - 1) * 2.5
 		var dx: float = float(px) + dx_off + float(col) * 5.0
 		var dy: float = float(py) - 2.0 + float(row) * 4.0
+		# Deterministic per-chip jitter for incomplete runs — same input gives
+		# the same offset, so the plate doesn't shimmer between redraws.
+		if incomplete:
+			dx += cos(float(i) * 7.3) * 1.5
+			dy += sin(float(i) * 11.7) * 1.5
 		var c: Color = FOOD_COLOR.get(owned[i], Color.WHITE)
 		draw_rect(Rect2(dx, dy, 3, 3), c)
 	# Perfect runs get a single ★ pixel sitting above the plate
