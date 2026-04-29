@@ -38,14 +38,51 @@ const STALL_CELLS: Array[Vector2i] = [
 ## Per-stall configuration — one entry per STALL_CELLS index.
 ## Total cheapest 5 = 190; with STARTING_MONEY=180 the player MUST bargain
 ## successfully at least once OR pick the cheapest 5 and skip the dearer two.
+## v0.23: each `intro` is now a POOL of 4 lines; StallNPC picks one at random
+## per bump for vendor-chatter variety.
 const STALL_DATA: Array[Dictionary] = [
-	{"id": "scallion",  "price": 20, "intro": ["新鮮蔥阿，要買嗎？"]},
-	{"id": "egg",       "price": 30, "intro": ["雞蛋一盒30元！"]},
-	{"id": "cabbage",   "price": 40, "intro": ["高麗菜，自家種的！"]},
-	{"id": "chicken",   "price": 50, "intro": ["雞肉新鮮現宰！"]},
-	{"id": "soy_sauce", "price": 50, "intro": ["陳年醬油，一瓶50！"]},
-	{"id": "tofu",      "price": 60, "intro": ["手工嫩豆腐！"]},
-	{"id": "mushroom",  "price": 70, "intro": ["山上採的香菇，補！"]},
+	{"id": "scallion",  "price": 20, "intro": [
+		"新鮮蔥阿，要買嗎？",
+		"我家蔥都自己種的，甜！",
+		"今天蔥特別嫩喔～",
+		"便宜啦，三把 60 才便宜！",
+	]},
+	{"id": "egg",       "price": 30, "intro": [
+		"雞蛋一盒 30 元！",
+		"我家雞蛋都當天現生的喔",
+		"今天蛋特別漂亮！",
+		"蛋黃黃黃的，超讚",
+	]},
+	{"id": "cabbage",   "price": 40, "intro": [
+		"高麗菜，自家種的！",
+		"山上來的高麗菜，脆脆的",
+		"今天高麗菜特別大顆",
+		"包水餃用最棒喔～",
+	]},
+	{"id": "chicken",   "price": 50, "intro": [
+		"雞肉新鮮現宰！",
+		"今天雞肉品質特別好",
+		"回家煮雞湯最棒",
+		"幫媽媽多買一斤啦",
+	]},
+	{"id": "soy_sauce", "price": 50, "intro": [
+		"陳年醬油，一瓶 50！",
+		"我們家醬油發酵 180 天",
+		"炒菜放一點，鹹香鹹香",
+		"這瓶陳年的，比超市便宜",
+	]},
+	{"id": "tofu",      "price": 60, "intro": [
+		"手工嫩豆腐！",
+		"今天豆腐才剛現做",
+		"做豆腐花最棒",
+		"我阿媽的祖傳配方喔",
+	]},
+	{"id": "mushroom",  "price": 70, "intro": [
+		"山上採的香菇，補！",
+		"新鮮乾香菇都有",
+		"香菇雞湯一級棒",
+		"南投來的，嚴選的",
+	]},
 ]
 
 ## Chatter NPC slots — atmospheric world-flavour, no shop.

@@ -344,3 +344,44 @@ func test_inventory_thursday_theme_forces_chicken_and_soy() -> void:
 			"雞肉日 must include chicken")
 		assert_true("soy_sauce" in Inventory.required_ingredients,
 			"雞肉日 must include soy_sauce")
+
+
+# ---------------------------------------------------------------------------
+# v0.23 — festivals (special days inside the 30-day cycle)
+# ---------------------------------------------------------------------------
+
+func test_inventory_no_festival_on_normal_day() -> void:
+	HiScore.day = 1
+	assert_eq(Inventory.current_festival(), Inventory.FESTIVAL_NONE)
+	assert_eq(Inventory.festival_bonus(), 0)
+
+
+func test_inventory_mid_autumn_festival_fires_on_day_15() -> void:
+	HiScore.day = 15
+	assert_eq(Inventory.current_festival(), Inventory.FESTIVAL_MID_AUTUMN)
+	assert_eq(Inventory.festival_bonus(), Inventory.FESTIVAL_BONUS_MID_AUTUMN)
+	assert_false(Inventory.festival_label().is_empty(),
+		"festival_label should be non-empty on a festival day")
+
+
+func test_inventory_new_year_festival_fires_on_day_30() -> void:
+	HiScore.day = 30
+	assert_eq(Inventory.current_festival(), Inventory.FESTIVAL_NEW_YEAR)
+	assert_eq(Inventory.festival_bonus(), Inventory.FESTIVAL_BONUS_NEW_YEAR)
+
+
+func test_inventory_festivals_repeat_on_30_day_cycle() -> void:
+	HiScore.day = 45  # day 15 of the 2nd month
+	assert_eq(Inventory.current_festival(), Inventory.FESTIVAL_MID_AUTUMN,
+		"中秋 should fire again on day 45")
+	HiScore.day = 60  # day 30 of the 2nd month
+	assert_eq(Inventory.current_festival(), Inventory.FESTIVAL_NEW_YEAR,
+		"過年 should fire again on day 60")
+
+
+func test_inventory_reset_applies_festival_bonus_to_money() -> void:
+	HiScore.day = 30  # 過年 day
+	Inventory.reset()
+	assert_eq(Inventory.money,
+		Inventory.STARTING_MONEY + Inventory.FESTIVAL_BONUS_NEW_YEAR,
+		"reset on 過年 should add the red-envelope bonus to STARTING_MONEY")

@@ -178,14 +178,25 @@ func _loyalty_discount() -> float:
 
 
 ## Returns the dialogue lines used as the bump intro for the current
-## loyalty tier. Tier 0 falls through to the configured intro_lines.
+## loyalty tier. Tier 0 falls through to a random line from intro_lines.
+## v0.23: intro_lines is now a POOL — pick one per bump for variety.
 func _greeting_lines_for_tier(tier: int) -> Array[String]:
 	if tier <= 0 or tier >= LOYALTY_GREETINGS.size():
-		return intro_lines
+		return _pick_random_intro()
 	var line: String = LOYALTY_GREETINGS[tier]
 	if line.is_empty():
-		return intro_lines
+		return _pick_random_intro()
 	var out: Array[String] = [line]
+	return out
+
+
+## v0.23: picks a single intro line at random from the configured pool.
+## Pool of size 1 always returns that line (backwards compat).
+func _pick_random_intro() -> Array[String]:
+	if intro_lines.is_empty():
+		return ["..."]
+	var picked: String = intro_lines[randi() % intro_lines.size()]
+	var out: Array[String] = [picked]
 	return out
 
 

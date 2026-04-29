@@ -286,11 +286,19 @@ func _run_intro_sequence() -> void:
 		return
 	if Dialogue._active and Dialogue._box != null:
 		Dialogue._box._close()
-	# v0.19: announce today's theme before the shopping list.
-	var theme: Dictionary = Inventory.current_theme()
-	var theme_line: String = "第 %d 天 · %s · %s — %s" % [
-		HiScore.day, theme["label"], theme["name"], theme["blurb"]
-	]
+	# v0.23: festival days override the day theme line with a special blurb.
+	var fest_blurb: String = Inventory.festival_blurb()
+	var theme_line: String
+	if not fest_blurb.is_empty():
+		theme_line = "%s — %s" % [
+			Inventory.festival_label(), fest_blurb
+		]
+	else:
+		# v0.19: announce today's theme before the shopping list.
+		var theme: Dictionary = Inventory.current_theme()
+		theme_line = "第 %d 天 · %s · %s — %s" % [
+			HiScore.day, theme["label"], theme["name"], theme["blurb"]
+		]
 	Dialogue.show([theme_line])
 	await get_tree().create_timer(2.0).timeout
 	if _stage == Stage.INTRO_DONE:

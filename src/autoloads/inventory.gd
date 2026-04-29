@@ -129,6 +129,33 @@ const DEFAULT_THEME: Dictionary = {
 }
 
 # ---------------------------------------------------------------------------
+# v0.23 — festivals (rare special days that override the weekly theme)
+# ---------------------------------------------------------------------------
+
+const FESTIVAL_NONE: String = ""
+const FESTIVAL_MID_AUTUMN: String = "mid_autumn"  ## 中秋節 — every 30 days @ +14
+const FESTIVAL_NEW_YEAR: String = "new_year"      ## 過年 — every 30 days @ +29
+
+## Day-of-month index that triggers each festival inside a 30-day cycle.
+## Reading: festival fires when `(day - 1) % 30 == FESTIVAL_DAY_<X>`.
+const FESTIVAL_DAY_MID_AUTUMN: int = 14   ## days 15, 45, 75, …
+const FESTIVAL_DAY_NEW_YEAR: int = 29     ## days 30, 60, 90, …
+
+## Bonus money awarded at the START of a festival run on top of STARTING_MONEY.
+const FESTIVAL_BONUS_MID_AUTUMN: int = 30
+const FESTIVAL_BONUS_NEW_YEAR: int = 60
+
+## Display labels for the title screen + home_intro mum line.
+const FESTIVAL_LABELS: Dictionary[String, String] = {
+	FESTIVAL_MID_AUTUMN: "🌕 中秋節",
+	FESTIVAL_NEW_YEAR:   "🧧 過年",
+}
+const FESTIVAL_BLURBS: Dictionary[String, String] = {
+	FESTIVAL_MID_AUTUMN: "中秋節快樂！多買一點，今晚賞月～",
+	FESTIVAL_NEW_YEAR:   "新年好！紅包拿去買菜囉～",
+}
+
+# ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
 
@@ -282,11 +309,50 @@ func owned_ingredients() -> PackedStringArray:
 ## Resets money and inventory back to the start of a fresh run.
 ## Called by R-009's title screen on START press. v0.13 also re-rolls the
 ## required-ingredient list so each run is a different shopping puzzle.
+## v0.23: festival days drop a bonus on top of STARTING_MONEY (red envelope
+## for 過年, mooncake stipend for 中秋).
 func reset() -> void:
-	money = STARTING_MONEY
+	money = STARTING_MONEY + festival_bonus()
 	ingredients = {}
 	randomize_required()
 	money_changed.emit(money)
+
+
+## v0.23: returns one of FESTIVAL_NONE / FESTIVAL_MID_AUTUMN / FESTIVAL_NEW_YEAR
+## based on HiScore.day. Festivals fire on a 30-day cycle (day 15 = 中秋,
+## day 30 = 過年) so a casual player hits one every couple of weeks.
+func current_festival() -> String:
+	var hs: Node = get_node_or_null("/root/HiScore")
+	if hs == null:
+		return FESTIVAL_NONE
+	var d: int = int(hs.day)
+	if d <= 0:
+		return FESTIVAL_NONE
+	var cycle: int = (d - 1) % 30
+	if cycle == FESTIVAL_DAY_MID_AUTUMN:
+		return FESTIVAL_MID_AUTUMN
+	if cycle == FESTIVAL_DAY_NEW_YEAR:
+		return FESTIVAL_NEW_YEAR
+	return FESTIVAL_NONE
+
+
+## v0.23: bonus NT$ given to the player at the start of a festival run
+## (added on top of STARTING_MONEY in `reset()`). 0 on non-festival days.
+func festival_bonus() -> int:
+	match current_festival():
+		FESTIVAL_MID_AUTUMN: return FESTIVAL_BONUS_MID_AUTUMN
+		FESTIVAL_NEW_YEAR:   return FESTIVAL_BONUS_NEW_YEAR
+		_:                   return 0
+
+
+## v0.23: human-readable label for the active festival (or "" if none).
+func festival_label() -> String:
+	return FESTIVAL_LABELS.get(current_festival(), "")
+
+
+## v0.23: blurb for the home_intro mum line on a festival day (or "" if none).
+func festival_blurb() -> String:
+	return FESTIVAL_BLURBS.get(current_festival(), "")
 
 
 ## Returns the CJK display name for an ingredient id.

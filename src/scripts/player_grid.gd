@@ -34,6 +34,10 @@ signal bumped(target_cell: Vector2i)
 ## Seconds for one cell-to-cell tween. 0.18 ≈ Pokémon GBA walking pace.
 const STEP_DURATION: float = 0.18
 
+## v0.23: hold Shift to sprint at ~1.8× speed. Useful for backtracking
+## across the market without padding the run timer.
+const SPRINT_STEP_DURATION: float = 0.10
+
 const PLAYER_SIZE: float = 14.0       ## drawn body edge length (px)
 const PLAYER_COLOR: Color = Color("#E8F542")  ## same yellow shirt as v0.1 kid
 const PLAYER_SKIN: Color = Color("#F2D6A8")
@@ -180,8 +184,13 @@ func _attempt_step(dir: Vector2i) -> void:
 	# Commit immediately so a held-input cascade reads the post-step cell next frame.
 	cell = target
 	is_stepping = true
+	# v0.23: Shift held → sprint cadence; otherwise walk cadence.
+	var dur: float = (
+		SPRINT_STEP_DURATION if Input.is_key_pressed(KEY_SHIFT)
+		else STEP_DURATION
+	)
 	var tween: Tween = create_tween()
-	tween.tween_property(self, "position", GridWorld.cell_to_px(target), STEP_DURATION)
+	tween.tween_property(self, "position", GridWorld.cell_to_px(target), dur)
 	tween.tween_callback(_on_step_finished)
 
 
