@@ -81,12 +81,14 @@ func _build_ui() -> void:
 		_add_revealable(vbox, row)
 		_ingredient_targets.append(row)
 
-	# v0.14: dish description changes when the kid came home short.
-	var dish_text: String = (
-		"今晚的料理：簡單炒一炒"
-		if Game.last_run_incomplete
-		else "今晚的料理：醬油雞炒蔥蛋高麗菜"
-	)
+	# v0.15: dish list is computed from what was actually bought. Empty list
+	# (player owns nothing recipe-shaped) falls back to "簡單炒一炒".
+	var dishes: PackedStringArray = Inventory.cooked_dishes()
+	var dish_text: String
+	if dishes.is_empty():
+		dish_text = "今晚的料理：簡單炒一炒"
+	else:
+		dish_text = "今晚的料理：" + "、".join(dishes)
 	_add_revealable(vbox, _make_label(dish_text, 9, Color("#F2A227")))
 
 	# Money remaining (bounce-tweened from 0 to actual value when revealed).

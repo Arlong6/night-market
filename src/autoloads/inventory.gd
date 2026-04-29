@@ -56,6 +56,24 @@ const INGREDIENT_ABBREV: Dictionary = {
 	"mushroom": "菇",
 }
 
+## v0.15: dish recipes — kitchen + end_screen call cooked_dishes() to render
+## the night's menu based on what was actually bought. Each dish lists the
+## ingredient ids it needs; if all of them are owned, the dish "cooks". The
+## list is ordered by display priority (more impressive dishes first), so a
+## perfect run that matches every recipe shows 三杯雞 ahead of a side dish.
+const RECIPES: Array[Dictionary] = [
+	{ "name": "三杯雞",       "needs": ["chicken", "soy_sauce", "scallion"] },
+	{ "name": "醬油雞",       "needs": ["chicken", "soy_sauce"] },
+	{ "name": "蔥蛋",         "needs": ["scallion", "egg"] },
+	{ "name": "香菇炒蛋",     "needs": ["mushroom", "egg"] },
+	{ "name": "紅燒豆腐",     "needs": ["tofu", "soy_sauce"] },
+	{ "name": "豆腐高麗菜湯", "needs": ["tofu", "cabbage"] },
+	{ "name": "清炒高麗菜",   "needs": ["cabbage"] },
+]
+
+## v0.15: cap the dish list shown in UI so a perfect run doesn't overflow.
+const MAX_DISHES_DISPLAYED: int = 3
+
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
@@ -195,3 +213,22 @@ func display_name(ingredient_id: String) -> String:
 ## name when missing.
 func display_abbrev(ingredient_id: String) -> String:
 	return INGREDIENT_ABBREV.get(ingredient_id, display_name(ingredient_id))
+
+
+## v0.15: returns the names of every dish whose ingredient list is fully
+## owned, in RECIPES order, capped to MAX_DISHES_DISPLAYED. Returns an empty
+## array if nothing matches — caller decides the fallback name.
+func cooked_dishes() -> PackedStringArray:
+	var out: PackedStringArray = PackedStringArray()
+	for recipe in RECIPES:
+		if out.size() >= MAX_DISHES_DISPLAYED:
+			break
+		var needs: Array = recipe["needs"]
+		var ok: bool = true
+		for id in needs:
+			if not has(id):
+				ok = false
+				break
+		if ok:
+			out.append(recipe["name"])
+	return out

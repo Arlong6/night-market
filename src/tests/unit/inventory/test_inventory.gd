@@ -212,3 +212,65 @@ func test_inventory_display_abbrev_returns_one_char() -> void:
 	assert_eq(Inventory.display_abbrev("chicken"), "雞")
 	assert_eq(Inventory.display_abbrev("cabbage"), "菜")
 	assert_eq(Inventory.display_abbrev("soy_sauce"), "醬")
+
+
+# ---------------------------------------------------------------------------
+# v0.15 — recipe / dish matching
+# ---------------------------------------------------------------------------
+
+func test_inventory_cooked_dishes_empty_when_nothing_owned() -> void:
+	# Fresh inventory — no ingredients, no dishes
+	assert_eq(Inventory.cooked_dishes().size(), 0,
+		"cooked_dishes() should be empty when no ingredients are owned")
+
+
+func test_inventory_cooked_dishes_matches_simple_pair() -> void:
+	Inventory.money = 1000
+	Inventory.buy("chicken", 50)
+	Inventory.buy("soy_sauce", 50)
+	var dishes: PackedStringArray = Inventory.cooked_dishes()
+	assert_true("醬油雞" in dishes,
+		"chicken + soy_sauce should produce 醬油雞 — got %s" % str(dishes))
+
+
+func test_inventory_cooked_dishes_orders_by_recipe_priority() -> void:
+	# RECIPES is ordered with 三杯雞 (the showpiece) first. When the
+	# ingredients support both 三杯雞 (chicken+soy+scallion) and 醬油雞
+	# (chicken+soy), the showpiece should appear first.
+	Inventory.money = 1000
+	Inventory.buy("chicken", 50)
+	Inventory.buy("soy_sauce", 50)
+	Inventory.buy("scallion", 20)
+	var dishes: PackedStringArray = Inventory.cooked_dishes()
+	assert_eq(dishes[0], "三杯雞",
+		"Showpiece dish should appear first when its ingredients are owned")
+
+
+func test_inventory_cooked_dishes_caps_at_max_displayed() -> void:
+	# Owning every ingredient should match every recipe (7) — but the
+	# returned list must respect MAX_DISHES_DISPLAYED so end-screen text
+	# doesn't overflow.
+	Inventory.money = 10000
+	for id in Inventory.ALL_INGREDIENTS:
+		Inventory.buy(id, 10)
+	var dishes: PackedStringArray = Inventory.cooked_dishes()
+	assert_eq(dishes.size(), Inventory.MAX_DISHES_DISPLAYED,
+		"Perfect run should be capped at MAX_DISHES_DISPLAYED dishes")
+
+
+func test_inventory_cooked_dishes_skips_recipes_with_missing_ingredient() -> void:
+	# 蔥蛋 needs scallion + egg. Owning only scallion should NOT match it.
+	Inventory.money = 1000
+	Inventory.buy("scallion", 20)
+	var dishes: PackedStringArray = Inventory.cooked_dishes()
+	assert_false("蔥蛋" in dishes,
+		"蔥蛋 should not match when egg is missing — got %s" % str(dishes))
+
+
+func test_inventory_cooked_dishes_solo_ingredient_recipes_match() -> void:
+	# 清炒高麗菜 needs only cabbage; owning just cabbage should match it.
+	Inventory.money = 1000
+	Inventory.buy("cabbage", 40)
+	var dishes: PackedStringArray = Inventory.cooked_dishes()
+	assert_true("清炒高麗菜" in dishes,
+		"清炒高麗菜 should match with just cabbage — got %s" % str(dishes))
