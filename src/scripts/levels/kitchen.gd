@@ -531,7 +531,6 @@ func _draw_dish_on_plate() -> void:
 	var px: int = TABLE_X
 	var py: int = TABLE_Y - 4
 	var perfect: bool = Game.last_run_perfect
-	var incomplete: bool = Game.last_run_incomplete
 	if perfect:
 		# Gold rim, slightly larger
 		draw_rect(Rect2(px - 18, py - 6, 36, 12), Color("#F2A227"))
@@ -539,28 +538,199 @@ func _draw_dish_on_plate() -> void:
 	else:
 		draw_rect(Rect2(px - 14, py - 5, 28, 10), COLOR_PLATE_RIM)
 		draw_rect(Rect2(px - 13, py - 4, 26, 8), COLOR_PLATE)
-	# Dish — cluster of ingredient-colored chips. Perfect run shows all 7
-	# in a 4+3 layout; standard shows up to 6 in a 3×2. v0.14 incomplete
-	# runs jitter each chip a couple px to telegraph "messy".
+
+	# v0.16: render the night's headline dish on the plate. Standard plate
+	# inset 1px from cream rim; perfect plate gets the bigger area. When no
+	# recipe matches (very messy run), fall back to the v0.14 chip cluster.
+	var dishes: PackedStringArray = Inventory.cooked_dishes()
+	if dishes.is_empty():
+		_draw_messy_chips(px, py, perfect)
+	else:
+		var dx: int = (px - 16) if perfect else (px - 12)
+		var dy: int = (py - 4) if perfect else (py - 3)
+		var dw: int = 32 if perfect else 24
+		var dh: int = 8 if perfect else 6
+		_draw_dish(dishes[0], dx, dy, dw, dh)
+
+	# Perfect runs get a single ★ pixel sitting above the plate
+	if perfect:
+		draw_rect(Rect2(px - 1, py - 9, 2, 2), Color("#F2A227"))
+
+
+# ---------------------------------------------------------------------------
+# v0.16 — per-recipe dish rendering. Each dish is a small pixel-art
+# composition fitting a (24×6) standard or (32×8) perfect plate area.
+# ---------------------------------------------------------------------------
+
+const COLOR_CHICKEN_BROWN: Color = Color("#A36B3A")
+const COLOR_CHICKEN_GLAZED: Color = Color("#7A4A2A")
+const COLOR_SOY_GLOSS: Color = Color("#3A1A0A")
+const COLOR_EGG_YELLOW: Color = Color("#FFE9B0")
+const COLOR_EGG_BROWNED: Color = Color("#E8C870")
+const COLOR_SCALLION_GREEN: Color = Color("#7AC940")
+const COLOR_MUSHROOM_BROWN: Color = Color("#7A4A2A")
+const COLOR_TOFU_WHITE: Color = Color("#F8F0D8")
+const COLOR_REDCOOK_SAUCE: Color = Color("#5A2410")
+const COLOR_BROTH_PALE: Color = Color("#F5E0B0")
+const COLOR_CABBAGE_LIGHT: Color = Color("#9EE070")
+const COLOR_CABBAGE_DARK: Color = Color("#5A8030")
+
+
+## Dispatch — picks the right per-recipe drawer. Falls back to messy chips
+## if the dish name doesn't have a custom render.
+func _draw_dish(dish_name: String, x: int, y: int, w: int, h: int) -> void:
+	match dish_name:
+		"三杯雞":         _draw_dish_sanbei(x, y, w, h)
+		"醬油雞":         _draw_dish_soy_chicken(x, y, w, h)
+		"蔥蛋":           _draw_dish_scallion_egg(x, y, w, h)
+		"香菇炒蛋":       _draw_dish_mushroom_egg(x, y, w, h)
+		"紅燒豆腐":       _draw_dish_red_tofu(x, y, w, h)
+		"豆腐高麗菜湯":   _draw_dish_tofu_soup(x, y, w, h)
+		"清炒高麗菜":     _draw_dish_stirfry_cabbage(x, y, w, h)
+
+
+## Pure-pixel helper: place a single dot inside the dish area, clipped to
+## (x..x+w-1, y..y+h-1).
+func _dot(x: int, y: int, w: int, h: int, ox: int, oy: int, c: Color) -> void:
+	if ox < 0 or oy < 0 or ox >= w or oy >= h:
+		return
+	draw_rect(Rect2(x + ox, y + oy, 1, 1), c)
+
+
+## Pure-pixel helper: place a 2×2 chunk clipped to the dish area.
+func _chunk2(x: int, y: int, w: int, h: int, ox: int, oy: int, c: Color) -> void:
+	if ox < 0 or oy < 0 or ox + 1 >= w or oy + 1 >= h:
+		return
+	draw_rect(Rect2(x + ox, y + oy, 2, 2), c)
+
+
+## Pure-pixel helper: place a 3×3 chunk (e.g. tofu cube, mushroom cap).
+func _chunk3(x: int, y: int, w: int, h: int, ox: int, oy: int, c: Color) -> void:
+	if ox < 0 or oy < 0 or ox + 2 >= w or oy + 2 >= h:
+		return
+	draw_rect(Rect2(x + ox, y + oy, 3, 3), c)
+
+
+## 三杯雞 — dark glossy chicken chunks plus scallion confetti.
+func _draw_dish_sanbei(x: int, y: int, w: int, h: int) -> void:
+	# Sauce pool along the bottom
+	draw_rect(Rect2(x, y + h - 1, w, 1), COLOR_SOY_GLOSS)
+	# Chicken chunks (4×3)
+	for chunk in [[1, 1], [6, 0], [11, 1], [16, 0], [3, 3], [13, 3]]:
+		var cx: int = x + int(chunk[0])
+		var cy: int = y + int(chunk[1])
+		if cx + 4 > x + w or cy + 3 > y + h:
+			continue
+		draw_rect(Rect2(cx, cy, 4, 3), COLOR_CHICKEN_GLAZED)
+		draw_rect(Rect2(cx + 1, cy, 1, 1), COLOR_CHICKEN_BROWN)
+	# Scallion sprinkle
+	for s in [[2, 0], [9, 2], [14, 0], [19, 1], [5, 4], [11, 4], [17, 4]]:
+		_dot(x, y, w, h, int(s[0]), int(s[1]), COLOR_SCALLION_GREEN)
+
+
+## 醬油雞 — chicken chunks coated with a soy glaze stripe.
+func _draw_dish_soy_chicken(x: int, y: int, w: int, h: int) -> void:
+	draw_rect(Rect2(x, y + h - 1, w, 1), COLOR_SOY_GLOSS)
+	for i in 4:
+		var cx: int = x + 1 + i * 5
+		var cy: int = y + 1
+		if cx + 4 > x + w:
+			break
+		draw_rect(Rect2(cx, cy, 4, h - 2), COLOR_CHICKEN_BROWN)
+		# Soy glaze stripe across the top
+		draw_rect(Rect2(cx, cy, 4, 1), COLOR_SOY_GLOSS)
+		# Highlight pixel
+		draw_rect(Rect2(cx + 2, cy + 1, 1, 1), COLOR_CHICKEN_BROWN.lightened(0.2))
+
+
+## 蔥蛋 — yellow egg base with green scallion specks.
+func _draw_dish_scallion_egg(x: int, y: int, w: int, h: int) -> void:
+	draw_rect(Rect2(x, y, w, h), COLOR_EGG_YELLOW)
+	# Browning along the top edge
+	draw_rect(Rect2(x, y, w, 1), COLOR_EGG_BROWNED)
+	# Scallion specks scattered
+	for s in [[1, 1], [4, 2], [7, 1], [10, 3], [13, 2], [16, 1], [19, 3], [22, 2],
+			  [3, 4], [11, 4], [18, 4], [5, 0]]:
+		_dot(x, y, w, h, int(s[0]), int(s[1]), COLOR_SCALLION_GREEN)
+
+
+## 香菇炒蛋 — yellow egg base with brown mushroom rounds.
+func _draw_dish_mushroom_egg(x: int, y: int, w: int, h: int) -> void:
+	draw_rect(Rect2(x, y, w, h), COLOR_EGG_YELLOW)
+	draw_rect(Rect2(x, y, w, 1), COLOR_EGG_BROWNED)
+	# Mushroom caps — 3×2 dome with stem dot
+	for i in 3:
+		var mx: int = x + 2 + i * 7
+		var my: int = y + 1
+		if mx + 3 > x + w or my + 2 > y + h:
+			break
+		draw_rect(Rect2(mx, my, 3, 1), COLOR_MUSHROOM_BROWN.darkened(0.2))
+		draw_rect(Rect2(mx, my + 1, 3, 2), COLOR_MUSHROOM_BROWN)
+		_dot(x, y, w, h, mx - x + 1, my - y + 3, COLOR_MUSHROOM_BROWN.lightened(0.2))
+
+
+## 紅燒豆腐 — white tofu cubes in dark red braising sauce.
+func _draw_dish_red_tofu(x: int, y: int, w: int, h: int) -> void:
+	draw_rect(Rect2(x, y, w, h), COLOR_REDCOOK_SAUCE)
+	# Glossy highlight on the sauce
+	draw_rect(Rect2(x + 2, y, 4, 1), COLOR_REDCOOK_SAUCE.lightened(0.15))
+	for i in 3:
+		var tx: int = x + 2 + i * 7
+		var ty: int = y + 2
+		if tx + 3 > x + w or ty + 3 > y + h:
+			break
+		_chunk3(x, y, w, h, tx - x, ty - y, COLOR_TOFU_WHITE)
+		# Sauce coating on the upper face
+		_dot(x, y, w, h, tx - x, ty - y, Color("#C8A878"))
+		_dot(x, y, w, h, tx - x + 1, ty - y, Color("#C8A878"))
+
+
+## 豆腐高麗菜湯 — pale broth with floating tofu cubes and cabbage chunks.
+func _draw_dish_tofu_soup(x: int, y: int, w: int, h: int) -> void:
+	draw_rect(Rect2(x, y, w, h), COLOR_BROTH_PALE)
+	# Steam shimmer dots along the surface
+	for sx in [2, 8, 14, 20]:
+		_dot(x, y, w, h, sx, 0, COLOR_BROTH_PALE.lightened(0.4))
+	# Tofu cubes
+	for i in 2:
+		var tx: int = x + 3 + i * 9
+		var ty: int = y + 2
+		_chunk3(x, y, w, h, tx - x, ty - y, COLOR_TOFU_WHITE)
+	# Cabbage chunks floating
+	for c in [[7, 1], [13, 3], [18, 1], [10, 4]]:
+		_chunk2(x, y, w, h, int(c[0]), int(c[1]), COLOR_CABBAGE_LIGHT)
+
+
+## 清炒高麗菜 — pile of pale-green leafy mass with shaded clumps.
+func _draw_dish_stirfry_cabbage(x: int, y: int, w: int, h: int) -> void:
+	draw_rect(Rect2(x, y, w, h), COLOR_CABBAGE_LIGHT)
+	# Shaded clumps for leafy texture
+	for c in [[2, 1], [6, 3], [10, 1], [14, 3], [18, 1], [22, 3]]:
+		_chunk2(x, y, w, h, int(c[0]), int(c[1]), COLOR_CABBAGE_DARK)
+	# Highlight curls
+	for hpt in [[3, 0], [8, 2], [13, 0], [16, 2], [21, 0]]:
+		_dot(x, y, w, h, int(hpt[0]), int(hpt[1]),
+			COLOR_CABBAGE_LIGHT.lightened(0.3))
+
+
+## v0.14 fallback — when no recipe matches, draw the old ingredient-chip
+## cluster, jittered if incomplete to telegraph "made do".
+func _draw_messy_chips(px: int, py: int, perfect: bool) -> void:
 	var owned: PackedStringArray = Inventory.owned_ingredients()
 	var per_row: int = 4 if perfect else 3
 	var max_chips: int = 7 if perfect else 6
+	var incomplete: bool = Game.last_run_incomplete
 	for i in mini(owned.size(), max_chips):
 		var col: int = i % per_row
 		var row: int = i / per_row
 		var dx_off: float = -float(per_row - 1) * 2.5
 		var dx: float = float(px) + dx_off + float(col) * 5.0
 		var dy: float = float(py) - 2.0 + float(row) * 4.0
-		# Deterministic per-chip jitter for incomplete runs — same input gives
-		# the same offset, so the plate doesn't shimmer between redraws.
 		if incomplete:
 			dx += cos(float(i) * 7.3) * 1.5
 			dy += sin(float(i) * 11.7) * 1.5
 		var c: Color = FOOD_COLOR.get(owned[i], Color.WHITE)
 		draw_rect(Rect2(dx, dy, 3, 3), c)
-	# Perfect runs get a single ★ pixel sitting above the plate
-	if perfect:
-		draw_rect(Rect2(px - 1, py - 9, 2, 2), Color("#F2A227"))
 
 
 func _draw_stir_meter() -> void:
