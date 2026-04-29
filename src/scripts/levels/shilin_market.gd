@@ -115,6 +115,18 @@ const BONUS_VALUE: int = 15
 const BONUS_LINE: String = "★ 哎呀，地上有人掉的 NT$15！"
 const BONUS_COLOR: Color = Color("#7AC940")  # green — distinct from gold
 
+# v0.21 — random street events. Each rolls independently per run.
+const WALLET_CHANCE: float = 0.35
+const WALLET_VALUE: int = 25
+const WALLET_LINE: String = "★ 撿到一個錢包！NT$25"
+const WALLET_COLOR: Color = Color("#8A4A28")  # brown leather
+
+const LOST_CAT_CHANCE: float = 0.25
+const RAIN_CHANCE: float = 0.30
+## Delay before rain starts after entering the market (seconds).
+const RAIN_DELAY_MIN: float = 4.0
+const RAIN_DELAY_MAX: float = 14.0
+
 # Palette
 const COLOR_FLOOR_A: Color = Color("#3A1A0A")  ## warm dark brown
 const COLOR_FLOOR_B: Color = Color("#4A2412")  ## one shade lighter (rhythm)
@@ -150,6 +162,11 @@ var _npcs_by_cell: Dictionary[Vector2i, NPC] = {}
 ## Floor pickups indexed by cell. Removed when collected.
 var _items_by_cell: Dictionary[Vector2i, ItemPickup] = {}
 
+## v0.21: lost cats (random event NPCs) indexed by cell so bumps dispatch
+## correctly. Cleared when the cat despawns. Cats aren't NPC subclasses so
+## they live in a separate dictionary from _npcs_by_cell.
+var _lost_cats_by_cell: Dictionary[Vector2i, LostCat] = {}
+
 ## Camera shake state — triggered on wall bumps. Decays linearly to 0.
 var _shake_t: float = 0.0
 const SHAKE_DURATION: float = 0.15
@@ -168,6 +185,7 @@ func _ready() -> void:
 	_spawn_chatters()
 	_spawn_shoppers()
 	_spawn_items()
+	_spawn_random_events()
 	_spawn_mom()
 	_spawn_hud()
 	_spawn_lanterns()
@@ -272,6 +290,90 @@ func _spawn_items() -> void:
 	_spawn_bonus_pickup()
 
 
+## v0.21: rolls independent random street events for this run.
+##   * Wallet pickup (35%)  — bigger NT$25 brown leather coin
+##   * Lost cat (25%)       — NPC at random cell, choice for +NT$20
+##   * Rain (30%)           — 8-second weather overlay, fires after a delay
+func _spawn_random_events() -> void:
+	if randf() < WALLET_CHANCE:
+		_spawn_wallet()
+	if randf() < LOST_CAT_CHANCE:
+		_spawn_lost_cat()
+	if randf() < RAIN_CHANCE:
+		_schedule_rain()
+
+
+func _spawn_wallet() -> void:
+	var pick: Vector2i = _random_free_cell()
+	if pick == Vector2i(-1, -1):
+		return
+	var item: ItemPickup = ItemPickup.new()
+	item.cell = pick
+	item.value = WALLET_VALUE
+	item.pickup_line = WALLET_LINE
+	item.color = WALLET_COLOR
+	add_child(item)
+	_items_by_cell[pick] = item
+
+
+func _spawn_lost_cat() -> void:
+	var pick: Vector2i = _random_free_cell()
+	if pick == Vector2i(-1, -1):
+		return
+	var cat: LostCat = LostCat.new()
+	cat.cell = pick
+	cat.despawned.connect(_on_cat_despawned)
+	add_child(cat)
+	_lost_cats_by_cell[pick] = cat
+	# Mark the cell unwalkable so the player bumps instead of stepping onto it.
+	if GridWorld.in_bounds(pick, GRID_W, GRID_H):
+		walkable[pick.y][pick.x] = false
+
+
+## v0.21: cat returned to its owner — free the cell and the dict slot so
+## the player can walk through it again (and so the cell is reusable for
+## other spawns if any future system needs it).
+func _on_cat_despawned(freed_cell: Vector2i) -> void:
+	_lost_cats_by_cell.erase(freed_cell)
+	if GridWorld.in_bounds(freed_cell, GRID_W, GRID_H):
+		walkable[freed_cell.y][freed_cell.x] = true
+
+
+func _schedule_rain() -> void:
+	var delay: float = randf_range(RAIN_DELAY_MIN, RAIN_DELAY_MAX)
+	get_tree().create_timer(delay).timeout.connect(_start_rain)
+
+
+func _start_rain() -> void:
+	# Don't stack overlapping rain layers if the timer somehow fires twice.
+	if has_node("Rain"):
+		return
+	var rain: RainOverlay = RainOverlay.new()
+	rain.name = "Rain"
+	add_child(rain)
+
+
+## Picks any walkable cell that isn't reserved (home, mom, existing items
+## or cats). Returns Vector2i(-1, -1) if no candidates remain.
+func _random_free_cell() -> Vector2i:
+	var candidates: Array[Vector2i] = []
+	for y in range(1, GRID_H - 1):
+		for x in range(1, GRID_W - 1):
+			var c: Vector2i = Vector2i(x, y)
+			if not is_walkable(c):
+				continue
+			if c == HOME_CELL or c == MOM_CELL:
+				continue
+			if _items_by_cell.has(c):
+				continue
+			if _lost_cats_by_cell.has(c):
+				continue
+			candidates.append(c)
+	if candidates.is_empty():
+		return Vector2i(-1, -1)
+	return candidates[randi() % candidates.size()]
+
+
 ## v0.9: one extra coin per run at a random walkable cell. Distinct green
 ## colour so it reads as "rare find" vs the standard gold pickups.
 func _spawn_bonus_pickup() -> void:
@@ -332,11 +434,16 @@ func _on_player_bumped(target_cell: Vector2i) -> void:
 	var npc: NPC = _npcs_by_cell.get(target_cell, null)
 	if npc != null:
 		npc.on_bumped()
-	else:
-		# Wall thunk — only when there's no NPC, so dialogue intros don't
-		# get a redundant bump cue stacked under the typewriter blips.
-		Sfx.play_bump()
-		_shake_t = SHAKE_DURATION
+		return
+	# v0.21: lost cats live in their own dict — same bump semantics.
+	var cat: LostCat = _lost_cats_by_cell.get(target_cell, null)
+	if cat != null:
+		cat.on_bumped()
+		return
+	# Wall thunk — only when there's no NPC, so dialogue intros don't
+	# get a redundant bump cue stacked under the typewriter blips.
+	Sfx.play_bump()
+	_shake_t = SHAKE_DURATION
 
 
 func _process(delta: float) -> void:
