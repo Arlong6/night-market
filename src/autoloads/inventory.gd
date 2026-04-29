@@ -1,8 +1,10 @@
 ## Player money + ingredient inventory for Night Market Shopping (R-005).
 ##
-## v0.7: 7 stalls in the market, but mum only needs ANY 5 — the player
-## chooses what mix to buy. STARTING_MONEY = 180 forces at least one
-## successful 殺價 (or skipping the most expensive items) to make budget.
+## v0.13: mum now requests a SPECIFIC random 5-of-7 each run instead of "any
+## 5". The picked list lives in `required_ingredients` (regenerated on reset)
+## and drives the HUD checklist + the home_intro dialogue. STARTING_MONEY
+## bumped 180→220 to keep most random selections feasible while still leaving
+## bargain pressure on the expensive end.
 ##
 ## Pure state class. The HUD subscribes to its signals; StallNPC mutates
 ## via `buy()`; MomNPC checks `has_enough()` for the win condition.
@@ -19,7 +21,7 @@ signal ingredient_added(ingredient_id: String)
 # Constants — tuning per design/gdd/game-concept-rpg.md §7
 # ---------------------------------------------------------------------------
 
-const STARTING_MONEY: int = 180
+const STARTING_MONEY: int = 220
 
 ## All sellable ingredients in the market. The player can buy any of them
 ## but only needs REQUIRED_COUNT of them to complete the quest.
@@ -27,7 +29,8 @@ const ALL_INGREDIENTS: PackedStringArray = [
 	"scallion", "egg", "cabbage", "chicken", "soy_sauce", "tofu", "mushroom"
 ]
 
-## How many distinct ingredients mum demands. Win condition: count() >= this.
+## How many distinct ingredients mum demands. Win condition: every entry of
+## `required_ingredients` has been bought.
 const REQUIRED_COUNT: int = 5
 
 ## CJK display names for the ingredient ids above.
@@ -41,6 +44,18 @@ const INGREDIENT_DISPLAY: Dictionary = {
 	"mushroom": "香菇",
 }
 
+## v0.13: 1-CJK-char abbreviations used by the HUD checklist (where the full
+## display name is too wide). Falls back to display_name if missing.
+const INGREDIENT_ABBREV: Dictionary = {
+	"scallion": "蔥",
+	"egg": "蛋",
+	"cabbage": "菜",
+	"chicken": "雞",
+	"soy_sauce": "醬",
+	"tofu": "腐",
+	"mushroom": "菇",
+}
+
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
@@ -50,6 +65,21 @@ var money: int = STARTING_MONEY
 ## Maps ingredient_id → true once owned. Boolean is enough for this slice
 ## (no stack counts, no expiry).
 var ingredients: Dictionary[String, bool] = {}
+
+## v0.13: the specific 5 ingredients mum requested for this run. Populated
+## by `randomize_required()` on every `reset()`, also seeded on _ready so
+## that HUD/intro reads before any reset still get a valid list.
+var required_ingredients: PackedStringArray = PackedStringArray()
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle
+# ---------------------------------------------------------------------------
+
+func _ready() -> void:
+	if required_ingredients.is_empty():
+		randomize_required()
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -84,10 +114,32 @@ func ingredient_count() -> int:
 	return ingredients.size()
 
 
-## True iff the player has bought at least REQUIRED_COUNT ingredients.
-## (Pre-v0.7 this was `has_all_required()` — kept as alias below.)
+## v0.13: true iff the given id is in the random required-list for this run.
+## HUD uses this to decide which ingredients show on the checklist.
+func is_required(id: String) -> bool:
+	return id in required_ingredients
+
+
+## v0.13: how many of the random required-list have been bought so far.
+## Drives the HUD's "N/5" progress counter.
+func required_owned_count() -> int:
+	var n: int = 0
+	for id in required_ingredients:
+		if has(id):
+			n += 1
+	return n
+
+
+## True iff every entry in `required_ingredients` has been bought. v0.13
+## replaced the old "any-5-of-7" semantics with "the specific 5 mum asked
+## for". Win condition for MomNPC.
 func has_enough() -> bool:
-	return ingredient_count() >= REQUIRED_COUNT
+	if required_ingredients.is_empty():
+		return false
+	for id in required_ingredients:
+		if not has(id):
+			return false
+	return true
 
 
 ## Legacy alias used by older callsites/tests. Same semantics as has_enough().
@@ -101,6 +153,19 @@ func has_all() -> bool:
 	return ingredient_count() >= ALL_INGREDIENTS.size()
 
 
+## v0.13: shuffles ALL_INGREDIENTS and picks REQUIRED_COUNT of them as the
+## random shopping list for this run. Called on every `reset()`.
+func randomize_required() -> void:
+	var pool: Array[String] = []
+	for id in ALL_INGREDIENTS:
+		pool.append(id)
+	pool.shuffle()
+	var picked: PackedStringArray = PackedStringArray()
+	for i in REQUIRED_COUNT:
+		picked.append(pool[i])
+	required_ingredients = picked
+
+
 ## Returns owned ingredient ids (in ALL_INGREDIENTS order, not insertion order),
 ## handy for the end-screen ingredient list.
 func owned_ingredients() -> PackedStringArray:
@@ -112,13 +177,21 @@ func owned_ingredients() -> PackedStringArray:
 
 
 ## Resets money and inventory back to the start of a fresh run.
-## Called by R-009's title screen on START press.
+## Called by R-009's title screen on START press. v0.13 also re-rolls the
+## required-ingredient list so each run is a different shopping puzzle.
 func reset() -> void:
 	money = STARTING_MONEY
 	ingredients = {}
+	randomize_required()
 	money_changed.emit(money)
 
 
 ## Returns the CJK display name for an ingredient id.
 func display_name(ingredient_id: String) -> String:
 	return INGREDIENT_DISPLAY.get(ingredient_id, ingredient_id)
+
+
+## v0.13: 1-CJK-char abbreviation for HUD checklists. Falls back to display
+## name when missing.
+func display_abbrev(ingredient_id: String) -> String:
+	return INGREDIENT_ABBREV.get(ingredient_id, display_name(ingredient_id))

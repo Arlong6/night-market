@@ -24,6 +24,7 @@ const FONT_SIZE: int = 10
 var _money_label: Label = null
 var _progress_label: Label = null
 var _time_label: Label = null
+var _checklist_label: Label = null
 
 # ---------------------------------------------------------------------------
 # Built-in
@@ -36,6 +37,7 @@ func _ready() -> void:
 	_refresh_money()
 	_refresh_progress()
 	_refresh_time()
+	_refresh_checklist()
 	# Subscribe so future changes auto-update.
 	if not Inventory.money_changed.is_connected(_on_money_changed):
 		Inventory.money_changed.connect(_on_money_changed)
@@ -79,6 +81,17 @@ func _build_ui() -> void:
 	_time_label.position = Vector2((VIEWPORT_W - 60.0) / 2.0, MARGIN)
 	add_child(_time_label)
 
+	# v0.13 checklist label — sits under the N/5 progress in the top-right
+	# and shows ✓/○ for each of mum's randomly-required ingredients.
+	_checklist_label = Label.new()
+	_checklist_label.add_theme_font_override("font", _make_cjk_font())
+	_checklist_label.add_theme_font_size_override("font_size", 8)
+	_checklist_label.add_theme_color_override("font_color", Color("#F5EDDA"))
+	_checklist_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_checklist_label.size = Vector2(110.0, 12.0)
+	_checklist_label.position = Vector2(VIEWPORT_W - MARGIN - 110.0, MARGIN + 12.0)
+	add_child(_checklist_label)
+
 
 func _make_cjk_font() -> FontFile:
 	var f: FontFile = load("res://assets/fonts/jf-openhuninn-2.1.ttf") as FontFile
@@ -97,6 +110,7 @@ func _on_money_changed(_new_money: int) -> void:
 
 func _on_ingredient_added(_id: String) -> void:
 	_refresh_progress()
+	_refresh_checklist()
 
 
 func _refresh_money() -> void:
@@ -104,10 +118,24 @@ func _refresh_money() -> void:
 
 
 func _refresh_progress() -> void:
+	# v0.13: progress counts ONLY the random required-list, not arbitrary
+	# extras the player might also buy for the perfect-run achievement.
 	_progress_label.text = "%d/%d" % [
-		Inventory.ingredient_count(),
+		Inventory.required_owned_count(),
 		Inventory.REQUIRED_COUNT
 	]
+
+
+## v0.13: rebuilds "✓蔥 ○蛋 ○菜 ○雞 ○醬"-style checklist from the run's
+## random required-list. Checked items use a brighter green to read clearly.
+func _refresh_checklist() -> void:
+	if _checklist_label == null:
+		return
+	var parts: PackedStringArray = PackedStringArray()
+	for id in Inventory.required_ingredients:
+		var mark: String = "✓" if Inventory.has(id) else "○"
+		parts.append("%s%s" % [mark, Inventory.display_abbrev(id)])
+	_checklist_label.text = " ".join(parts)
 
 
 func _refresh_time() -> void:

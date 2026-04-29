@@ -279,13 +279,14 @@ func _run_intro_sequence() -> void:
 		return
 	if Dialogue._active and Dialogue._box != null:
 		Dialogue._box._close()
-	Dialogue.show(["蔥 蛋 雞肉 高麗菜 醬油 豆腐 香菇 — 任選 5 樣！"])
+	# v0.13: list mum's actual random shopping list for this run.
+	Dialogue.show(["今天要：%s ～" % _format_required_list()])
 	await get_tree().create_timer(2.0).timeout
 	if _stage == Stage.INTRO_DONE:
 		return
 	if Dialogue._active and Dialogue._box != null:
 		Dialogue._box._close()
-	Dialogue.show(["給你 NT$180… 記得試試 殺價！"])
+	Dialogue.show(["給你 NT$%d… 記得試試 殺價！" % Inventory.STARTING_MONEY])
 	await get_tree().create_timer(1.6).timeout
 	if _stage == Stage.INTRO_DONE:
 		return
@@ -301,6 +302,17 @@ func _run_intro_sequence() -> void:
 	if _stage != Stage.INTRO_DONE:
 		_stage = Stage.INTRO_DONE
 		Game.goto_level("shilin")
+
+
+## Joins required-ingredient display names with 、 for mum's intro line.
+## Falls back to a generic "5 樣食材" if the list is somehow empty.
+func _format_required_list() -> String:
+	var names: PackedStringArray = PackedStringArray()
+	for id in Inventory.required_ingredients:
+		names.append(Inventory.display_name(id))
+	if names.is_empty():
+		return "5 樣食材"
+	return "、".join(names)
 
 
 ## Fast-forwards intro: closes any line + jumps the kid offscreen + transition.
