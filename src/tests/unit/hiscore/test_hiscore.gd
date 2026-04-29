@@ -195,3 +195,84 @@ func test_hiscore_clear_wipes_vendor_purchases() -> void:
 	assert_eq(HiScore.purchase_count("chicken"), 0,
 		"clear() should drop loyalty counts to 0")
 	assert_eq(HiScore.purchase_count("egg"), 0)
+
+
+# ---------------------------------------------------------------------------
+# v0.24 — cookbook journal (dishes_cooked)
+# ---------------------------------------------------------------------------
+
+func test_hiscore_unlocked_dish_count_starts_at_zero() -> void:
+	# Arrange: clear() in before_each leaves dishes_cooked empty.
+	# Act / Assert
+	assert_eq(HiScore.unlocked_dish_count(), 0,
+		"fresh HiScore should report 0 unlocked dishes")
+	assert_eq(HiScore.cook_count("三杯雞"), 0,
+		"unknown dishes should report cook count 0")
+
+
+func test_hiscore_record_cooked_dish_increments_count() -> void:
+	# Arrange / Act
+	HiScore.record_cooked_dish("三杯雞")
+	HiScore.record_cooked_dish("三杯雞")
+	HiScore.record_cooked_dish("三杯雞")
+
+	# Assert
+	assert_eq(HiScore.cook_count("三杯雞"), 3,
+		"3 record_cooked_dish() calls should yield count = 3")
+	assert_eq(HiScore.unlocked_dish_count(), 1,
+		"a single distinct dish should count as 1 unlocked entry")
+
+
+func test_hiscore_record_cooked_dish_isolates_per_dish() -> void:
+	# Arrange / Act
+	HiScore.record_cooked_dish("三杯雞")
+	HiScore.record_cooked_dish("蔥蛋")
+	HiScore.record_cooked_dish("蔥蛋")
+
+	# Assert
+	assert_eq(HiScore.cook_count("三杯雞"), 1)
+	assert_eq(HiScore.cook_count("蔥蛋"), 2)
+	assert_eq(HiScore.cook_count("醬油雞"), 0,
+		"untouched dishes should remain at 0")
+	assert_eq(HiScore.unlocked_dish_count(), 2,
+		"two distinct dishes → unlocked count of 2")
+
+
+func test_hiscore_record_cooked_dish_ignores_empty_name() -> void:
+	# Arrange / Act
+	HiScore.record_cooked_dish("")
+
+	# Assert
+	assert_eq(HiScore.unlocked_dish_count(), 0,
+		"empty dish name should be a no-op")
+
+
+func test_hiscore_dishes_cooked_persist_via_config_file() -> void:
+	# Arrange
+	HiScore.record_cooked_dish("三杯雞")
+	HiScore.record_cooked_dish("三杯雞")
+	HiScore.record_cooked_dish("醬油雞")
+
+	# Act: wipe in-memory and reload from disk
+	HiScore.dishes_cooked = {}
+	HiScore._load()
+
+	# Assert
+	assert_eq(HiScore.cook_count("三杯雞"), 2,
+		"dishes_cooked should round-trip via the ConfigFile")
+	assert_eq(HiScore.cook_count("醬油雞"), 1)
+	assert_eq(HiScore.unlocked_dish_count(), 2)
+
+
+func test_hiscore_clear_wipes_dishes_cooked() -> void:
+	# Arrange
+	HiScore.record_cooked_dish("三杯雞")
+	HiScore.record_cooked_dish("蔥蛋")
+
+	# Act
+	HiScore.clear()
+
+	# Assert
+	assert_eq(HiScore.unlocked_dish_count(), 0,
+		"clear() should empty the cookbook journal")
+	assert_eq(HiScore.cook_count("三杯雞"), 0)

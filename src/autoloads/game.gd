@@ -53,6 +53,7 @@ const LEVEL_PATHS: Dictionary[String, String] = {
 	"shilin": "res://scenes/levels/shilin_market.tscn",
 	"kitchen": "res://scenes/levels/kitchen.tscn",
 	"end_win": "res://scenes/menus/end_screen.tscn",
+	"cookbook": "res://scenes/menus/cookbook.tscn",
 }
 
 # ---------------------------------------------------------------------------
@@ -82,6 +83,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_ESCAPE:
 			# Skip ESC handling on the title itself (no run to abandon).
 			if current_area == "title":
+				return
+			# v0.24: cookbook ESC returns to title without touching run state.
+			if current_area == "cookbook":
+				goto_level("title")
+				get_viewport().set_input_as_handled()
 				return
 			Inventory.reset()
 			reset_run()

@@ -65,6 +65,15 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("interact"):
 		_on_start_pressed()
 		get_viewport().set_input_as_handled()
+		return
+	# v0.24: 'C' opens the cookbook journal — only meaningful once the player
+	# has unlocked at least one dish, but always responsive so the hint isn't
+	# a lie.
+	if event is InputEventKey:
+		var ke: InputEventKey = event
+		if ke.pressed and not ke.echo and ke.physical_keycode == KEY_C:
+			Game.goto_level("cookbook")
+			get_viewport().set_input_as_handled()
 
 
 func _draw() -> void:
@@ -152,9 +161,13 @@ func _build_ui() -> void:
 	vbox.add_child(_start_label)
 
 	# Bottom hint pinned at bottom of viewport, NOT in the vbox flow.
-	var hint: Label = _make_label(
-		"方向鍵 移動 　空白鍵 互動 　M 靜音 　 試試 殺價 ！", 8, COLOR_HINT
-	)
+	# v0.24: append C 圖鑑 hint once the player has unlocked at least one dish
+	# so it doesn't clutter a brand-new player's title screen.
+	var hint_text: String = "方向鍵 移動 　空白鍵 互動 　M 靜音"
+	if HiScore.unlocked_dish_count() > 0:
+		hint_text += " 　C 圖鑑"
+	hint_text += " 　 試試 殺價 ！"
+	var hint: Label = _make_label(hint_text, 8, COLOR_HINT)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.size = Vector2(VIEWPORT_W, 12)
 	hint.position = Vector2(0, VIEWPORT_H - 14)

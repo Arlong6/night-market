@@ -211,6 +211,11 @@ func _run_sequence() -> void:
 		await get_tree().process_frame
 
 	_stage = Stage.PLATE
+	# v0.24: cookbook journal — every dish that landed on the plate this run
+	# permanently unlocks (and increments) in HiScore. Done at PLATE start so
+	# the entry exists before the closing line / end_win.
+	for d in Inventory.cooked_dishes():
+		HiScore.record_cooked_dish(d)
 	if Dialogue._active and Dialogue._box != null:
 		Dialogue._box._close()
 	Dialogue.show(["完成！上桌囉～"])
@@ -578,7 +583,7 @@ func _draw_dish_on_plate() -> void:
 		var dy: int = (py - 3) if perfect else (py - 3)
 		var dw: int = 34 if perfect else 28
 		var dh: int = 8 if perfect else 7
-		_draw_dish(dishes[0], dx, dy, dw, dh)
+		DishRenderer.draw_dish(self, dishes[0], dx, dy, dw, dh)
 		# v0.18: steam wisps above the plate while the dish is hot.
 		_draw_dish_steam(px, dy)
 
@@ -588,87 +593,11 @@ func _draw_dish_on_plate() -> void:
 
 
 # ---------------------------------------------------------------------------
-# v0.18 — per-recipe dish rendering, multi-tone palette pass.
-# Each dish fits a (28×7) standard or (34×8) perfect plate area, drawn with
-# 3-tone shading (highlight / base / shadow) plus garnish layers (sesame,
-# basil, sauce gloss). Steam wisps are drawn above the plate.
+# v0.18 / v0.24 — per-recipe dish rendering.
+# All palette + drawer code moved into DishRenderer (see dish_renderer.gd) so
+# the cookbook journal can render the same dishes at the same shading. Only
+# the steam wisps remain here (they depend on the kitchen's _steam_t).
 # ---------------------------------------------------------------------------
-
-const COLOR_CHICKEN_LIGHT: Color = Color("#D4965A")     ## chicken highlight
-const COLOR_CHICKEN_BROWN: Color = Color("#A36B3A")     ## chicken base
-const COLOR_CHICKEN_DARK: Color = Color("#7A4A2A")      ## chicken shadow
-const COLOR_SOY_GLOSS: Color = Color("#3A1A0A")         ## sauce dark
-const COLOR_SOY_HIGHLIGHT: Color = Color("#6A3A2A")     ## sauce gloss reflection
-const COLOR_SESAME: Color = Color("#F5EDDA")            ## sesame seeds
-const COLOR_BASIL: Color = Color("#3A6A2A")             ## 九層塔 dark
-const COLOR_BASIL_LIGHT: Color = Color("#5A9A3A")       ## basil highlight
-const COLOR_EGG_YELLOW: Color = Color("#FFE9B0")        ## egg base
-const COLOR_EGG_BROWNED: Color = Color("#E8C870")       ## egg crust top
-const COLOR_EGG_DARK: Color = Color("#C8A848")          ## egg crust shadow
-const COLOR_SCALLION_GREEN: Color = Color("#7AC940")    ## scallion base
-const COLOR_SCALLION_DARK: Color = Color("#5A9028")     ## scallion shadow
-const COLOR_MUSHROOM_LIGHT: Color = Color("#A06A4A")    ## mushroom highlight
-const COLOR_MUSHROOM_BROWN: Color = Color("#7A4A2A")    ## mushroom base
-const COLOR_MUSHROOM_DARK: Color = Color("#5A3018")     ## mushroom shadow
-const COLOR_TOFU_WHITE: Color = Color("#F8F0D8")        ## tofu base
-const COLOR_TOFU_SHADOW: Color = Color("#D8C8A8")       ## tofu shadow
-const COLOR_REDCOOK_SAUCE: Color = Color("#5A2410")     ## braising sauce
-const COLOR_REDCOOK_HIGHLIGHT: Color = Color("#7A3818") ## sauce sheen
-const COLOR_BROTH_PALE: Color = Color("#F5E0B0")        ## broth base
-const COLOR_BROTH_SHIMMER: Color = Color("#FFF8D8")     ## broth shimmer dot
-const COLOR_CABBAGE_LIGHT: Color = Color("#B8E890")     ## cabbage highlight
-const COLOR_CABBAGE_MID: Color = Color("#9EE070")       ## cabbage base
-const COLOR_CABBAGE_DARK: Color = Color("#5A8030")      ## cabbage shadow
-
-## Dispatch — picks the right per-recipe drawer. Falls back to messy chips
-## if the dish name doesn't have a custom render.
-func _draw_dish(dish_name: String, x: int, y: int, w: int, h: int) -> void:
-	match dish_name:
-		"三杯雞":         _draw_dish_sanbei(x, y, w, h)
-		"醬油雞":         _draw_dish_soy_chicken(x, y, w, h)
-		"蔥蛋":           _draw_dish_scallion_egg(x, y, w, h)
-		"香菇炒蛋":       _draw_dish_mushroom_egg(x, y, w, h)
-		"紅燒豆腐":       _draw_dish_red_tofu(x, y, w, h)
-		"豆腐高麗菜湯":   _draw_dish_tofu_soup(x, y, w, h)
-		"清炒高麗菜":     _draw_dish_stirfry_cabbage(x, y, w, h)
-
-
-## Pure-pixel helper: place a single dot inside the dish area, clipped to
-## (x..x+w-1, y..y+h-1).
-func _dot(x: int, y: int, w: int, h: int, ox: int, oy: int, c: Color) -> void:
-	if ox < 0 or oy < 0 or ox >= w or oy >= h:
-		return
-	draw_rect(Rect2(x + ox, y + oy, 1, 1), c)
-
-
-## Pure-pixel helper: place a 2×2 chunk clipped to the dish area.
-func _chunk2(x: int, y: int, w: int, h: int, ox: int, oy: int, c: Color) -> void:
-	if ox < 0 or oy < 0 or ox + 1 >= w or oy + 1 >= h:
-		return
-	draw_rect(Rect2(x + ox, y + oy, 2, 2), c)
-
-
-## Pure-pixel helper: place a 3×3 chunk (e.g. tofu cube, mushroom cap).
-func _chunk3(x: int, y: int, w: int, h: int, ox: int, oy: int, c: Color) -> void:
-	if ox < 0 or oy < 0 or ox + 2 >= w or oy + 2 >= h:
-		return
-	draw_rect(Rect2(x + ox, y + oy, 3, 3), c)
-
-
-## Pure-pixel helper: 4×3 chicken chunk with 3-tone shading. Used by 三杯雞,
-## 醬油雞 and other chicken dishes for consistent shape language.
-func _chunk_chicken(x: int, y: int, w: int, h: int, ox: int, oy: int) -> void:
-	if ox < 0 or oy < 0 or ox + 3 >= w or oy + 2 >= h:
-		return
-	# Base body
-	draw_rect(Rect2(x + ox, y + oy, 4, 3), COLOR_CHICKEN_BROWN)
-	# Top highlight stripe
-	draw_rect(Rect2(x + ox, y + oy, 4, 1), COLOR_CHICKEN_LIGHT)
-	# Bottom shadow stripe
-	draw_rect(Rect2(x + ox, y + oy + 2, 4, 1), COLOR_CHICKEN_DARK)
-	# Single specular highlight pixel near top-left
-	draw_rect(Rect2(x + ox + 1, y + oy, 1, 1), COLOR_CHICKEN_LIGHT.lightened(0.2))
-
 
 ## v0.18: steam wisps rising above the plate during PLATE/CLOSING/DONE.
 ## 3 wisps cycle on offset phases so they look continuous rather than
@@ -687,177 +616,6 @@ func _draw_dish_steam(plate_cx: int, plate_top_y: int) -> void:
 		var c2: Color = COLOR_STEAM
 		c2.a = clampf(1.0 - phase, 0.0, 1.0) * 0.4
 		draw_rect(Rect2(wx + sway, wy + 1, 1, 1), c2)
-
-
-## 三杯雞 — glossy dark chicken chunks, basil leaves, sesame, sauce pool.
-## The signature dish, drawn richest. Layout fits 28×7 standard / 34×8 perfect.
-func _draw_dish_sanbei(x: int, y: int, w: int, h: int) -> void:
-	# Sauce pool — bottom 1px row with two gloss highlights
-	draw_rect(Rect2(x, y + h - 1, w, 1), COLOR_SOY_GLOSS)
-	_dot(x, y, w, h, w / 4, h - 1, COLOR_SOY_HIGHLIGHT)
-	_dot(x, y, w, h, 3 * w / 4, h - 1, COLOR_SOY_HIGHLIGHT)
-	# Chicken chunks — 4 main + 2 peeking
-	for chunk in [[1, 2], [7, 1], [13, 2], [19, 1], [4, 4], [16, 4]]:
-		_chunk_chicken(x, y, w, h, int(chunk[0]), int(chunk[1]))
-	# 九層塔 basil leaves — 2x2 dark green with a lighter highlight pixel
-	for b in [[5, 0], [11, 0], [17, 0], [23, 1]]:
-		var bx: int = int(b[0])
-		var by: int = int(b[1])
-		_chunk2(x, y, w, h, bx, by, COLOR_BASIL)
-		_dot(x, y, w, h, bx + 1, by, COLOR_BASIL_LIGHT)
-	# Sesame seeds — 1px light dots scattered on top of chunks
-	for s in [[3, 1], [9, 0], [15, 1], [21, 0], [25, 2], [8, 4]]:
-		_dot(x, y, w, h, int(s[0]), int(s[1]), COLOR_SESAME)
-
-
-## 醬油雞 — chicken chunks with soy glaze coating, sesame on top.
-func _draw_dish_soy_chicken(x: int, y: int, w: int, h: int) -> void:
-	# Sauce pool
-	draw_rect(Rect2(x, y + h - 1, w, 1), COLOR_SOY_GLOSS)
-	_dot(x, y, w, h, w / 2, h - 1, COLOR_SOY_HIGHLIGHT)
-	# Larger chicken chunks (5×4 ish each, 4 across)
-	for i in 4:
-		var cx: int = x + 1 + i * 6
-		var cy: int = y + 1
-		if cx + 5 > x + w:
-			break
-		# Body — base + highlight band + shadow band
-		draw_rect(Rect2(cx, cy, 5, h - 2), COLOR_CHICKEN_BROWN)
-		draw_rect(Rect2(cx, cy + 1, 5, 1), COLOR_CHICKEN_LIGHT)
-		draw_rect(Rect2(cx, cy + h - 3, 5, 1), COLOR_CHICKEN_DARK)
-		# Soy glaze drip — top stripe with gloss highlight
-		draw_rect(Rect2(cx, cy, 5, 1), COLOR_SOY_GLOSS)
-		_dot(x, y, w, h, cx - x + 2, cy - y, COLOR_SOY_HIGHLIGHT)
-		# Sesame seed on top of glaze
-		_dot(x, y, w, h, cx - x + 1, cy - y + 1, COLOR_SESAME)
-		_dot(x, y, w, h, cx - x + 3, cy - y + 1, COLOR_SESAME)
-
-
-## 蔥蛋 — fluffy yellow egg with crispy edges and varied scallion specks.
-func _draw_dish_scallion_egg(x: int, y: int, w: int, h: int) -> void:
-	# Egg base — full fill
-	draw_rect(Rect2(x, y, w, h), COLOR_EGG_YELLOW)
-	# Top crust (browning)
-	draw_rect(Rect2(x, y, w, 1), COLOR_EGG_BROWNED)
-	# Bottom shadow
-	draw_rect(Rect2(x, y + h - 1, w, 1), COLOR_EGG_DARK)
-	# Crispy edge spots (uneven darker bits along top)
-	for ex in [2, 8, 14, 21, 26]:
-		_dot(x, y, w, h, ex, 0, COLOR_EGG_DARK)
-	# Fold ridges — 2px darker vertical streaks suggesting omelette folds
-	for fy in [2, 4]:
-		for fx in [4, 11, 18, 24]:
-			_dot(x, y, w, h, fx, fy, COLOR_EGG_BROWNED)
-	# Scallion specks — mix of 2-px segments and 1-px dots, with shadow
-	for seg in [[1, 1], [6, 2], [12, 1], [17, 3], [22, 2]]:
-		var sx: int = int(seg[0])
-		var sy: int = int(seg[1])
-		if sx + 1 < w and sy < h:
-			draw_rect(Rect2(x + sx, y + sy, 2, 1), COLOR_SCALLION_GREEN)
-			_dot(x, y, w, h, sx, sy + 1, COLOR_SCALLION_DARK)
-	for d in [[3, 3], [9, 4], [15, 4], [20, 1], [25, 3]]:
-		_dot(x, y, w, h, int(d[0]), int(d[1]), COLOR_SCALLION_GREEN)
-
-
-## 香菇炒蛋 — egg base with rounded mushroom caps (3-tone shaded).
-func _draw_dish_mushroom_egg(x: int, y: int, w: int, h: int) -> void:
-	draw_rect(Rect2(x, y, w, h), COLOR_EGG_YELLOW)
-	draw_rect(Rect2(x, y, w, 1), COLOR_EGG_BROWNED)
-	draw_rect(Rect2(x, y + h - 1, w, 1), COLOR_EGG_DARK)
-	# Mushroom caps — 4 across, with cap dome + gill underside + stem dot
-	for i in 4:
-		var mx: int = x + 1 + i * 7
-		var my: int = y + 1
-		if mx + 4 > x + w:
-			break
-		# Cap dome — 4×2 with shadow on bottom row
-		draw_rect(Rect2(mx, my, 4, 1), COLOR_MUSHROOM_DARK)
-		draw_rect(Rect2(mx, my + 1, 4, 2), COLOR_MUSHROOM_BROWN)
-		# Highlight pixel on cap
-		_dot(x, y, w, h, mx - x + 1, my - y + 1, COLOR_MUSHROOM_LIGHT)
-		# Gill / stem hint underneath
-		_dot(x, y, w, h, mx - x + 1, my - y + 3, COLOR_MUSHROOM_DARK)
-		_dot(x, y, w, h, mx - x + 2, my - y + 3, COLOR_MUSHROOM_DARK)
-	# Scattered scallion garnish for colour pop
-	for s in [[5, 4], [12, 4], [19, 4], [25, 4]]:
-		_dot(x, y, w, h, int(s[0]), int(s[1]), COLOR_SCALLION_GREEN)
-
-
-## 紅燒豆腐 — white tofu cubes braised in glossy red sauce.
-func _draw_dish_red_tofu(x: int, y: int, w: int, h: int) -> void:
-	# Sauce fills the whole dish area
-	draw_rect(Rect2(x, y, w, h), COLOR_REDCOOK_SAUCE)
-	# Sauce gloss reflection — 2px highlight stripe near the top
-	draw_rect(Rect2(x + 2, y, w - 4, 1), COLOR_REDCOOK_HIGHLIGHT)
-	# Tofu cubes — 3 large 4×4-ish cubes with shaded faces
-	for i in 3:
-		var tx: int = x + 2 + i * 8
-		var ty: int = y + 2
-		if tx + 4 > x + w or ty + 3 > y + h:
-			break
-		# Cube body
-		draw_rect(Rect2(tx, ty, 4, 3), COLOR_TOFU_WHITE)
-		# Top edge highlight
-		draw_rect(Rect2(tx, ty, 4, 1), COLOR_TOFU_WHITE.lightened(0.15))
-		# Right-side shadow
-		draw_rect(Rect2(tx + 3, ty, 1, 3), COLOR_TOFU_SHADOW)
-		# Sauce drip on cube top (1-2 dark pixels)
-		_dot(x, y, w, h, tx - x + 1, ty - y, COLOR_REDCOOK_SAUCE)
-	# Scallion garnish floating on the sauce
-	for s in [[5, 5], [12, 5], [19, 5], [25, 5]]:
-		_dot(x, y, w, h, int(s[0]), int(s[1]), COLOR_SCALLION_GREEN)
-
-
-## 豆腐高麗菜湯 — pale broth, white tofu cubes, green cabbage chunks, steam.
-func _draw_dish_tofu_soup(x: int, y: int, w: int, h: int) -> void:
-	# Broth base
-	draw_rect(Rect2(x, y, w, h), COLOR_BROTH_PALE)
-	# Surface shimmer dots (broth highlights)
-	for sx in [3, 8, 13, 18, 23]:
-		_dot(x, y, w, h, sx, 0, COLOR_BROTH_SHIMMER)
-	for sx in [5, 11, 17, 22]:
-		_dot(x, y, w, h, sx, 1, COLOR_BROTH_SHIMMER)
-	# Tofu cubes — 3 cubes floating, with shadow under each (sauce ripples)
-	for i in 3:
-		var tx: int = x + 3 + i * 8
-		var ty: int = y + 2
-		if tx + 3 > x + w or ty + 3 > y + h:
-			break
-		# Body
-		draw_rect(Rect2(tx, ty, 3, 3), COLOR_TOFU_WHITE)
-		# Highlight edge
-		draw_rect(Rect2(tx, ty, 3, 1), COLOR_TOFU_WHITE.lightened(0.15))
-		# Submerged shadow underneath in the broth
-		_dot(x, y, w, h, tx - x + 1, ty - y + 3, COLOR_BROTH_PALE.darkened(0.15))
-	# Cabbage pieces — 2-tone for leafy depth
-	for c in [[6, 1], [13, 4], [20, 1], [25, 4]]:
-		var cx: int = int(c[0])
-		var cy: int = int(c[1])
-		_chunk2(x, y, w, h, cx, cy, COLOR_CABBAGE_MID)
-		_dot(x, y, w, h, cx, cy, COLOR_CABBAGE_LIGHT)
-
-
-## 清炒高麗菜 — multi-tone leafy stir-fry pile.
-func _draw_dish_stirfry_cabbage(x: int, y: int, w: int, h: int) -> void:
-	# Base — slightly darker than highlights so layered clumps pop
-	draw_rect(Rect2(x, y, w, h), COLOR_CABBAGE_MID)
-	# Darker shaded clumps — bottom and shadow areas of the pile
-	for c in [[1, 2], [5, 4], [9, 2], [14, 4], [18, 2], [22, 4], [26, 2]]:
-		var cx: int = int(c[0])
-		var cy: int = int(c[1])
-		_chunk2(x, y, w, h, cx, cy, COLOR_CABBAGE_DARK)
-	# Lighter highlight clumps — top edges of leaves catching light
-	for c in [[3, 0], [7, 1], [12, 0], [17, 1], [21, 0], [25, 1]]:
-		var cx: int = int(c[0])
-		var cy: int = int(c[1])
-		_chunk2(x, y, w, h, cx, cy, COLOR_CABBAGE_LIGHT)
-	# Highlight curls — single bright pixels on leaf tips
-	for h_pt in [[2, 0], [10, 0], [16, 0], [24, 0]]:
-		_dot(x, y, w, h, int(h_pt[0]), int(h_pt[1]),
-			COLOR_CABBAGE_LIGHT.lightened(0.3))
-	# A pinch of garlic / chilli — 1px red dots for accent
-	for r in [[6, 3], [15, 3], [23, 3]]:
-		_dot(x, y, w, h, int(r[0]), int(r[1]), Color("#C2241A"))
 
 
 ## v0.14 fallback — when no recipe matches, draw the old ingredient-chip

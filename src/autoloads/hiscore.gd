@@ -25,6 +25,7 @@ const KEY_NO_BARGAIN: String = "no_bargain_wins"
 const KEY_MUTED: String = "muted"
 const KEY_DAY: String = "day"
 const KEY_VENDOR_PURCHASES: String = "vendor_purchases"
+const KEY_DISHES_COOKED: String = "dishes_cooked"
 
 ## Sentinel for "no record yet" — easier than a separate Optional flag.
 const NO_RECORD: float = INF
@@ -49,6 +50,10 @@ var day: int = 1
 ## ingredient. Drives the loyalty-tier greeting + discount in StallNPC.
 ## Persists via ConfigFile alongside the other counters.
 var vendor_purchases: Dictionary[String, int] = {}
+
+## v0.24: cookbook journal. Maps dish name → number of times cooked across
+## all runs. A dish is "unlocked" iff dishes_cooked.has(name). Persisted.
+var dishes_cooked: Dictionary[String, int] = {}
 
 # ---------------------------------------------------------------------------
 # Lifecycle
@@ -155,6 +160,26 @@ func purchase_count(ingredient_id: String) -> int:
 	return vendor_purchases.get(ingredient_id, 0)
 
 
+## v0.24: marks the named dish as cooked at least once and increments its
+## count. Called by Kitchen after the dish lands on the plate.
+func record_cooked_dish(dish_name: String) -> void:
+	if dish_name.is_empty():
+		return
+	var prev: int = dishes_cooked.get(dish_name, 0)
+	dishes_cooked[dish_name] = prev + 1
+	_save()
+
+
+## v0.24: how many times the player has cooked the named dish.
+func cook_count(dish_name: String) -> int:
+	return dishes_cooked.get(dish_name, 0)
+
+
+## v0.24: how many distinct dishes the player has unlocked in the cookbook.
+func unlocked_dish_count() -> int:
+	return dishes_cooked.size()
+
+
 ## Toggles the global mute flag, persists, and pushes the change to Sfx + Music.
 func toggle_mute() -> bool:
 	muted = not muted
@@ -178,8 +203,8 @@ func _apply_mute() -> void:
 # Test helpers
 # ---------------------------------------------------------------------------
 
-## Wipes ALL state (record + counters + mute + day + loyalty) and the
-## on-disk file.
+## Wipes ALL state (record + counters + mute + day + loyalty + cookbook)
+## and the on-disk file.
 func clear() -> void:
 	best_time = NO_RECORD
 	total_wins = 0
@@ -188,6 +213,7 @@ func clear() -> void:
 	muted = false
 	day = 1
 	vendor_purchases = {}
+	dishes_cooked = {}
 	if FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 
@@ -216,6 +242,11 @@ func _load() -> void:
 	var raw: Dictionary = cfg.get_value(SECTION, KEY_VENDOR_PURCHASES, {})
 	for k in raw.keys():
 		vendor_purchases[String(k)] = int(raw[k])
+	# v0.24: cookbook counts — same shape as vendor_purchases.
+	dishes_cooked = {}
+	var raw_d: Dictionary = cfg.get_value(SECTION, KEY_DISHES_COOKED, {})
+	for k in raw_d.keys():
+		dishes_cooked[String(k)] = int(raw_d[k])
 	# Push restored mute state to audio autoloads on next frame so they have
 	# finished their own _ready (autoload init order may not guarantee it).
 	call_deferred("_apply_mute")
@@ -230,6 +261,7 @@ func _save() -> void:
 	cfg.set_value(SECTION, KEY_MUTED, muted)
 	cfg.set_value(SECTION, KEY_DAY, day)
 	cfg.set_value(SECTION, KEY_VENDOR_PURCHASES, vendor_purchases)
+	cfg.set_value(SECTION, KEY_DISHES_COOKED, dishes_cooked)
 	var err: Error = cfg.save(SAVE_PATH)
 	if err != OK:
 		push_warning("[HiScore] save failed (err=%d)" % err)
