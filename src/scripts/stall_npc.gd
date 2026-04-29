@@ -238,19 +238,40 @@ func _on_choice(index: int) -> void:
 func _start_bargain() -> void:
 	_bargained = true
 	Game.bargain_count += 1   # v0.12: tracks for no-bargain achievement
-	# v0.7.1: bumped 50%→60% so the bargain isn't punishing under the new
-	# tighter $180 budget — players need it to close the $10 gap reliably.
-	var success: bool = randf() < 0.6
-	if success:
-		discount = maxf(discount * 0.8, 0.5)  # never below 50%
-		var line: String = "好啦好啦，再 20%% 給你！"  # %% renders one %
-		var on_done: Callable = func() -> void: _open_buy_choice()
-		Dialogue.show([line], on_done)
-	else:
-		discount = minf(discount * 1.1, 1.5)  # cap at 150%
-		var line: String = "你這小鬼，貴 10%%！"
-		var on_done: Callable = func() -> void: _open_buy_choice()
-		Dialogue.show([line], on_done)
+	# v0.22: skill-based bargain. Test mode uses a deterministic legacy roll
+	# (matches the v0.7.1 60% chance) so existing tests stay green.
+	if Game.test_mode:
+		_apply_bargain_tier(2 if randf() < 0.6 else 0)
+		return
+	# Spawn the meter on the level (this NPC's parent) so it lives at the
+	# scene level rather than under this NPC.
+	var parent: Node = get_parent()
+	if parent == null:
+		_apply_bargain_tier(0)
+		return
+	var meter: BargainMeter = BargainMeter.new()
+	meter.resolved.connect(_apply_bargain_tier)
+	parent.add_child(meter)
+
+
+## v0.22: outcome of the bargain minigame mapped to discount / line.
+##   tier 0 → fail   (+10%)   "你這小鬼，貴 10%！"
+##   tier 1 → partial (-10%)  "好吧，給你 10% 吧～"
+##   tier 2 → jackpot (-20%)  "好啦好啦，再 20% 給你！"
+func _apply_bargain_tier(tier: int) -> void:
+	var line: String
+	match tier:
+		2:
+			discount = maxf(discount * 0.8, 0.5)
+			line = "好啦好啦，再 20%% 給你！"  # %% → %
+		1:
+			discount = maxf(discount * 0.9, 0.5)
+			line = "好吧，給你 10%% 吧～"
+		_:
+			discount = minf(discount * 1.1, 1.5)
+			line = "你這小鬼，貴 10%%！"
+	var on_done: Callable = func() -> void: _open_buy_choice()
+	Dialogue.show([line], on_done)
 
 
 func _attempt_buy() -> void:

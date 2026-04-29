@@ -7,10 +7,11 @@ func _reset() -> void:
 		Dialogue._box._close()
 	Dialogue._active = false
 	Game.in_dialogue = false
+	# v0.22: bargain now spawns an interactive meter — under test_mode the
+	# stall falls back to the legacy randf path so existing assertions still
+	# work without simulating cursor timing.
+	Game.test_mode = true
 	Inventory.reset()
-	# v0.20: stall buys now bump HiScore.purchase_count, which mutates
-	# effective_price via the loyalty discount. Clear so each bargain test
-	# sees a fresh "stranger tier 0 = full price" baseline.
 	HiScore.clear()
 
 
@@ -20,6 +21,7 @@ func before_each() -> void:
 
 func after_each() -> void:
 	_reset()
+	Game.test_mode = false
 
 
 func _make_stall(price: int = 50) -> StallNPC:
