@@ -75,9 +75,10 @@ func test_mom_bump_with_all_ingredients_triggers_win() -> void:
 	Dialogue._box._advance()  # close + on_done
 	await get_tree().process_frame
 
-	# v0.8: win path now routes through the kitchen cutscene first.
-	assert_eq(Game.current_area, "kitchen",
-		"goto_level should route to 'kitchen' on win — got '%s'" % Game.current_area)
+	# v0.28: win path now routes through the 回家路上 interlude first
+	# (which auto-advances to "kitchen" — that hop is owned by walking_home).
+	assert_eq(Game.current_area, "walking_home",
+		"goto_level should route to 'walking_home' on win — got '%s'" % Game.current_area)
 
 
 func test_mom_bump_without_all_ingredients_routes_to_kitchen_messy() -> void:
@@ -107,8 +108,10 @@ func test_mom_bump_without_all_ingredients_routes_to_kitchen_messy() -> void:
 	Dialogue._box._advance()
 	await get_tree().process_frame
 
-	assert_eq(Game.current_area, "kitchen",
-		"v0.14: incomplete runs still cook — should route to 'kitchen', got '%s'" % Game.current_area)
+	# v0.28: incomplete runs also walk home first — same routing as a full
+	# win, but with last_run_incomplete=true so the kitchen picks 湊合.
+	assert_eq(Game.current_area, "walking_home",
+		"v0.28: incomplete runs route through walking_home — got '%s'" % Game.current_area)
 	assert_true(Game.last_run_incomplete,
 		"last_run_incomplete should be set so kitchen + end_screen pick the messy variant")
 	assert_eq(HiScore.total_wins, wins_before,

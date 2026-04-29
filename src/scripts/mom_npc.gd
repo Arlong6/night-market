@@ -68,7 +68,9 @@ func _do_complete_flow() -> void:
 	)
 	Game.last_run_was_record = bool(result.get("new_record", false))
 	Sfx.play_win()
-	var on_done: Callable = func() -> void: Game.goto_level("kitchen")
+	# v0.28: route through the 回家路上 interlude before the kitchen — the
+	# scene auto-advances to "kitchen" after WALK_DURATION (or SPACE skip).
+	var on_done: Callable = func() -> void: Game.goto_level("walking_home")
 	Dialogue.show(lines, on_done)
 
 
@@ -78,7 +80,9 @@ func _do_incomplete_flow() -> void:
 	Game.last_run_incomplete = true
 	Game.last_run_perfect = false
 	Game.last_run_was_record = false
-	var on_done: Callable = func() -> void: Game.goto_level("kitchen")
+	# v0.28: route through the 回家路上 interlude before the kitchen — the
+	# scene auto-advances to "kitchen" after WALK_DURATION (or SPACE skip).
+	var on_done: Callable = func() -> void: Game.goto_level("walking_home")
 	Dialogue.show(_incomplete_lines(), on_done)
 
 

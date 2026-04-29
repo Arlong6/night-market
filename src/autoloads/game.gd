@@ -57,6 +57,7 @@ const LEVEL_PATHS: Dictionary[String, String] = {
 	"title": "res://scenes/menus/title.tscn",
 	"home_intro": "res://scenes/levels/home_intro.tscn",
 	"shilin": "res://scenes/levels/shilin_market.tscn",
+	"walking_home": "res://scenes/levels/walking_home.tscn",
 	"kitchen": "res://scenes/levels/kitchen.tscn",
 	"end_win": "res://scenes/menus/end_screen.tscn",
 	"cookbook": "res://scenes/menus/cookbook.tscn",
