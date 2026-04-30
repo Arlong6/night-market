@@ -177,6 +177,16 @@ func _build_ui() -> void:
 		fest_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		vbox.add_child(fest_line)
 
+	# v0.31: weekend banner — every Sat / Sun the world feels different.
+	# Mum's chattier, the market drops a 紅包, mum's intro is special.
+	# Hide on festival days so the festival badge keeps its prominence.
+	if Inventory.is_weekend() and fest_label.is_empty():
+		var weekend_line: Label = _make_label(
+			"★ 週末！紅包等你撿 ★", 10, Color("#F2A227")
+		)
+		weekend_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(weekend_line)
+
 	if HiScore.has_record():
 		var best: Label = _make_label(
 			"最佳記錄 %s" % HiScore.format_best(), 8, Color("#C8E66D")

@@ -164,6 +164,12 @@ const RAIN_CHANCE: float = 0.30
 const RAIN_DELAY_MIN: float = 4.0
 const RAIN_DELAY_MAX: float = 14.0
 
+# v0.31 — weekend 紅包. Guaranteed (not chance) when the rotating-week day
+# is Sat or Sun. Bigger value than wallet so weekends feel like a payday.
+const RED_ENVELOPE_VALUE: int = 50
+const RED_ENVELOPE_LINE: String = "★ 週末紅包！NT$50"
+const RED_ENVELOPE_COLOR: Color = Color("#C2241A")  # festive red
+
 # Palette
 const COLOR_FLOOR_A: Color = Color("#3A1A0A")  ## warm dark brown
 const COLOR_FLOOR_B: Color = Color("#4A2412")  ## one shade lighter (rhythm)
@@ -331,6 +337,10 @@ func _spawn_items() -> void:
 ##   * Wallet pickup (35%)  — bigger NT$25 brown leather coin
 ##   * Lost cat (25%)       — NPC at random cell, choice for +NT$20
 ##   * Rain (30%)           — 8-second weather overlay, fires after a delay
+##
+## v0.31: when today is the weekend (Sat / Sun in the rotating week), a
+## guaranteed 紅包 also spawns at a free cell — NT$50, red. Skipped in
+## test_mode so deterministic tests don't trip over the extra spawn.
 func _spawn_random_events() -> void:
 	if randf() < WALLET_CHANCE:
 		_spawn_wallet()
@@ -338,6 +348,8 @@ func _spawn_random_events() -> void:
 		_spawn_lost_cat()
 	if randf() < RAIN_CHANCE:
 		_schedule_rain()
+	if Inventory.is_weekend() and not Game.test_mode:
+		_spawn_red_envelope()
 
 
 func _spawn_wallet() -> void:
@@ -349,6 +361,21 @@ func _spawn_wallet() -> void:
 	item.value = WALLET_VALUE
 	item.pickup_line = WALLET_LINE
 	item.color = WALLET_COLOR
+	add_child(item)
+	_items_by_cell[pick] = item
+
+
+## v0.31: weekend 紅包 — guaranteed when Inventory.is_weekend(). Same
+## ItemPickup machinery as the wallet, just bigger value + red colour.
+func _spawn_red_envelope() -> void:
+	var pick: Vector2i = _random_free_cell()
+	if pick == Vector2i(-1, -1):
+		return
+	var item: ItemPickup = ItemPickup.new()
+	item.cell = pick
+	item.value = RED_ENVELOPE_VALUE
+	item.pickup_line = RED_ENVELOPE_LINE
+	item.color = RED_ENVELOPE_COLOR
 	add_child(item)
 	_items_by_cell[pick] = item
 

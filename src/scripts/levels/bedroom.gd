@@ -315,6 +315,8 @@ func _draw_bubble_dish(cx: int, cy: int) -> void:
 
 
 ## Renders the day count + a "晚安" closer — last beat before the fade.
+## v0.31: on weekends, the closer becomes "週末晚安～" so the bookend
+## acknowledges the special day instead of feeling identical to weekdays.
 func _draw_bubble_night(cx: int, cy: int) -> void:
 	if _bubble_font == null:
 		return
@@ -324,10 +326,13 @@ func _draw_bubble_night(cx: int, cy: int) -> void:
 		"第 %d 天" % maxi(HiScore.day - 1, 1),
 		HORIZONTAL_ALIGNMENT_CENTER, BUBBLE_W - 4, 9,
 		COLOR_BUBBLE_BORDER)
-	# "晚安" closer
+	# "晚安" closer (with weekend variant)
+	var goodnight: String = (
+		"週末晚安～" if Inventory.is_weekend() else "晚安～"
+	)
 	draw_string(_bubble_font,
 		Vector2(cx - BUBBLE_W / 2 + 2, cy + 8),
-		"晚安～", HORIZONTAL_ALIGNMENT_CENTER, BUBBLE_W - 4, 10,
+		goodnight, HORIZONTAL_ALIGNMENT_CENTER, BUBBLE_W - 4, 10,
 		COLOR_BUBBLE_BORDER)
 
 

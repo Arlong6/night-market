@@ -296,6 +296,19 @@ func current_theme() -> Dictionary:
 	return DAILY_THEMES[idx]
 
 
+## v0.31: true when the current day is Sat OR Sun in the rotating week
+## (theme keys "saturday"/"sunday"). Drives the weekend-mode features —
+## special mum dialog, the guaranteed 紅包 spawn in the market, the
+## weekend banner on the title and bedroom thought-bubble variant.
+##
+## Reads `current_theme()` so it stays consistent with the existing
+## calendar instead of duplicating modulo math.
+func is_weekend() -> bool:
+	var theme: Dictionary = current_theme()
+	var key: String = String(theme.get("key", ""))
+	return key == "saturday" or key == "sunday"
+
+
 ## Returns owned ingredient ids (in ALL_INGREDIENTS order, not insertion order),
 ## handy for the end-screen ingredient list.
 func owned_ingredients() -> PackedStringArray:

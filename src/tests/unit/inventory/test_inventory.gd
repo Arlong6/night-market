@@ -301,6 +301,42 @@ func test_inventory_current_theme_cycles_every_7_days() -> void:
 		"day 14 should be Sunday — got %s" % theme["key"])
 
 
+# ---------------------------------------------------------------------------
+# v0.31 — weekend mode
+# ---------------------------------------------------------------------------
+
+func test_inventory_is_weekend_false_on_weekdays() -> void:
+	# Mon..Fri = days 1..5 in the rotating week — none should be weekends.
+	for d in [1, 2, 3, 4, 5]:
+		HiScore.day = d
+		assert_false(Inventory.is_weekend(),
+			"day %d (%s) should NOT be weekend"
+			% [d, Inventory.current_theme()["key"]])
+
+
+func test_inventory_is_weekend_true_on_saturday_and_sunday() -> void:
+	# Day 6 = Sat, Day 7 = Sun.
+	HiScore.day = 6
+	assert_true(Inventory.is_weekend(),
+		"day 6 (Sat) should be weekend — theme key %s"
+		% Inventory.current_theme()["key"])
+	HiScore.day = 7
+	assert_true(Inventory.is_weekend(),
+		"day 7 (Sun) should be weekend — theme key %s"
+		% Inventory.current_theme()["key"])
+
+
+func test_inventory_is_weekend_cycles_every_week() -> void:
+	# Weekend semantics must hold across week boundaries — day 13 (Sat
+	# of week 2) must still be a weekend.
+	HiScore.day = 13
+	assert_true(Inventory.is_weekend(),
+		"day 13 (Sat of week 2) should be weekend")
+	HiScore.day = 15  # Mon of week 3
+	assert_false(Inventory.is_weekend(),
+		"day 15 (Mon of week 3) should NOT be weekend")
+
+
 func test_inventory_soup_day_forces_tofu_and_cabbage() -> void:
 	HiScore.day = 2  # 週二 湯品日 — forces tofu + cabbage
 	# Run randomize many times; every result must contain both forced items.

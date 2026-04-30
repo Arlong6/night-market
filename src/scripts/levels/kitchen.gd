@@ -306,7 +306,13 @@ func _do_stir() -> void:
 
 func _run_intro_sequence() -> void:
 	_stage = Stage.INTRO_OPENING
-	Dialogue.show(["寶貝！幫媽媽去夜市買菜～"])
+	# v0.31: weekends pick a chattier opening so the day feels different.
+	var opening: String = (
+		"寶貝！週末了～夜市人多，小心走！"
+		if Inventory.is_weekend()
+		else "寶貝！幫媽媽去夜市買菜～"
+	)
+	Dialogue.show([opening])
 	await get_tree().create_timer(1.4).timeout
 	if _stage == Stage.INTRO_DONE:
 		return
