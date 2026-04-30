@@ -19,7 +19,12 @@ func after_each() -> void:
 func test_sfx_bakes_all_streams_on_ready() -> void:
 	# Streams are private (_bump etc); reach them via property names
 	# so a future rename forces a test update too.
-	for name: String in ["_bump", "_pickup", "_buy", "_blip", "_win", "_choice"]:
+	# v0.32: 5 new streams (footstep / sizzle / page_flip / chime / denial).
+	var stream_names: PackedStringArray = PackedStringArray([
+		"_bump", "_pickup", "_buy", "_blip", "_win", "_choice",
+		"_footstep", "_sizzle", "_page_flip", "_chime", "_denial",
+	])
+	for name in stream_names:
 		var s: AudioStreamWAV = Sfx.get(name)
 		assert_not_null(s, "Sfx.%s should be baked" % name)
 		assert_gt(s.data.size(), 0,
@@ -36,6 +41,12 @@ func test_sfx_play_methods_are_safe_under_test_mode() -> void:
 	Sfx.play_blip()
 	Sfx.play_win()
 	Sfx.play_choice()
+	# v0.32 — texture / per-action SFX
+	Sfx.play_footstep()
+	Sfx.play_sizzle()
+	Sfx.play_page_flip()
+	Sfx.play_chime()
+	Sfx.play_denial()
 	assert_true(true, "All play_*() returned cleanly under test_mode")
 
 

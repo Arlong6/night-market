@@ -51,3 +51,42 @@ func test_music_loop_seam_phase_alignment() -> void:
 		"first sample should be near silence — got %d" % first)
 	assert_lt(absi(last), 2000,
 		"last sample should be near silence — got %d" % last)
+
+
+# ---------------------------------------------------------------------------
+# v0.32 — bedroom lullaby loop
+# ---------------------------------------------------------------------------
+
+func test_music_bakes_lullaby_loop_on_ready() -> void:
+	# Arrange / Act
+	var s: AudioStreamWAV = Music._lullaby_stream
+
+	# Assert
+	assert_not_null(s, "Music._lullaby_stream should be baked at startup")
+	assert_eq(s.format, AudioStreamWAV.FORMAT_16_BITS)
+	assert_gt(s.data.size(), 0, "lullaby PCM data should not be empty")
+	assert_eq(s.loop_mode, AudioStreamWAV.LOOP_FORWARD,
+		"lullaby should LOOP_FORWARD for seamless playback")
+
+
+func test_music_play_lullaby_is_safe_under_test_mode() -> void:
+	# Arrange / Act — test_mode short-circuits play_lullaby like play_market
+	Music.play_lullaby()
+
+	# Assert
+	assert_false(Music._player.playing,
+		"player should NOT be playing when test_mode suppresses output")
+
+
+func test_music_stop_resets_player_volume_for_next_track() -> void:
+	# Arrange — simulate the lullaby having lowered the volume
+	Music._player.volume_db = Music.LULLABY_VOLUME_DB
+
+	# Act
+	Music.stop()
+
+	# Assert: stop() should restore the standard market volume so a later
+	# play_market() doesn't accidentally inherit the lullaby's softer mix.
+	assert_almost_eq(Music._player.volume_db, Music.VOLUME_DB, 0.01,
+		"stop() should reset volume to VOLUME_DB — got %f"
+		% Music._player.volume_db)

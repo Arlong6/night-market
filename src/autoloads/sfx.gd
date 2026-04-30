@@ -28,6 +28,12 @@ var _buy: AudioStreamWAV
 var _blip: AudioStreamWAV
 var _win: AudioStreamWAV
 var _choice: AudioStreamWAV
+# v0.32 — audio enrichment pass
+var _footstep: AudioStreamWAV   ## subtle tick on every grid step
+var _sizzle: AudioStreamWAV     ## filtered noise burst for kitchen stir
+var _page_flip: AudioStreamWAV  ## soft swoosh for menu / cookbook open
+var _chime: AudioStreamWAV      ## bright 2-tone for windfall money pickups
+var _denial: AudioStreamWAV     ## sad descending tone for can't-afford
 
 ## Test hook — disables actual playback (autoloads still bake the streams).
 var muted: bool = false
@@ -50,7 +56,19 @@ func _ready() -> void:
 	_blip = _make_tone(1400.0, 0.018, "square", 0.6)
 	_win = _make_arpeggio([523.25, 659.25, 784.0, 1046.5], 0.13, 0.85)
 	_choice = _make_tone(880.0, 0.05, "square", 0.6)
-	print("[Sfx] ready — 6 streams baked, volume_db=+6")
+	# v0.32 — quieter / texture-y SFX tied to per-action feedback gaps:
+	#   * footstep: very short low click — fires on every grid step so amp
+	#     stays low and dur tiny to avoid crowding fast walks
+	#   * sizzle: filtered white noise — kitchen stir minigame
+	#   * page_flip: short downward sweep with low-pass character — menu open
+	#   * chime: two ascending stacked bell-like sines — windfall pickups
+	#   * denial: short descending two-tone — can't-afford feedback
+	_footstep = _make_tone(80.0, 0.04, "square", 0.35)
+	_sizzle = _make_noise(0.18, 0.55, 0.40)
+	_page_flip = _make_sweep(1200.0, 380.0, 0.10, 0.45)
+	_chime = _make_two_tone(1320.0, 1980.0, 0.30, 0.85)
+	_denial = _make_two_tone(440.0, 277.0, 0.26, 0.70)
+	print("[Sfx] ready — 11 streams baked, volume_db=+6")
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +81,12 @@ func play_buy() -> void: _play(_buy)
 func play_blip() -> void: _play(_blip)
 func play_win() -> void: _play(_win)
 func play_choice() -> void: _play(_choice)
+# v0.32 — texture / per-action SFX
+func play_footstep() -> void: _play(_footstep)
+func play_sizzle() -> void: _play(_sizzle)
+func play_page_flip() -> void: _play(_page_flip)
+func play_chime() -> void: _play(_chime)
+func play_denial() -> void: _play(_denial)
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +175,27 @@ func _make_two_tone(f0: float, f1: float, dur: float, amp: float) -> AudioStream
 		var env: float = _envelope(u_local)
 		var s: float = sin(TAU * freq * t)
 		var sample: int = int(clampf(s * env * amp, -1.0, 1.0) * 32767.0)
+		bytes.encode_s16(i * 2, sample)
+	return _make_stream(bytes)
+
+
+## v0.32: white-noise burst with envelope. Used for sizzle + texture SFX.
+## Cutoff is a simple 1-pole low-pass on the noise stream so it sounds
+## warmer than raw white noise (less "TV static", more "frying").
+func _make_noise(dur: float, cutoff: float, amp: float) -> AudioStreamWAV:
+	var n: int = int(dur * SAMPLE_RATE)
+	var bytes: PackedByteArray = PackedByteArray()
+	bytes.resize(n * 2)
+	# 1-pole LPF coefficient — cutoff in [0, 1]; lower = warmer.
+	var a: float = clampf(cutoff, 0.05, 0.95)
+	var prev: float = 0.0
+	for i in n:
+		var u: float = float(i) / float(n)
+		var env: float = _envelope(u)
+		var raw: float = randf_range(-1.0, 1.0)
+		# y[n] = a*x[n] + (1-a)*y[n-1]
+		prev = a * raw + (1.0 - a) * prev
+		var sample: int = int(clampf(prev * env * amp, -1.0, 1.0) * 32767.0)
 		bytes.encode_s16(i * 2, sample)
 	return _make_stream(bytes)
 

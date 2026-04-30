@@ -59,6 +59,8 @@ func _ready() -> void:
 	Game.current_area = "cookbook"
 	_build_ui()
 	set_process_unhandled_input(true)
+	# v0.32: short page-flip on open so the menu transition has audio weight.
+	Sfx.play_page_flip()
 
 
 func _unhandled_input(event: InputEvent) -> void:

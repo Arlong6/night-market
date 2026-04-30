@@ -39,11 +39,23 @@ const MELODY: Array[float] = [
 	N_A4, N_C5, N_D5, N_E5, N_D5, N_C5, N_A4, N_G4,
 ]
 
+## v0.32 — slow bedroom lullaby. Half-speed of the market loop, sparser
+## (a third of the slots are rests — float 0.0), simpler shape. Same
+## pentatonic scale so it stays in the same musical world.
+const LULLABY_BPM: float = 50.0
+const LULLABY_DRONE: float = 110.0  # A2, same as market
+const LULLABY: Array[float] = [
+	N_A4, 0.0,  N_C5, 0.0,  N_D5, 0.0,  N_E5, 0.0,
+	N_C5, 0.0,  N_A4, 0.0,  N_G4, 0.0,  N_A4, 0.0,
+]
+const LULLABY_VOLUME_DB: float = -16.0  ## quieter than market
+
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
 
 var _stream: AudioStreamWAV
+var _lullaby_stream: AudioStreamWAV
 var _player: AudioStreamPlayer
 
 # ---------------------------------------------------------------------------
@@ -56,8 +68,10 @@ func _ready() -> void:
 	_player.volume_db = VOLUME_DB
 	add_child(_player)
 	_stream = _bake_market_loop()
-	print("[Music] ready — market loop baked (%d samples, %.2fs)" %
-		[_stream.data.size() / 2, float(_stream.data.size() / 2) / SAMPLE_RATE])
+	_lullaby_stream = _bake_lullaby_loop()
+	print("[Music] ready — market loop %d samples, lullaby %d samples" % [
+		_stream.data.size() / 2, _lullaby_stream.data.size() / 2,
+	])
 
 
 # ---------------------------------------------------------------------------
@@ -76,10 +90,30 @@ func play_market() -> void:
 	_player.play()
 
 
+## v0.32: starts the bedroom lullaby loop at -16 dB. Same player as the
+## market loop, so swapping scenes naturally takes over from each other.
+func play_lullaby() -> void:
+	if _is_test_mode():
+		return
+	if _player == null or _lullaby_stream == null:
+		return
+	if _player.playing and _player.stream == _lullaby_stream:
+		return
+	_player.stream = _lullaby_stream
+	# Lullaby plays softer than the market loop — set the volume on the
+	# player itself rather than swapping the bus; mute is still respected
+	# because set_muted() drops to -80 dB regardless.
+	_player.volume_db = LULLABY_VOLUME_DB
+	_player.play()
+
+
 ## Stops any current track. Safe to call when nothing is playing.
+## v0.32: also resets player volume so the next play_market() starts at
+## the standard VOLUME_DB rather than the lullaby's softer setting.
 func stop() -> void:
 	if _player != null:
 		_player.stop()
+		_player.volume_db = VOLUME_DB
 
 
 ## v0.12: applied by HiScore on startup + on M-key toggle. Mutes by dropping
@@ -147,3 +181,58 @@ func _bake_market_loop() -> AudioStreamWAV:
 	stream.loop_begin = 0
 	stream.loop_end = total_samples
 	return stream
+
+
+## v0.32: slow lullaby loop for the bedroom scene. Half-speed of the
+## market track, sparse rests (entries with freq=0.0), and a softer pluck
+## envelope. Drone stays the same A2 so transitioning between rooms feels
+## tonally connected.
+func _bake_lullaby_loop() -> AudioStreamWAV:
+	var beat_dur: float = 60.0 / LULLABY_BPM
+	var eighth: float = beat_dur / 2.0
+	var n_per_eighth: int = int(eighth * SAMPLE_RATE)
+	var total_samples: int = n_per_eighth * LULLABY.size()
+
+	var bytes: PackedByteArray = PackedByteArray()
+	bytes.resize(total_samples * 2)
+
+	var melody_phase: float = 0.0
+	var drone_phase: float = 0.0
+
+	for note_idx in LULLABY.size():
+		var freq: float = LULLABY[note_idx]
+		var rest: bool = freq <= 0.0
+		for i in n_per_eighth:
+			var u: float = float(i) / float(n_per_eighth)
+			# Slower attack on the lullaby — longer attack ramp = softer feel.
+			var env: float = _lullaby_env(u)
+			drone_phase += TAU * LULLABY_DRONE / float(SAMPLE_RATE)
+			var m: float = 0.0
+			if not rest:
+				melody_phase += TAU * freq / float(SAMPLE_RATE)
+				m = (2.0 / PI) * asin(sin(melody_phase))
+			var d: float = sin(drone_phase)
+			# Lullaby mixes softer overall + heavier on the drone for "sleepy"
+			var s: float = m * 0.28 * env + d * 0.22
+			var sample: int = int(clampf(s, -1.0, 1.0) * 32767.0)
+			var idx: int = (note_idx * n_per_eighth + i) * 2
+			bytes.encode_s16(idx, sample)
+
+	var stream: AudioStreamWAV = AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = SAMPLE_RATE
+	stream.stereo = false
+	stream.data = bytes
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_begin = 0
+	stream.loop_end = total_samples
+	return stream
+
+
+## Slow attack/decay envelope — softer than the market loop's pluck.
+## 15% attack, gentle exponential decay across remaining 85%.
+func _lullaby_env(u: float) -> float:
+	if u < 0.15:
+		return u / 0.15
+	var d: float = (u - 0.15) / 0.85
+	return pow(1.0 - d, 1.1)

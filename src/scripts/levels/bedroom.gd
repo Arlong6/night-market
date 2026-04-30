@@ -89,7 +89,9 @@ var _fade_overlay: ColorRect = null
 func _ready() -> void:
 	Game.current_area = "bedroom"
 	Game.in_dialogue = false
-	Music.stop()
+	# v0.32: lullaby track plays softly under the bookend (-16 dB pentatonic
+	# loop, half-tempo of the market track). Stops naturally on goto_level.
+	Music.play_lullaby()
 	set_process_unhandled_input(true)
 	_build_overlays()
 	if not Game.test_mode:

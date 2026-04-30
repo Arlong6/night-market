@@ -285,7 +285,8 @@ func _do_stir() -> void:
 		return
 	_stir_count += 1
 	_wok_rock_t = WOK_ROCK_DURATION
-	Sfx.play_choice()
+	# v0.32: replaced the generic blip with a real sizzle (filtered noise).
+	Sfx.play_sizzle()
 	# Steam puff out the wok on each stir.
 	var burst: ParticleBurst = ParticleBurst.new()
 	burst.position = Vector2(STOVE_X, STOVE_Y - 12)

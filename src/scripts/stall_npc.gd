@@ -398,6 +398,8 @@ func _apply_bargain_tier(tier: int) -> void:
 func _attempt_buy() -> void:
 	var pay: int = effective_price()
 	if not Inventory.can_afford(pay):
+		# v0.32: short descending two-tone so the rejection has audio bite.
+		Sfx.play_denial()
 		Dialogue.show(["錢不夠喔，下次再來"])
 		return
 	if Inventory.buy(ingredient_id, pay):
