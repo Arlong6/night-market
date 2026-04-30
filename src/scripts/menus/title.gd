@@ -22,6 +22,41 @@ const COLOR_LANTERN_RIM: Color = Color("#F2A227")
 const COLOR_LANTERN_TASSEL: Color = Color("#F5EDDA")
 const COLOR_ROPE: Color = Color("#3A1A0A")
 
+# v0.30: atmospheric layers
+const COLOR_STAR: Color = Color("#F5EDDA")
+const COLOR_STAR_DIM: Color = Color("#888888")
+const COLOR_SILHOUETTE_DARK: Color = Color("#1A0F18")
+const COLOR_SILHOUETTE_MID: Color = Color("#2A1A28")
+const COLOR_SILHOUETTE_LANTERN: Color = Color("#5A2418")
+const COLOR_SILHOUETTE_LANTERN_LIT: Color = Color("#C2241A")
+const COLOR_SILHOUETTE_GLOW: Color = Color("#F2A227")
+
+# Silhouette strip (low market band drawn above the hint line)
+const SILHOUETTE_TOP_Y: int = 138
+const SILHOUETTE_BOTTOM_Y: int = 160
+
+# Walking-kid loop
+const KID_Y: int = 154
+const KID_SPEED: float = 18.0  # px/sec
+
+# Twinkling-star pattern. Each entry is (x, y, phase_offset, brightness_seed).
+const STAR_DATA: Array = [
+	[ 12,  6,  0.0, 0],
+	[ 30, 10,  0.4, 1],
+	[ 56,  4,  0.8, 0],
+	[ 88,  8,  1.2, 1],
+	[122,  5,  1.6, 0],
+	[148, 12,  2.0, 1],
+	[176,  3,  2.4, 0],
+	[204, 11,  2.8, 1],
+	[228,  7,  3.2, 0],
+	[256,  4,  3.6, 1],
+	[286, 13,  4.0, 0],
+	[306,  9,  4.4, 1],
+	[ 70, 14,  4.8, 0],
+	[200, 16,  5.2, 1],
+]
+
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
@@ -77,7 +112,15 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _draw() -> void:
-	# Lanterns drawn on the Control's own canvas behind the labels.
+	# v0.30: layered title atmosphere — back to front:
+	#   1. starry sky in the gap between lanterns
+	#   2. market silhouette strip above the bottom hint
+	#   3. animated kid walking across the strip
+	#   4. lantern row hanging at the top (existing)
+	# Labels are added as children and draw on top automatically.
+	_draw_starry_sky()
+	_draw_market_silhouette()
+	_draw_walking_kid()
 	_draw_lantern_row()
 
 
@@ -185,6 +228,95 @@ func _build_ui() -> void:
 # ---------------------------------------------------------------------------
 # Lantern animation
 # ---------------------------------------------------------------------------
+
+## v0.30: scattered stars in the strip between the lantern row and the
+## title text. Each star twinkles on its own phase — alternating between
+## bright cream and dim grey — so the sky feels alive.
+func _draw_starry_sky() -> void:
+	for s in STAR_DATA:
+		var x: int = int(s[0])
+		var y: int = int(s[1])
+		var phase: float = float(s[2])
+		var seed: int = int(s[3])
+		# Twinkle at ~0.6 Hz; offset per-star by phase.
+		var lit: bool = sin(_t * 0.8 + phase) > -0.2
+		var c: Color = COLOR_STAR if (lit != bool(seed)) else COLOR_STAR_DIM
+		draw_rect(Rect2(x, y, 1, 1), c)
+
+
+## v0.30: low market-stall silhouette band above the hint line — telegraphs
+## the market the kid is heading to. A few stalls glow with a tiny lantern
+## dot, suggesting they're still open. Sits behind the walking kid.
+func _draw_market_silhouette() -> void:
+	# Backdrop band — a deeper shadow stripe behind the silhouettes
+	draw_rect(Rect2(0, SILHOUETTE_BOTTOM_Y - 4, VIEWPORT_W, 4),
+		COLOR_SILHOUETTE_DARK)
+	# Stall blocks — varying widths/heights, alternating shades
+	var x: int = 0
+	var widths: Array = [38, 32, 44, 28, 36, 30, 42, 26, 34, 32]
+	var heights: Array = [16, 20, 14, 22, 17, 19, 15, 23, 18, 16]
+	var shades: Array = [
+		COLOR_SILHOUETTE_DARK, COLOR_SILHOUETTE_MID,
+	]
+	var i: int = 0
+	while x < VIEWPORT_W:
+		var w: int = int(widths[i % widths.size()])
+		var h: int = int(heights[i % heights.size()])
+		var c: Color = shades[i % shades.size()]
+		draw_rect(Rect2(x, SILHOUETTE_BOTTOM_Y - h, w, h), c)
+		# Awning hint — 1 px lighter top edge
+		draw_rect(Rect2(x, SILHOUETTE_BOTTOM_Y - h, w, 1),
+			COLOR_SILHOUETTE_LANTERN)
+		# Every other stall has a lit lantern dot above the awning
+		if i % 2 == 0:
+			var lit_x: int = x + w / 2
+			var lit_y: int = SILHOUETTE_BOTTOM_Y - h - 4
+			# Lantern body
+			draw_rect(Rect2(lit_x - 1, lit_y, 2, 3),
+				COLOR_SILHOUETTE_LANTERN_LIT)
+			# Glow halo (semi-transparent)
+			var glow: Color = COLOR_SILHOUETTE_GLOW
+			glow.a = 0.35
+			draw_rect(Rect2(lit_x - 3, lit_y - 1, 6, 5), glow)
+		x += w
+		i += 1
+
+
+## v0.30: animated kid walking left-to-right across the silhouette strip.
+## Loops continuously with screen-wrap. 2-frame leg cycle synced to the
+## walk speed so steps land on the ground every ~0.25 s.
+func _draw_walking_kid() -> void:
+	# Wrap kid X across (-12, VIEWPORT_W + 12) so the sprite slides off the
+	# right edge cleanly and reappears on the left.
+	var pad: float = 12.0
+	var span: float = float(VIEWPORT_W) + pad * 2.0
+	var raw_x: float = -pad + fmod(_t * KID_SPEED, span)
+	var x: int = int(raw_x)
+	var y: int = KID_Y
+	var leg_phase: bool = (int(_t * 4.0) % 2) == 0
+	var bob: int = -1 if leg_phase else 0
+	# Hair
+	draw_rect(Rect2(x - 3, y - 7 + bob, 6, 2), Color("#3A1A0A"))
+	# Head
+	draw_rect(Rect2(x - 3, y - 5 + bob, 6, 4), Color("#F2D6A8"))
+	# Eyes — looking right (in the direction of travel)
+	draw_rect(Rect2(x - 1, y - 3 + bob, 1, 1), Color("#2A1A0A"))
+	draw_rect(Rect2(x + 2, y - 3 + bob, 1, 1), Color("#2A1A0A"))
+	# Yellow shirt
+	draw_rect(Rect2(x - 4, y - 1 + bob, 8, 5), Color("#E8F542"))
+	draw_rect(Rect2(x - 4, y - 1 + bob, 8, 1),
+		Color("#E8F542").darkened(0.25))
+	# Blue shorts
+	draw_rect(Rect2(x - 3, y + 4 + bob, 2, 3), Color("#3A4A8A"))
+	draw_rect(Rect2(x + 1, y + 4 + bob, 2, 3), Color("#3A4A8A"))
+	# Legs alternate
+	if leg_phase:
+		draw_rect(Rect2(x - 3, y + 7, 2, 2), Color("#F2D6A8"))
+		draw_rect(Rect2(x + 1, y + 6, 2, 3), Color("#F2D6A8"))
+	else:
+		draw_rect(Rect2(x - 3, y + 6, 2, 3), Color("#F2D6A8"))
+		draw_rect(Rect2(x + 1, y + 7, 2, 2), Color("#F2D6A8"))
+
 
 ## Draws a row of N lanterns hanging from a horizontal rope at the top.
 ## Each lantern has its own phase so the swaying looks alive, not in sync.
