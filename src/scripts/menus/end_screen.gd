@@ -43,11 +43,12 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEvent and event.is_pressed()):
 		return
-	# First press: skip animation. Second press: return to title.
+	# First press: skip animation. Second press: bookend the day with the
+	# v0.29 bedroom interlude (which auto-advances to the title).
 	if not _animation_complete:
 		_skip_to_end()
 	else:
-		Game.goto_level("title")
+		Game.goto_level("bedroom")
 
 
 # ---------------------------------------------------------------------------
