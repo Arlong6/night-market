@@ -113,13 +113,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-## Single-shot transition to title — guarded so SPACE + the auto timer
-## can't both fire and double-load the title.
+## Single-shot transition out of the bedroom — guarded so SPACE + the
+## auto timer can't both fire and double-load the next scene.
+##
+## v0.33: weekends route to the 夢境 platformer first; the dream scene
+## then routes onward to "title" once the kid wakes up. Other days go
+## straight to title as before.
 func _advance() -> void:
 	if _done:
 		return
 	_done = true
-	Game.goto_level("title")
+	var next: String = "dream" if Inventory.is_weekend() else "title"
+	Game.goto_level(next)
 
 
 # ---------------------------------------------------------------------------

@@ -9,6 +9,10 @@ func _reset() -> void:
 	Game.test_mode = true
 	Game.current_area = ""
 	Game.in_dialogue = false
+	# v0.33: bedroom routing now branches on weekday vs weekend, so pin the
+	# day to a weekday (Mon = day 1) so the default-routing tests stay
+	# deterministic. Weekend test overrides this explicitly.
+	HiScore.day = 1
 
 
 func before_each() -> void:
@@ -79,4 +83,37 @@ func test_bedroom_advance_is_single_shot() -> void:
 	# both fire and double-load the title.
 	assert_eq(Game.current_area, "shilin",
 		"second _advance call should be a no-op — got '%s'"
+		% Game.current_area)
+
+
+# ---------------------------------------------------------------------------
+# v0.33 — weekend dream routing
+# ---------------------------------------------------------------------------
+
+func test_bedroom_advance_routes_to_dream_on_weekend() -> void:
+	# Arrange — day 6 = Saturday in the rotating week
+	HiScore.day = 6
+	var scene: Bedroom = await _make_scene()
+
+	# Act
+	scene._advance()
+
+	# Assert: weekend nights route to the dream platformer instead of the
+	# title; the dream scene itself owns the hop onward.
+	assert_eq(Game.current_area, "dream",
+		"weekend bedroom _advance should route to 'dream' — got '%s'"
+		% Game.current_area)
+
+
+func test_bedroom_advance_routes_to_title_on_weekday() -> void:
+	# Arrange — day 3 = Wednesday
+	HiScore.day = 3
+	var scene: Bedroom = await _make_scene()
+
+	# Act
+	scene._advance()
+
+	# Assert
+	assert_eq(Game.current_area, "title",
+		"weekday bedroom _advance should route to 'title' — got '%s'"
 		% Game.current_area)
