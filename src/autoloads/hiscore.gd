@@ -26,6 +26,8 @@ const KEY_MUTED: String = "muted"
 const KEY_DAY: String = "day"
 const KEY_VENDOR_PURCHASES: String = "vendor_purchases"
 const KEY_DISHES_COOKED: String = "dishes_cooked"
+const KEY_DREAM_BEST_KILLS: String = "dream_best_kills"
+const KEY_DREAM_BOSS_CLEARS: String = "dream_boss_clears"
 
 ## Sentinel for "no record yet" — easier than a separate Optional flag.
 const NO_RECORD: float = INF
@@ -54,6 +56,15 @@ var vendor_purchases: Dictionary[String, int] = {}
 ## v0.24: cookbook journal. Maps dish name → number of times cooked across
 ## all runs. A dish is "unlocked" iff dishes_cooked.has(name). Persisted.
 var dishes_cooked: Dictionary[String, int] = {}
+
+## v0.34: best dream-sequence kill count across all weekend nights. 0 if the
+## player has never played a dream. Capped at the kill count, NOT the boss
+## HP — boss-clear runs add to dream_boss_clears instead.
+var dream_best_kills: int = 0
+
+## v0.34: number of times the player has defeated 夜市大魔王. Increments on
+## every boss-clear ending in the dream scene.
+var dream_boss_clears: int = 0
 
 # ---------------------------------------------------------------------------
 # Lifecycle
@@ -180,6 +191,29 @@ func unlocked_dish_count() -> int:
 	return dishes_cooked.size()
 
 
+## v0.34: records a finished dream sequence. `kills` is the total small-fry
+## kill count and `boss_cleared` is true iff the player defeated the boss.
+## Returns a small dictionary describing what was achieved this dream:
+##   {
+##     "new_kill_record": bool,    # beat dream_best_kills
+##     "first_boss_clear": bool,   # first ever boss kill
+##   }
+## Caller (Dream._advance) drives any "new record" UI from the result.
+func record_dream(kills: int, boss_cleared: bool) -> Dictionary:
+	var new_kill_record: bool = kills > dream_best_kills
+	if new_kill_record:
+		dream_best_kills = kills
+	var first_boss_clear: bool = false
+	if boss_cleared:
+		first_boss_clear = dream_boss_clears == 0
+		dream_boss_clears += 1
+	_save()
+	return {
+		"new_kill_record": new_kill_record,
+		"first_boss_clear": first_boss_clear,
+	}
+
+
 ## Toggles the global mute flag, persists, and pushes the change to Sfx + Music.
 func toggle_mute() -> bool:
 	muted = not muted
@@ -214,6 +248,8 @@ func clear() -> void:
 	day = 1
 	vendor_purchases = {}
 	dishes_cooked = {}
+	dream_best_kills = 0
+	dream_boss_clears = 0
 	if FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 
@@ -247,6 +283,9 @@ func _load() -> void:
 	var raw_d: Dictionary = cfg.get_value(SECTION, KEY_DISHES_COOKED, {})
 	for k in raw_d.keys():
 		dishes_cooked[String(k)] = int(raw_d[k])
+	# v0.34: dream-sequence cross-run records.
+	dream_best_kills = maxi(0, int(cfg.get_value(SECTION, KEY_DREAM_BEST_KILLS, 0)))
+	dream_boss_clears = maxi(0, int(cfg.get_value(SECTION, KEY_DREAM_BOSS_CLEARS, 0)))
 	# Push restored mute state to audio autoloads on next frame so they have
 	# finished their own _ready (autoload init order may not guarantee it).
 	call_deferred("_apply_mute")
@@ -262,6 +301,8 @@ func _save() -> void:
 	cfg.set_value(SECTION, KEY_DAY, day)
 	cfg.set_value(SECTION, KEY_VENDOR_PURCHASES, vendor_purchases)
 	cfg.set_value(SECTION, KEY_DISHES_COOKED, dishes_cooked)
+	cfg.set_value(SECTION, KEY_DREAM_BEST_KILLS, dream_best_kills)
+	cfg.set_value(SECTION, KEY_DREAM_BOSS_CLEARS, dream_boss_clears)
 	var err: Error = cfg.save(SAVE_PATH)
 	if err != OK:
 		push_warning("[HiScore] save failed (err=%d)" % err)

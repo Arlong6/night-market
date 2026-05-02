@@ -203,6 +203,16 @@ func _build_ui() -> void:
 		stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		vbox.add_child(stats)
 
+	# v0.34: dream-sequence stats — only after the player has played a dream.
+	# (Either dream_best_kills > 0 or dream_boss_clears > 0 means they did.)
+	if HiScore.dream_best_kills > 0 or HiScore.dream_boss_clears > 0:
+		var dream_text: String = "夢境最高擊倒 %d 隻　打倒大魔王 %d 次" % [
+			HiScore.dream_best_kills, HiScore.dream_boss_clears
+		]
+		var dream_stats: Label = _make_label(dream_text, 8, Color("#7AC940"))
+		dream_stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(dream_stats)
+
 	var spacer2: Control = Control.new()
 	spacer2.custom_minimum_size = Vector2(0, 8)
 	vbox.add_child(spacer2)

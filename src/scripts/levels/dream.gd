@@ -28,6 +28,15 @@ const FLOOR_Y: int = 142             ## y at top of ground bricks
 const GRAVITY: float = 600.0         ## px / s²
 const MOVE_SPEED: float = 84.0       ## px / s on ground
 const JUMP_VELOCITY: float = -210.0  ## initial jump py/s (negative = up)
+
+## Floating one-way platforms — landed on from above only. Each entry is the
+## top-edge surface: x=left, y=top, w=width. Player feet at exactly `y` while
+## standing. Cleared via "drop-through" not implemented (weekend scope).
+const PLATFORMS: Array = [
+	{"x": 56, "y": 110, "w": 40},
+	{"x": 224, "y": 110, "w": 40},
+	{"x": 140, "y": 84, "w": 40},
+]
 const PLAYER_W: float = 8.0
 const PLAYER_H: float = 14.0
 const PLAYER_HP_MAX: int = 3
@@ -48,6 +57,34 @@ const ENEMY_SPEED_RAMP: float = 0.6  ## per-second speed gain over the run
 const ENEMY_SPAWN_INTERVAL_BASE: float = 1.6
 const ENEMY_SPAWN_INTERVAL_MIN: float = 0.7
 const ENEMY_MAX_ALIVE: int = 4
+
+## v0.34 — second enemy variant: 章魚燒 hopper. Walks-then-arcs toward the
+## player so the dream isn't just a 1D shoot gallery. Takes 2 hits.
+const TAKO_GRAVITY: float = 600.0
+const TAKO_HOP_VX: float = 50.0      ## horizontal speed during a hop
+const TAKO_HOP_VY: float = -160.0    ## initial hop velocity (negative = up)
+const TAKO_HOP_COOLDOWN: float = 0.42 ## time spent grounded between hops
+const TAKO_HP: int = 2
+const TAKO_INTRO_WAVE_T: float = 10.0 ## tako only starts spawning after this
+
+## v0.34 — 夜市大魔王 boss. Triggers when small-fry kill count reaches
+## BOSS_TRIGGER_KILLS. Replaces the "10 small kills" win path: defeating
+## the boss is the new big-win.
+const BOSS_TRIGGER_KILLS: int = 8
+const BOSS_HP_MAX: int = 5
+const BOSS_W: float = 22.0
+const BOSS_H: float = 14.0
+const BOSS_HOVER_Y: float = 60.0    ## boss centre-y while patrolling
+const BOSS_PATROL_X_MIN: float = 28.0
+const BOSS_PATROL_X_MAX: float = 292.0
+const BOSS_PATROL_SPEED: float = 50.0  ## px/s side-to-side
+const BOSS_BOB_AMP: float = 4.0       ## sine-bob amplitude (px)
+const BOSS_FIRE_INTERVAL: float = 1.1  ## sauce-splat drop cadence
+const BOSS_INVINCIBLE_ON_HIT: float = 0.18  ## i-frames after each scallion
+const BOSS_PROJECTILE_VY: float = 130.0
+const BOSS_PROJECTILE_W: float = 5.0
+const BOSS_PROJECTILE_H: float = 5.0
+const BOSS_PROJECTILE_LIFETIME: float = 2.0
 
 const TIME_LIMIT: float = 45.0       ## seconds to survive
 const TARGET_KILLS: int = 10         ## early-win threshold
@@ -70,6 +107,16 @@ const COLOR_PROJECTILE_TIP: Color = Color("#C8E66D")
 const COLOR_ENEMY_BODY: Color = Color("#C8242A")    ## 黑輪 reddish
 const COLOR_ENEMY_RIM: Color = Color("#3A1A0A")
 const COLOR_ENEMY_FACE: Color = Color("#F5EDDA")
+const COLOR_TAKO_BODY: Color = Color("#8A4A22")     ## browned takoyaki
+const COLOR_TAKO_RIM: Color = Color("#3A1A0A")
+const COLOR_TAKO_HIGHLIGHT: Color = Color("#F2D6A8") ## flake of bonito
+const COLOR_TAKO_SAUCE: Color = Color("#5A2A12")    ## brown sauce drip
+const COLOR_BOSS_BODY: Color = Color("#3A2A6A")     ## big boss purple-blue
+const COLOR_BOSS_RIM: Color = Color("#1A0F2A")
+const COLOR_BOSS_GLOW: Color = Color("#7AC940")     ## eye glow
+const COLOR_BOSS_FLASH: Color = Color("#F5EDDA")    ## hit-flash highlight
+const COLOR_BOSS_PROJ: Color = Color("#5A2A12")     ## sauce splat (matches tako sauce)
+const COLOR_BOSS_PROJ_RIM: Color = Color("#3A1A0A")
 const COLOR_HEART: Color = Color("#C2241A")
 const COLOR_HEART_DIM: Color = Color("#3A1A28")
 const COLOR_TEXT: Color = Color("#F5EDDA")
@@ -86,6 +133,7 @@ var _player_facing: int = 1            ## 1 = right, -1 = left
 var _player_hp: int = PLAYER_HP_MAX
 var _player_invincible_t: float = 0.0
 var _player_on_ground: bool = true
+var _player_prev_y: float = 142.0      ## last frame's y (for platform cross-from-above detection)
 var _walk_phase_t: float = 0.0         ## leg-cycle accumulator
 
 # Combat
@@ -95,6 +143,15 @@ var _enemies: Array = []               ## { pos: Vector2, hp: int }
 var _spawn_t: float = 0.0
 var _enemies_killed: int = 0
 var _wave_t: float = 0.0               ## total run time for difficulty ramp
+
+# Boss state — null until BOSS_TRIGGER_KILLS reached, then a single dict.
+var _boss: Dictionary = {}            ## {} = no boss yet
+var _boss_alive: bool = false
+var _boss_defeated: bool = false
+var _boss_dir: int = 1                 ## 1 = drift right, -1 = drift left
+var _boss_invincible_t: float = 0.0
+var _boss_fire_t: float = 0.0
+var _boss_projectiles: Array = []     ## { pos: Vector2, vel: Vector2, age: float }
 
 # Run state
 var _t: float = 0.0
@@ -149,6 +206,9 @@ func _process(delta: float) -> void:
 	_step_projectiles(delta)
 	_step_enemies(delta)
 	_step_spawner(delta)
+	_maybe_spawn_boss()
+	_step_boss(delta)
+	_step_boss_projectiles(delta)
 	_check_endings()
 	queue_redraw()
 
@@ -199,16 +259,32 @@ func _step_player(delta: float) -> void:
 	_player_vel.y += GRAVITY * delta
 
 	# Integrate
+	_player_prev_y = _player_pos.y
 	_player_pos.x += _player_vel.x * delta
 	_player_pos.y += _player_vel.y * delta
 
 	# Ground collision — player feet at FLOOR_Y is the ground line.
+	_player_on_ground = false
 	if _player_pos.y >= float(FLOOR_Y):
 		_player_pos.y = float(FLOOR_Y)
 		_player_vel.y = 0.0
 		_player_on_ground = true
-	else:
-		_player_on_ground = false
+	# One-way platforms — only land if falling and feet crossed the top edge.
+	# Skip when jumping up (vy < 0) so platforms feel cross-through from below.
+	elif _player_vel.y >= 0.0:
+		for plat in PLATFORMS:
+			var top: float = float(plat["y"])
+			var left: float = float(plat["x"])
+			var right: float = left + float(plat["w"])
+			# Player horizontally over platform?
+			if _player_pos.x < left or _player_pos.x > right:
+				continue
+			# Crossed the top this frame?
+			if _player_prev_y <= top and _player_pos.y >= top:
+				_player_pos.y = top
+				_player_vel.y = 0.0
+				_player_on_ground = true
+				break
 
 	# Horizontal clamp inside viewport
 	_player_pos.x = clampf(_player_pos.x,
@@ -274,6 +350,21 @@ func _step_projectiles(delta: float) -> void:
 					if not Game.test_mode:
 						Sfx.play_pickup()
 				break
+		# Hit-test against the boss (if alive and out of i-frames)
+		if not hit and _boss_alive and _boss_invincible_t <= 0.0:
+			if _rect_overlap(p["pos"], PROJECTILE_W, PROJECTILE_H,
+					_boss["pos"], BOSS_W, BOSS_H):
+				_boss["hp"] = int(_boss["hp"]) - 1
+				_boss_invincible_t = BOSS_INVINCIBLE_ON_HIT
+				hit = true
+				if int(_boss["hp"]) <= 0:
+					_boss_alive = false
+					_boss_defeated = true
+					if not Game.test_mode:
+						Sfx.play_win()
+				else:
+					if not Game.test_mode:
+						Sfx.play_bump()
 		if not hit:
 			keep.append(p)
 	_projectiles = keep
@@ -288,14 +379,12 @@ func _step_enemies(delta: float) -> void:
 	for e in _enemies:
 		if e["hp"] <= 0:
 			continue
-		# Walk toward player horizontally
-		var dx: float = _player_pos.x - e["pos"].x
-		var dir: float = signf(dx) if absf(dx) > 1.0 else 0.0
-		var spd: float = ENEMY_SPEED_BASE + _wave_t * ENEMY_SPEED_RAMP
-		e["pos"].x += dir * spd * delta
-		# Enemies stick to the floor (oden wobble — no jumping)
-		e["pos"].y = float(FLOOR_Y) - ENEMY_H * 0.5
-		# Contact with player → damage
+		match String(e.get("kind", "oden")):
+			"tako":
+				_step_tako(e, delta)
+			_:
+				_step_oden(e, delta)
+		# Contact with player → damage (shared across kinds)
 		if _player_invincible_t <= 0.0 and _rect_overlap(
 				_player_pos - Vector2(0, PLAYER_H * 0.5), PLAYER_W, PLAYER_H,
 				e["pos"] - Vector2(0, ENEMY_H * 0.5), ENEMY_W, ENEMY_H):
@@ -304,7 +393,47 @@ func _step_enemies(delta: float) -> void:
 	_enemies = alive
 
 
+## 黑輪 — slow walker, sticks to ground, ramps speed with run length.
+func _step_oden(e: Dictionary, delta: float) -> void:
+	var dx: float = _player_pos.x - e["pos"].x
+	var dir: float = signf(dx) if absf(dx) > 1.0 else 0.0
+	var spd: float = ENEMY_SPEED_BASE + _wave_t * ENEMY_SPEED_RAMP
+	e["pos"].x += dir * spd * delta
+	e["pos"].y = float(FLOOR_Y) - ENEMY_H * 0.5
+
+
+## 章魚燒 — hops in arcs toward the player. Grounded → cooldown countdown →
+## launch in player's horizontal direction.
+func _step_tako(e: Dictionary, delta: float) -> void:
+	var vel: Vector2 = e.get("vel", Vector2.ZERO)
+	var hop_cd: float = float(e.get("hop_cd_t", 0.0))
+	var grounded: bool = bool(e.get("grounded", true))
+	if grounded:
+		hop_cd = maxf(hop_cd - delta, 0.0)
+		if hop_cd <= 0.0:
+			# Launch a hop toward the player
+			var dx: float = _player_pos.x - e["pos"].x
+			var dir: float = signf(dx) if absf(dx) > 1.0 else 1.0
+			vel = Vector2(dir * TAKO_HOP_VX, TAKO_HOP_VY)
+			grounded = false
+	else:
+		vel.y += TAKO_GRAVITY * delta
+		e["pos"] += vel * delta
+		# Landing on the floor — clamp + reset cooldown.
+		if e["pos"].y >= float(FLOOR_Y) - ENEMY_H * 0.5:
+			e["pos"].y = float(FLOOR_Y) - ENEMY_H * 0.5
+			vel = Vector2.ZERO
+			grounded = true
+			hop_cd = TAKO_HOP_COOLDOWN
+	e["vel"] = vel
+	e["hop_cd_t"] = hop_cd
+	e["grounded"] = grounded
+
+
 func _step_spawner(delta: float) -> void:
+	# Pause small-fry spawning during the boss fight and after victory.
+	if _boss_alive or _boss_defeated:
+		return
 	if _enemies.size() >= ENEMY_MAX_ALIVE:
 		return
 	_spawn_t -= delta
@@ -318,10 +447,100 @@ func _step_spawner(delta: float) -> void:
 	# Pick a side opposite to player so they have time to react
 	var side: int = -1 if _player_pos.x > float(VIEWPORT_W) / 2.0 else 1
 	var spawn_x: float = -8.0 if side > 0 else float(VIEWPORT_W) + 8.0
-	_enemies.append({
-		"pos": Vector2(spawn_x, float(FLOOR_Y) - ENEMY_H * 0.5),
-		"hp": 1,
-	})
+	# v0.34: every 3rd spawn after TAKO_INTRO_WAVE_T is a 章魚燒 hopper.
+	# Counter is _enemies_killed + alive count → close enough to "Nth spawn".
+	var spawn_index: int = _enemies_killed + _enemies.size()
+	var is_tako: bool = (
+		_wave_t >= TAKO_INTRO_WAVE_T and (spawn_index % 3) == 2
+	)
+	if is_tako:
+		_enemies.append({
+			"pos": Vector2(spawn_x, float(FLOOR_Y) - ENEMY_H * 0.5),
+			"hp": TAKO_HP,
+			"kind": "tako",
+			"vel": Vector2.ZERO,
+			"hop_cd_t": 0.0,         ## launch immediately on first tick
+			"grounded": true,
+		})
+	else:
+		_enemies.append({
+			"pos": Vector2(spawn_x, float(FLOOR_Y) - ENEMY_H * 0.5),
+			"hp": 1,
+			"kind": "oden",
+		})
+
+
+# ---------------------------------------------------------------------------
+# Boss (v0.34) — 夜市大魔王
+# ---------------------------------------------------------------------------
+
+## One-time spawn check. Once the player has cleared BOSS_TRIGGER_KILLS small
+## fries, the boss flies in centred and the small-fry spawner stops.
+func _maybe_spawn_boss() -> void:
+	if _boss_alive or _boss_defeated:
+		return
+	if _enemies_killed < BOSS_TRIGGER_KILLS:
+		return
+	_boss = {
+		"pos": Vector2(float(VIEWPORT_W) / 2.0, BOSS_HOVER_Y),
+		"hp": BOSS_HP_MAX,
+	}
+	_boss_alive = true
+	_boss_dir = 1 if _player_pos.x < float(VIEWPORT_W) / 2.0 else -1
+	_boss_fire_t = BOSS_FIRE_INTERVAL * 0.6
+	if not Game.test_mode:
+		Sfx.play_choice()
+
+
+func _step_boss(delta: float) -> void:
+	if not _boss_alive:
+		return
+	# Side-to-side patrol with sine bob.
+	var pos: Vector2 = _boss["pos"]
+	pos.x += float(_boss_dir) * BOSS_PATROL_SPEED * delta
+	if pos.x < BOSS_PATROL_X_MIN:
+		pos.x = BOSS_PATROL_X_MIN
+		_boss_dir = 1
+	elif pos.x > BOSS_PATROL_X_MAX:
+		pos.x = BOSS_PATROL_X_MAX
+		_boss_dir = -1
+	pos.y = BOSS_HOVER_Y + sin(_t * 2.4) * BOSS_BOB_AMP
+	_boss["pos"] = pos
+	# i-frame timer
+	if _boss_invincible_t > 0.0:
+		_boss_invincible_t = maxf(_boss_invincible_t - delta, 0.0)
+	# Fire sauce splats on a fixed cadence
+	_boss_fire_t -= delta
+	if _boss_fire_t <= 0.0:
+		_boss_fire_t = BOSS_FIRE_INTERVAL
+		_boss_projectiles.append({
+			"pos": Vector2(pos.x, pos.y + BOSS_H * 0.5),
+			"vel": Vector2(0.0, BOSS_PROJECTILE_VY),
+			"age": 0.0,
+		})
+		if not Game.test_mode:
+			Sfx.play_blip()
+
+
+func _step_boss_projectiles(delta: float) -> void:
+	var keep: Array = []
+	for p in _boss_projectiles:
+		p["pos"] += p["vel"] * delta
+		p["age"] += delta
+		var off: bool = (
+			p["pos"].y > float(VIEWPORT_H) + 8.0
+			or p["age"] >= BOSS_PROJECTILE_LIFETIME
+		)
+		if off:
+			continue
+		# Hit-test against player (only if not invincible)
+		if _player_invincible_t <= 0.0 and _rect_overlap(
+				_player_pos - Vector2(0, PLAYER_H * 0.5), PLAYER_W, PLAYER_H,
+				p["pos"], BOSS_PROJECTILE_W, BOSS_PROJECTILE_H):
+			_take_damage(p["pos"])
+			continue
+		keep.append(p)
+	_boss_projectiles = keep
 
 
 # ---------------------------------------------------------------------------
@@ -352,28 +571,38 @@ func _check_endings() -> void:
 		_outro_t = OUTRO_HOLD
 		_show_outro_card()
 		return
-	if _enemies_killed >= TARGET_KILLS:
-		_outro_text = "夜市超人！"
+	if _boss_defeated:
+		# Beat the boss — biggest win ending.
+		_outro_text = "打倒大魔王！"
 		_won = true
 		_outro_t = OUTRO_HOLD
 		_show_outro_card()
-		if not Game.test_mode:
-			Sfx.play_win()
+		# (play_win was already played at the kill-shot; don't double-play.)
 		return
 	if _t >= TIME_LIMIT:
-		# Timed out — count as a soft win (you survived)
-		_outro_text = "夢醒了…"
-		_won = true
+		# Timed out. If the boss is still alive on screen, that's a lose
+		# (you ran out of time mid-fight). Otherwise treat as soft win.
+		if _boss_alive:
+			_outro_text = "差一點…"
+			_won = false
+		else:
+			_outro_text = "夢醒了…"
+			_won = true
 		_outro_t = OUTRO_HOLD
 		_show_outro_card()
 
 
 ## Single-shot transition to the title — guarded so the timer + ESC route
 ## can't both trigger and double-load the next scene.
+##
+## v0.34: persists the dream's best-kill count + boss-clear count to HiScore
+## before the scene swap. Records on every exit (win OR lose) so the player
+## still gets credit for partial progress.
 func _advance() -> void:
 	if _done:
 		return
 	_done = true
+	HiScore.record_dream(_enemies_killed, _boss_defeated)
 	Game.goto_level("title")
 
 
@@ -434,8 +663,11 @@ func _draw() -> void:
 	_draw_sky()
 	_draw_bg_lanterns()
 	_draw_floor()
+	_draw_platforms()
 	_draw_projectiles()
 	_draw_enemies()
+	_draw_boss()
+	_draw_boss_projectiles()
 	_draw_player()
 	_draw_hud()
 	if _outro_t > 0.0:
@@ -487,6 +719,25 @@ func _draw_floor() -> void:
 	draw_rect(Rect2(0, FLOOR_Y, VIEWPORT_W, 1), COLOR_FLOOR_TOP)
 
 
+## Floating brick-top platforms. Drawn as a 4-px-tall slab so the player can
+## tell from a glance there is a landable surface.
+func _draw_platforms() -> void:
+	for plat in PLATFORMS:
+		var x: float = float(plat["x"])
+		var y: float = float(plat["y"])
+		var w: float = float(plat["w"])
+		# Underside slab
+		draw_rect(Rect2(x, y, w, 4), COLOR_FLOOR_BRICK_A)
+		# Brick joins — every 8 px
+		var i: int = 0
+		while i < int(w):
+			var jc: Color = COLOR_FLOOR_BRICK_B if (i / 8) % 2 == 0 else COLOR_FLOOR_BRICK_A
+			draw_rect(Rect2(x + float(i), y + 1, 8, 3), jc)
+			i += 8
+		# Bright top edge
+		draw_rect(Rect2(x, y, w, 1), COLOR_FLOOR_TOP)
+
+
 func _draw_projectiles() -> void:
 	for p in _projectiles:
 		var pos: Vector2 = p["pos"]
@@ -505,20 +756,64 @@ func _draw_enemies() -> void:
 	for e in _enemies:
 		if e["hp"] <= 0:
 			continue
-		var pos: Vector2 = e["pos"]
-		# Body — round-ish red 黑輪
-		draw_rect(Rect2(pos.x - ENEMY_W * 0.5, pos.y - ENEMY_H * 0.5,
-			ENEMY_W, ENEMY_H), COLOR_ENEMY_BODY)
-		# Top + bottom rim
-		draw_rect(Rect2(pos.x - ENEMY_W * 0.5, pos.y - ENEMY_H * 0.5,
-			ENEMY_W, 1), COLOR_ENEMY_RIM)
-		draw_rect(Rect2(pos.x - ENEMY_W * 0.5, pos.y + ENEMY_H * 0.5 - 1,
-			ENEMY_W, 1), COLOR_ENEMY_RIM)
-		# Tiny eyes — face direction of player
-		var eye_dir: float = signf(_player_pos.x - pos.x)
-		var ex: float = pos.x + eye_dir * 1.5
-		draw_rect(Rect2(ex - 1, pos.y - 1, 1, 1), COLOR_ENEMY_FACE)
-		draw_rect(Rect2(ex + 1, pos.y - 1, 1, 1), COLOR_ENEMY_FACE)
+		match String(e.get("kind", "oden")):
+			"tako":
+				_draw_tako(e)
+			_:
+				_draw_oden(e)
+
+
+func _draw_oden(e: Dictionary) -> void:
+	var pos: Vector2 = e["pos"]
+	# Body — round-ish red 黑輪
+	draw_rect(Rect2(pos.x - ENEMY_W * 0.5, pos.y - ENEMY_H * 0.5,
+		ENEMY_W, ENEMY_H), COLOR_ENEMY_BODY)
+	# Top + bottom rim
+	draw_rect(Rect2(pos.x - ENEMY_W * 0.5, pos.y - ENEMY_H * 0.5,
+		ENEMY_W, 1), COLOR_ENEMY_RIM)
+	draw_rect(Rect2(pos.x - ENEMY_W * 0.5, pos.y + ENEMY_H * 0.5 - 1,
+		ENEMY_W, 1), COLOR_ENEMY_RIM)
+	# Tiny eyes — face direction of player
+	var eye_dir: float = signf(_player_pos.x - pos.x)
+	var ex: float = pos.x + eye_dir * 1.5
+	draw_rect(Rect2(ex - 1, pos.y - 1, 1, 1), COLOR_ENEMY_FACE)
+	draw_rect(Rect2(ex + 1, pos.y - 1, 1, 1), COLOR_ENEMY_FACE)
+
+
+## 章魚燒 — browned ball with bonito flake highlights and angry eyes.
+## Squashes vertically when grounded for visible "anticipation" before a hop.
+func _draw_tako(e: Dictionary) -> void:
+	var pos: Vector2 = e["pos"]
+	var grounded: bool = bool(e.get("grounded", true))
+	# Visual squash — slightly flattened on ground, full-tall in air.
+	var sq: float = 0.0 if not grounded else 1.0
+	var w: float = ENEMY_W
+	var h: float = ENEMY_H - sq
+	var dy: float = sq * 0.5
+	# Body
+	draw_rect(Rect2(pos.x - w * 0.5, pos.y - h * 0.5 + dy, w, h),
+		COLOR_TAKO_BODY)
+	# Sauce drip on the upper-left
+	draw_rect(Rect2(pos.x - w * 0.5 + 1, pos.y - h * 0.5 + dy + 1, 2, 1),
+		COLOR_TAKO_SAUCE)
+	draw_rect(Rect2(pos.x - w * 0.5 + 2, pos.y - h * 0.5 + dy + 2, 1, 1),
+		COLOR_TAKO_SAUCE)
+	# Bonito flake highlight (off-white sliver)
+	draw_rect(Rect2(pos.x + 1, pos.y - h * 0.5 + dy + 1, 2, 1),
+		COLOR_TAKO_HIGHLIGHT)
+	# Top + bottom rim
+	draw_rect(Rect2(pos.x - w * 0.5, pos.y - h * 0.5 + dy, w, 1),
+		COLOR_TAKO_RIM)
+	draw_rect(Rect2(pos.x - w * 0.5, pos.y + h * 0.5 + dy - 1, w, 1),
+		COLOR_TAKO_RIM)
+	# Eyes — angled inward "angry" pair, face direction of player
+	var eye_dir: float = signf(_player_pos.x - pos.x)
+	var ex: float = pos.x + eye_dir * 1.5
+	draw_rect(Rect2(ex - 2, pos.y, 1, 1), COLOR_ENEMY_FACE)
+	draw_rect(Rect2(ex + 1, pos.y, 1, 1), COLOR_ENEMY_FACE)
+	# Pupil — single dark dot on the side facing the player
+	var pupil_x: float = ex + 1.0 if eye_dir > 0 else ex - 2.0
+	draw_rect(Rect2(pupil_x, pos.y, 1, 1), COLOR_TAKO_RIM)
 
 
 ## Player sprite — yellow-shirt kid, but armed. 2-frame leg cycle on the
@@ -567,6 +862,53 @@ func _draw_player() -> void:
 		draw_rect(Rect2(fx - 1.0, fy - 1.0, 3.0, 3.0), COLOR_PROJECTILE_TIP)
 
 
+## 夜市大魔王 — chunky purple-blue rectangle with glowing eye and a hit-flash
+## white frame during i-frames so successful hits read clearly.
+func _draw_boss() -> void:
+	if not _boss_alive:
+		return
+	var pos: Vector2 = _boss["pos"]
+	var x: float = pos.x - BOSS_W * 0.5
+	var y: float = pos.y - BOSS_H * 0.5
+	var flashing: bool = _boss_invincible_t > 0.0 and \
+		(int(_t * 32.0) % 2 == 0)
+	var body: Color = COLOR_BOSS_FLASH if flashing else COLOR_BOSS_BODY
+	# Body slab
+	draw_rect(Rect2(x, y, BOSS_W, BOSS_H), body)
+	# Top + bottom rim
+	draw_rect(Rect2(x, y, BOSS_W, 1), COLOR_BOSS_RIM)
+	draw_rect(Rect2(x, y + BOSS_H - 1, BOSS_W, 1), COLOR_BOSS_RIM)
+	# Side rims
+	draw_rect(Rect2(x, y, 1, BOSS_H), COLOR_BOSS_RIM)
+	draw_rect(Rect2(x + BOSS_W - 1, y, 1, BOSS_H), COLOR_BOSS_RIM)
+	# Eye stripe — big single eye that follows the player
+	var eye_dir: float = signf(_player_pos.x - pos.x)
+	var eye_x: float = pos.x + eye_dir * 4.0
+	draw_rect(Rect2(eye_x - 3.0, pos.y - 3.0, 6.0, 4.0),
+		COLOR_BOSS_RIM)
+	draw_rect(Rect2(eye_x - 2.0, pos.y - 2.0, 4.0, 2.0),
+		COLOR_BOSS_GLOW)
+	# Pupil
+	var pupil_x: float = eye_x + (1.0 if eye_dir > 0 else -2.0)
+	draw_rect(Rect2(pupil_x, pos.y - 1.0, 1.0, 1.0), COLOR_BOSS_RIM)
+	# Crown — three small spikes on top
+	for i in 3:
+		var sx: float = pos.x - 4.0 + float(i) * 4.0
+		draw_rect(Rect2(sx, y - 2.0, 2.0, 2.0), COLOR_BG_LANTERN_GLOW)
+
+
+func _draw_boss_projectiles() -> void:
+	for p in _boss_projectiles:
+		var pos: Vector2 = p["pos"]
+		var x: float = pos.x - BOSS_PROJECTILE_W * 0.5
+		var y: float = pos.y - BOSS_PROJECTILE_H * 0.5
+		# Sauce blob — darker rim, lighter centre
+		draw_rect(Rect2(x, y, BOSS_PROJECTILE_W, BOSS_PROJECTILE_H),
+			COLOR_BOSS_PROJ_RIM)
+		draw_rect(Rect2(x + 1.0, y + 1.0,
+			BOSS_PROJECTILE_W - 2.0, BOSS_PROJECTILE_H - 2.0), COLOR_BOSS_PROJ)
+
+
 func _draw_hud() -> void:
 	# HP hearts top-left
 	for i in PLAYER_HP_MAX:
@@ -578,16 +920,32 @@ func _draw_hud() -> void:
 		draw_rect(Rect2(hx + 2, hy, 1, 1), c)
 		draw_rect(Rect2(hx, hy + 1, 3, 1), c)
 		draw_rect(Rect2(hx + 1, hy + 2, 1, 1), c)
-	# Kill count top-right
+	# Kill count / boss progress top-right
 	if _font != null:
-		var kill_text: String = "× %d / %d" % [_enemies_killed, TARGET_KILLS]
-		draw_string(_font, Vector2(VIEWPORT_W - 70, 12),
-			kill_text, HORIZONTAL_ALIGNMENT_RIGHT, 64, 9, COLOR_TEXT)
-		# Time remaining bottom-left of HUD
+		var top_text: String
+		if _boss_alive:
+			top_text = "BOSS  %d / %d" % [int(_boss["hp"]), BOSS_HP_MAX]
+		elif _boss_defeated:
+			top_text = "★ CLEAR ★"
+		else:
+			top_text = "× %d / %d" % [_enemies_killed, BOSS_TRIGGER_KILLS]
+		draw_string(_font, Vector2(VIEWPORT_W - 86, 12),
+			top_text, HORIZONTAL_ALIGNMENT_RIGHT, 80, 9, COLOR_TEXT)
+		# Time remaining centre-top
 		var remaining: float = maxf(TIME_LIMIT - _t, 0.0)
 		var time_text: String = "%.1fs" % remaining
 		draw_string(_font, Vector2(VIEWPORT_W / 2 - 32, 12),
 			time_text, HORIZONTAL_ALIGNMENT_CENTER, 64, 9, COLOR_TEXT)
+	# Boss HP bar — drawn as a slim segmented bar above the boss
+	if _boss_alive:
+		var bx: float = float(_boss["pos"].x) - BOSS_W * 0.5
+		var by: float = float(_boss["pos"].y) - BOSS_H * 0.5 - 5.0
+		for i in BOSS_HP_MAX:
+			var sx: float = bx + float(i) * (BOSS_W / float(BOSS_HP_MAX))
+			var seg_w: float = (BOSS_W / float(BOSS_HP_MAX)) - 1.0
+			var c: Color = COLOR_HEART if i < int(_boss["hp"]) \
+				else COLOR_HEART_DIM
+			draw_rect(Rect2(sx, by, seg_w, 2.0), c)
 
 
 ## Dim the playfield while the outro card is held so the text reads cleanly.
