@@ -143,3 +143,63 @@ func test_player_no_step_when_no_input() -> void:
 
 	assert_eq(p.cell, Vector2i(5, 5),
 		"No input should produce no movement — got %s" % p.cell)
+
+
+# ---------------------------------------------------------------------------
+# v0.37 — sprite polish: facing + idle breathing
+# ---------------------------------------------------------------------------
+
+func test_player_idle_accumulator_advances_when_stationary() -> void:
+	# Arrange — reset to a known value (the helper's process_frame already
+	# bumped _idle_t by one frame's delta).
+	var p: PlayerGrid = await _make_player(Vector2i(5, 5), true)
+	p._idle_t = 0.0
+
+	# Act — wait a few frames with no input held.
+	await get_tree().create_timer(0.2).timeout
+
+	# Assert — accumulator should have grown so the breathing sin has phase.
+	assert_gt(p._idle_t, 0.1,
+		"idle accumulator should tick when stationary — got %f"
+		% p._idle_t)
+
+
+func test_player_idle_accumulator_freezes_during_step() -> void:
+	# Arrange — capture _idle_t after some idle time, then start stepping.
+	var p: PlayerGrid = await _make_player(Vector2i(5, 5), true)
+	await get_tree().create_timer(0.15).timeout
+	var idle_before: float = p._idle_t
+	# Act — press right and wait until step is in flight.
+	Input.action_press("ui_right")
+	await get_tree().create_timer(PlayerGrid.STEP_DURATION * 0.4).timeout
+	# At this moment the player is mid-tween. Capture the idle accumulator.
+	var idle_during_step: float = p._idle_t
+	Input.action_release("ui_right")
+	# Assert
+	assert_almost_eq(idle_during_step, idle_before, 0.05,
+		"_idle_t should be frozen while a step is in flight — was %f, now %f"
+		% [idle_before, idle_during_step])
+
+
+func test_player_facing_up_after_pressing_up() -> void:
+	# Arrange
+	var p: PlayerGrid = await _make_player(Vector2i(5, 5), false)  # blocked
+	# Act — press up on blocked map; facing should still update.
+	Input.action_press("ui_up")
+	await get_tree().create_timer(0.1).timeout
+	Input.action_release("ui_up")
+	# Assert
+	assert_eq(p.facing, Vector2i(0, -1),
+		"facing should be (0,-1) after pressing up — got %s" % p.facing)
+
+
+func test_player_facing_horizontal_records_x_sign() -> void:
+	# Arrange
+	var p: PlayerGrid = await _make_player(Vector2i(5, 5), false)
+	# Act — press left
+	Input.action_press("ui_left")
+	await get_tree().create_timer(0.1).timeout
+	Input.action_release("ui_left")
+	# Assert
+	assert_eq(p.facing.x, -1,
+		"facing.x should be -1 after pressing left — got %d" % p.facing.x)

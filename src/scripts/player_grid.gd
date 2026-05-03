@@ -82,6 +82,10 @@ var is_stepping: bool = false
 ## visual so the walk cycle feels left-right-left.
 var _step_count: int = 0
 
+## v0.37: free-running accumulator for idle breathing animation when the
+## player is not moving. Drives a slow 1-px shoulders-rise via sin(_t * 2).
+var _idle_t: float = 0.0
+
 # ---------------------------------------------------------------------------
 # Private state — input edge detection
 # ---------------------------------------------------------------------------
@@ -103,7 +107,11 @@ func _ready() -> void:
 	position = GridWorld.cell_to_px(start_cell)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	# v0.37: idle accumulator — only ticks when stationary so breathing
+	# doesn't fight the walk-cycle bob.
+	if not is_stepping and _pressed_dirs.is_empty():
+		_idle_t += delta
 	_update_pressed_dirs()
 
 	# Don't accept new movement while a step is in flight or a dialogue is open.
@@ -117,38 +125,112 @@ func _process(_delta: float) -> void:
 	_attempt_step(_pressed_dirs[-1])
 
 
+## v0.37 sprite — 4-direction facing + walk cycle + idle breathing.
+##
+## Layers (back→front, drawn vertically aligned with player at y=0):
+##   - Hair (varies by facing — back of head when looking up, sweeping
+##     fringe + side hair when looking down)
+##   - Skin head (face shape unchanged across directions)
+##   - Eyes (pair of dots when facing down/left/right; absent when up)
+##   - Shirt (with collar accent + tiny side detail when facing left/right)
+##   - Arms (small 1×2 rects that swing forward/back during walk)
+##   - Shorts (alternating foot-lift on walk cycle)
+##
+## When stationary, _idle_t drives a 1-px shoulder rise on a slow sine so
+## the player still looks alive while the world ticks around them.
 func _draw() -> void:
-	# Walk bob: when stepping, alternating-foot lift via _step_count parity.
-	# Body lifts 1px on even-numbered steps; stays low on odd ones. Combined
-	# with the position tween it reads as a Pokémon-style 2-frame walk cycle.
-	var bob: float = 0.0
-	if is_stepping and _step_count % 2 == 0:
-		bob = -1.0
+	var step_phase: bool = is_stepping and (_step_count % 2 == 0)
+	var bob: float = -1.0 if step_phase else 0.0
+	# Idle breathing — only when not stepping and no input held.
+	var idle_bob: float = 0.0
+	if not is_stepping and _pressed_dirs.is_empty():
+		# 0.6 Hz breathing → noticeable but calm. Floor to int so the head
+		# either lifts a full pixel or sits flat (no sub-pixel shimmer).
+		var s: float = sin(_idle_t * 1.6)
+		idle_bob = -1.0 if s > 0.4 else 0.0
+	bob += idle_bob
 
-	# Head — 6×6 skin square with hair cap on top
-	draw_rect(Rect2(-3.0, -7.0 + bob, 6.0, 6.0), PLAYER_SKIN)
-	draw_rect(Rect2(-3.0, -7.0 + bob, 6.0, 2.0), PLAYER_HAIR)
+	# --- Hair / head per facing direction ----------------------------------
+	if facing.y < 0:
+		_draw_head_back(bob)
+	else:
+		_draw_head_front(bob, facing.x)
 
-	# Eyes — pair of dots, biased toward facing.x for left/right look.
-	# When facing up/down, eyes stay centred (1px each side of midline).
-	var face_shift: float = signf(facing.x) * 1.0  # -1, 0, or +1
-	draw_rect(Rect2(-2.0 + face_shift, -4.0 + bob, 1.0, 1.0), Color("#2A1A0A"))
-	draw_rect(Rect2(1.0 + face_shift, -4.0 + bob, 1.0, 1.0), Color("#2A1A0A"))
-
-	# Yellow shirt body — 8×5 rect
+	# --- Body --------------------------------------------------------------
 	draw_rect(Rect2(-4.0, -1.0 + bob, 8.0, 5.0), PLAYER_COLOR)
 	# Shirt collar accent — 1px darker strip across the top of the torso
 	draw_rect(Rect2(-4.0, -1.0 + bob, 8.0, 1.0), PLAYER_COLOR.darkened(0.25))
+	# Side accent — tiny 1px shadow on the trailing side when facing
+	# left/right so the body has a "front vs back" hint.
+	if facing.x != 0:
+		var side_x: float = -4.0 if facing.x > 0 else 3.0
+		draw_rect(Rect2(side_x, 0.0 + bob, 1.0, 4.0),
+			PLAYER_COLOR.darkened(0.35))
 
-	# Blue shorts — split legs with a 2px gap, alternating "foot lift" matching
-	# the walk-cycle bob (one leg slightly down, the other slightly up).
-	var step_phase: bool = _step_count % 2 == 0 and is_stepping
-	var left_lift: float = 0.0 if not step_phase else -1.0
-	var right_lift: float = 0.0 if step_phase else -1.0
-	draw_rect(Rect2(-3.0, 4.0 + bob + left_lift, 2.0, 3.0 + (1.0 if left_lift == 0.0 else 0.0)), PLAYER_PANTS)
-	draw_rect(Rect2(1.0, 4.0 + bob + right_lift, 2.0, 3.0 + (1.0 if right_lift == 0.0 else 0.0)), PLAYER_PANTS)
+	# --- Arms — small swinging blocks during walk --------------------------
+	# Stationary: arms hang flush with body. Walking: opposite arms forward
+	# from opposite legs (left arm forward when right leg lifts).
+	var arm_lift: float = 0.0
+	if is_stepping:
+		arm_lift = -1.0 if step_phase else 0.0
+	# Only draw arm visibly on the side that doesn't get hidden by a
+	# left/right facing offset (cleaner profile when facing horizontal).
+	if facing.y < 0:
+		# Facing up → both arms behind body, draw as small bumps at
+		# shoulder line in skin tone.
+		draw_rect(Rect2(-5.0, 0.0 + bob, 1.0, 2.0), PLAYER_SKIN)
+		draw_rect(Rect2(4.0, 0.0 + bob, 1.0, 2.0), PLAYER_SKIN)
+	else:
+		# Facing down/horizontal: 1×2 arms beside body, opposite-phase to
+		# legs for a natural walk feel.
+		draw_rect(Rect2(-5.0, 0.0 + bob - arm_lift, 1.0, 2.0), PLAYER_SKIN)
+		draw_rect(Rect2(4.0, 0.0 + bob + arm_lift, 1.0, 2.0), PLAYER_SKIN)
+
+	# --- Legs / shorts -----------------------------------------------------
+	# Alternating foot lift drives the walk cadence; idle = both flat.
+	var left_lift: float = 0.0
+	var right_lift: float = 0.0
+	if is_stepping:
+		left_lift = -1.0 if step_phase else 0.0
+		right_lift = 0.0 if step_phase else -1.0
+	draw_rect(Rect2(-3.0, 4.0 + bob + left_lift,
+		2.0, 3.0 + (1.0 if left_lift == 0.0 else 0.0)), PLAYER_PANTS)
+	draw_rect(Rect2(1.0, 4.0 + bob + right_lift,
+		2.0, 3.0 + (1.0 if right_lift == 0.0 else 0.0)), PLAYER_PANTS)
 
 	queue_redraw()
+
+
+## Front / side head — visible face with eyes biased toward facing.x.
+## face_x is signf(facing.x): -1 left, 0 down, +1 right.
+func _draw_head_front(bob: float, face_x: int) -> void:
+	# Head — 6×6 skin square
+	draw_rect(Rect2(-3.0, -7.0 + bob, 6.0, 6.0), PLAYER_SKIN)
+	# Hair — cap (2px stripe) + a tiny fringe sweeping toward the facing side
+	draw_rect(Rect2(-3.0, -7.0 + bob, 6.0, 2.0), PLAYER_HAIR)
+	if face_x != 0:
+		# Side fringe — 1×1 bit dropping down from cap on the trailing side
+		var fringe_x: float = -3.0 if face_x > 0 else 2.0
+		draw_rect(Rect2(fringe_x, -5.0 + bob, 1.0, 1.0), PLAYER_HAIR)
+	else:
+		# Centre fringe — 2×1 bit hanging from the cap
+		draw_rect(Rect2(-1.0, -5.0 + bob, 2.0, 1.0), PLAYER_HAIR)
+	# Eyes — pair of dots, biased toward facing.x for left/right look.
+	var face_shift: float = float(face_x) * 1.0
+	draw_rect(Rect2(-2.0 + face_shift, -4.0 + bob, 1.0, 1.0),
+		Color("#2A1A0A"))
+	draw_rect(Rect2(1.0 + face_shift, -4.0 + bob, 1.0, 1.0),
+		Color("#2A1A0A"))
+
+
+## Back of head — solid hair cap covering the whole head silhouette.
+## No eyes drawn (we're looking at the back).
+func _draw_head_back(bob: float) -> void:
+	# Hair fully covers the head when facing away; one small skin strip
+	# at the bottom hints at the neck.
+	draw_rect(Rect2(-3.0, -7.0 + bob, 6.0, 5.0), PLAYER_HAIR)
+	# Neck — 1px skin sliver at the bottom of the head silhouette
+	draw_rect(Rect2(-2.0, -2.0 + bob, 4.0, 1.0), PLAYER_SKIN)
 
 # ---------------------------------------------------------------------------
 # Private helpers
