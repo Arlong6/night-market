@@ -365,3 +365,63 @@ func test_hiscore_clear_wipes_pending_dream_bonus() -> void:
 	# Assert
 	assert_eq(HiScore.pending_dream_bonus, 0,
 		"clear() should zero the pending dream bonus")
+
+
+# ---------------------------------------------------------------------------
+# v0.40 — pending special-request bonus
+# ---------------------------------------------------------------------------
+
+func test_hiscore_queue_special_bonus_accumulates() -> void:
+	# Arrange — fresh HiScore from before_each.
+
+	# Act — queue twice (e.g. dad birthday then guest dinner back-to-back).
+	HiScore.queue_special_bonus(80)
+	HiScore.queue_special_bonus(60)
+
+	# Assert
+	assert_eq(HiScore.pending_special_bonus, 140,
+		"queue should accumulate — got %d" % HiScore.pending_special_bonus)
+
+
+func test_hiscore_queue_special_bonus_ignores_non_positive() -> void:
+	# Act
+	HiScore.queue_special_bonus(0)
+	HiScore.queue_special_bonus(-50)
+
+	# Assert
+	assert_eq(HiScore.pending_special_bonus, 0,
+		"non-positive amounts should be ignored")
+
+
+func test_hiscore_claim_pending_special_bonus_returns_amount_and_zeroes() -> void:
+	# Arrange
+	HiScore.pending_special_bonus = 80
+
+	# Act
+	var amount: int = HiScore.claim_pending_special_bonus()
+
+	# Assert
+	assert_eq(amount, 80, "claim should return queued amount")
+	assert_eq(HiScore.pending_special_bonus, 0,
+		"claim should zero pending_special_bonus")
+
+
+func test_hiscore_pending_special_bonus_persists_via_config_file() -> void:
+	# Arrange
+	HiScore.pending_special_bonus = 200
+	HiScore._save()
+	HiScore.pending_special_bonus = 0
+
+	# Act
+	HiScore._load()
+
+	# Assert
+	assert_eq(HiScore.pending_special_bonus, 200,
+		"pending special bonus should persist across save/load")
+
+
+func test_hiscore_clear_wipes_pending_special_bonus() -> void:
+	HiScore.pending_special_bonus = 500
+	HiScore.clear()
+	assert_eq(HiScore.pending_special_bonus, 0,
+		"clear() should zero the pending special bonus")

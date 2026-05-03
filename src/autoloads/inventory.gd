@@ -156,6 +156,57 @@ const FESTIVAL_BLURBS: Dictionary[String, String] = {
 }
 
 # ---------------------------------------------------------------------------
+# v0.40 — 媽媽特別交代 (special requests)
+# ---------------------------------------------------------------------------
+#
+# Layered on top of the normal day-theme + festival system. Special requests
+# fire on a 7-day cycle (skipping festival days) so the player gets a
+# narratively-flavoured shopping run roughly twice a week — different from
+# both the day-theme cadence and the rare festival.
+#
+# Each request:
+#   * overrides must_include + size in randomize_required()
+#   * gets its own title-screen + intro line
+#   * awards a one-shot NT$ bonus on completion (queued via
+#     HiScore.pending_special_bonus, paid out next morning the same way
+#     the dream-clear bonus is)
+
+const SPECIAL_REQUEST_NONE: String = ""
+const SPECIAL_REQUEST_DAD_BIRTHDAY: String = "dad_birthday"
+const SPECIAL_REQUEST_GUEST_DINNER: String = "guest_dinner"
+
+## (day - 1) % 7 indices that trigger each request. Skipped silently when a
+## festival day is also active so the festival keeps narrative priority.
+const SPECIAL_REQUEST_DAY_DAD_BIRTHDAY: int = 2  ## days 3, 10, 17, 24…
+const SPECIAL_REQUEST_DAY_GUEST_DINNER: int = 5  ## days 6, 13, 20, 27…
+
+## Bonus NT$ awarded on completion of each special request.
+const SPECIAL_REQUEST_BONUS_DAD_BIRTHDAY: int = 80
+const SPECIAL_REQUEST_BONUS_GUEST_DINNER: int = 60
+
+## Required ingredient list per special request — overrides the day-theme
+## must_include + size when active. Plain Array literals are the only
+## const-expression form; consumers (`randomize_required`,
+## `special_request_complete`) iterate them directly without a cast.
+const SPECIAL_REQUEST_REQUIRED: Dictionary = {
+	SPECIAL_REQUEST_DAD_BIRTHDAY: ["chicken", "scallion", "soy_sauce", "egg"],
+	SPECIAL_REQUEST_GUEST_DINNER: [
+		"chicken", "egg", "scallion", "cabbage", "tofu", "soy_sauce", "mushroom"
+	],
+}
+
+## Short labels used by title screen + mum's intro.
+const SPECIAL_REQUEST_LABELS: Dictionary[String, String] = {
+	SPECIAL_REQUEST_DAD_BIRTHDAY: "🎂 爸爸生日",
+	SPECIAL_REQUEST_GUEST_DINNER: "🍽 客人晚餐",
+}
+## Longer flavour blurbs.
+const SPECIAL_REQUEST_BLURBS: Dictionary[String, String] = {
+	SPECIAL_REQUEST_DAD_BIRTHDAY: "今天爸爸生日，要做三杯雞慶祝～",
+	SPECIAL_REQUEST_GUEST_DINNER: "客人要來晚餐，請把全部食材都買齊！",
+}
+
+# ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
 
@@ -175,6 +226,11 @@ var required_ingredients: PackedStringArray = PackedStringArray()
 ## in dialogue. Lives on Inventory rather than HiScore because by the time
 ## the intro plays, HiScore's pending value has already been zeroed.
 var last_dream_bonus: int = 0
+
+## v0.40: NT$ awarded on the most recent reset() for completing a special
+## request the previous day (mirror of last_dream_bonus, separate so the
+## intro can phrase the two thank-yous independently).
+var last_special_bonus: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -261,8 +317,20 @@ func has_all() -> bool:
 ## v0.13: picks the random shopping list for this run.
 ## v0.19: list size + forced ingredients now come from the active day theme
 ## (Mon = 5 items, Fri = 3 items, Sun = 7 items, Tue forces tofu+cabbage…).
+## v0.40: a special request (爸爸生日 / 客人晚餐) overrides the day theme
+## entirely so mum's plot beat takes priority over the weekly cadence.
 ## Called on every `reset()`, after HiScore is ready.
 func randomize_required() -> void:
+	# v0.40 — special request override
+	var special: String = current_special_request()
+	if special != SPECIAL_REQUEST_NONE:
+		var override: Array = SPECIAL_REQUEST_REQUIRED.get(special, [])
+		if not override.is_empty():
+			var packed: PackedStringArray = PackedStringArray()
+			for id in override:
+				packed.append(String(id))
+			required_ingredients = packed
+			return
 	var theme: Dictionary = current_theme()
 	var must: Array = theme.get("must_include", [])
 	var size: int = clampi(int(theme.get("size", REQUIRED_COUNT)),
@@ -336,9 +404,14 @@ func reset() -> void:
 	# value, so the bonus is paid out exactly once.
 	var hs: Node = get_node_or_null("/root/HiScore")
 	last_dream_bonus = 0
+	last_special_bonus = 0
 	if hs != null and hs.has_method("claim_pending_dream_bonus"):
 		last_dream_bonus = int(hs.claim_pending_dream_bonus())
-	money = STARTING_MONEY + festival_bonus() + last_dream_bonus
+	# v0.40: same pattern for special-request bonus.
+	if hs != null and hs.has_method("claim_pending_special_bonus"):
+		last_special_bonus = int(hs.claim_pending_special_bonus())
+	money = (STARTING_MONEY + festival_bonus()
+		+ last_dream_bonus + last_special_bonus)
 	ingredients = {}
 	randomize_required()
 	money_changed.emit(money)
@@ -369,6 +442,63 @@ func festival_bonus() -> int:
 		FESTIVAL_MID_AUTUMN: return FESTIVAL_BONUS_MID_AUTUMN
 		FESTIVAL_NEW_YEAR:   return FESTIVAL_BONUS_NEW_YEAR
 		_:                   return 0
+
+
+# ---------------------------------------------------------------------------
+# v0.40 — special request helpers
+# ---------------------------------------------------------------------------
+
+## Returns one of SPECIAL_REQUEST_NONE / DAD_BIRTHDAY / GUEST_DINNER for
+## today, based on (HiScore.day - 1) % 7. Festival days take priority and
+## suppress any special request that would otherwise fire.
+func current_special_request() -> String:
+	if current_festival() != FESTIVAL_NONE:
+		return SPECIAL_REQUEST_NONE
+	var hs: Node = get_node_or_null("/root/HiScore")
+	if hs == null:
+		return SPECIAL_REQUEST_NONE
+	var d: int = int(hs.day)
+	if d <= 0:
+		return SPECIAL_REQUEST_NONE
+	var cycle: int = (d - 1) % 7
+	if cycle == SPECIAL_REQUEST_DAY_DAD_BIRTHDAY:
+		return SPECIAL_REQUEST_DAD_BIRTHDAY
+	if cycle == SPECIAL_REQUEST_DAY_GUEST_DINNER:
+		return SPECIAL_REQUEST_GUEST_DINNER
+	return SPECIAL_REQUEST_NONE
+
+
+## Short title-screen label for the active request. Empty on regular days.
+func special_request_label() -> String:
+	return SPECIAL_REQUEST_LABELS.get(current_special_request(), "")
+
+
+## Longer flavour line for the active request. Empty on regular days.
+func special_request_blurb() -> String:
+	return SPECIAL_REQUEST_BLURBS.get(current_special_request(), "")
+
+
+## NT$ bonus awarded if the player completes the active special request.
+## 0 when no request is active.
+func special_request_bonus() -> int:
+	match current_special_request():
+		SPECIAL_REQUEST_DAD_BIRTHDAY: return SPECIAL_REQUEST_BONUS_DAD_BIRTHDAY
+		SPECIAL_REQUEST_GUEST_DINNER: return SPECIAL_REQUEST_BONUS_GUEST_DINNER
+		_:                            return 0
+
+
+## True iff every required ingredient (per the active special request OR
+## the day theme if no request is active) has been bought. Mum uses this
+## to decide whether to award the special-request bonus on win.
+func special_request_complete() -> bool:
+	var req: String = current_special_request()
+	if req == SPECIAL_REQUEST_NONE:
+		return false
+	var needed: Array = SPECIAL_REQUEST_REQUIRED.get(req, [])
+	for id in needed:
+		if not ingredients.get(String(id), false):
+			return false
+	return true
 
 
 ## v0.23: human-readable label for the active festival (or "" if none).

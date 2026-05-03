@@ -320,11 +320,19 @@ func _run_intro_sequence() -> void:
 	if Dialogue._active and Dialogue._box != null:
 		Dialogue._box._close()
 	# v0.23: festival days override the day theme line with a special blurb.
+	# v0.40: a special request also overrides — but festival has priority
+	# because they don't co-fire (current_special_request returns NONE on
+	# festival days). So order is: festival → special_request → day theme.
 	var fest_blurb: String = Inventory.festival_blurb()
+	var sr_blurb: String = Inventory.special_request_blurb()
 	var theme_line: String
 	if not fest_blurb.is_empty():
 		theme_line = "%s — %s" % [
 			Inventory.festival_label(), fest_blurb
+		]
+	elif not sr_blurb.is_empty():
+		theme_line = "%s — %s" % [
+			Inventory.special_request_label(), sr_blurb
 		]
 	else:
 		# v0.19: announce today's theme before the shopping list.
@@ -352,6 +360,18 @@ func _run_intro_sequence() -> void:
 		Dialogue.show([
 			"哇！你今天眼睛特別亮～昨晚作了好夢吧？多給你 NT$%d 加菜金！"
 			% Inventory.last_dream_bonus
+		])
+		await get_tree().create_timer(2.0).timeout
+		if _stage == Stage.INTRO_DONE:
+			return
+		if Dialogue._active and Dialogue._box != null:
+			Dialogue._box._close()
+	# v0.40: thank-you for completing yesterday's 媽媽特別交代. Independent
+	# of the dream bonus — both can fire on the same morning.
+	if Inventory.last_special_bonus > 0:
+		Dialogue.show([
+			"昨天辛苦你了～這 NT$%d 給你當零用錢，謝謝你幫忙！"
+			% Inventory.last_special_bonus
 		])
 		await get_tree().create_timer(2.0).timeout
 		if _stage == Stage.INTRO_DONE:

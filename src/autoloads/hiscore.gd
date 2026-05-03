@@ -29,6 +29,7 @@ const KEY_DISHES_COOKED: String = "dishes_cooked"
 const KEY_DREAM_BEST_KILLS: String = "dream_best_kills"
 const KEY_DREAM_BOSS_CLEARS: String = "dream_boss_clears"
 const KEY_PENDING_DREAM_BONUS: String = "pending_dream_bonus"
+const KEY_PENDING_SPECIAL_BONUS: String = "pending_special_bonus"
 
 ## v0.35: NT$ awarded the next time Inventory.reset() runs, after a dream
 ## boss-clear. One boss = one DREAM_BONUS_PER_CLEAR payout. Stacks if the
@@ -78,6 +79,12 @@ var dream_boss_clears: int = 0
 ## Persists so a player who quits between the dream and the next morning
 ## still gets their reward.
 var pending_dream_bonus: int = 0
+
+## v0.40: same pattern as pending_dream_bonus, but awarded for completing
+## a 媽媽特別交代 (爸爸生日 / 客人晚餐) the previous day. Tracked in a
+## separate field so the morning-intro can phrase mum's two thank-yous
+## independently rather than lumping them together.
+var pending_special_bonus: int = 0
 
 # ---------------------------------------------------------------------------
 # Lifecycle
@@ -241,6 +248,25 @@ func claim_pending_dream_bonus() -> int:
 	return amount
 
 
+## v0.40: queues a special-request completion bonus for the next morning.
+## Called by mom_npc when a 媽媽特別交代 is fulfilled.
+func queue_special_bonus(amount: int) -> void:
+	if amount <= 0:
+		return
+	pending_special_bonus += amount
+	_save()
+
+
+## v0.40: same payout pattern as claim_pending_dream_bonus, but for
+## 媽媽特別交代 completion bonuses. Returns + zeroes the queued amount.
+func claim_pending_special_bonus() -> int:
+	var amount: int = pending_special_bonus
+	if amount > 0:
+		pending_special_bonus = 0
+		_save()
+	return amount
+
+
 ## Toggles the global mute flag, persists, and pushes the change to Sfx + Music.
 func toggle_mute() -> bool:
 	muted = not muted
@@ -278,6 +304,7 @@ func clear() -> void:
 	dream_best_kills = 0
 	dream_boss_clears = 0
 	pending_dream_bonus = 0
+	pending_special_bonus = 0
 	if FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 
@@ -316,6 +343,8 @@ func _load() -> void:
 	dream_boss_clears = maxi(0, int(cfg.get_value(SECTION, KEY_DREAM_BOSS_CLEARS, 0)))
 	# v0.35: pending bonus from the most recent boss clear(s).
 	pending_dream_bonus = maxi(0, int(cfg.get_value(SECTION, KEY_PENDING_DREAM_BONUS, 0)))
+	# v0.40: pending bonus from the most recent special-request completion.
+	pending_special_bonus = maxi(0, int(cfg.get_value(SECTION, KEY_PENDING_SPECIAL_BONUS, 0)))
 	# Push restored mute state to audio autoloads on next frame so they have
 	# finished their own _ready (autoload init order may not guarantee it).
 	call_deferred("_apply_mute")
@@ -334,6 +363,7 @@ func _save() -> void:
 	cfg.set_value(SECTION, KEY_DREAM_BEST_KILLS, dream_best_kills)
 	cfg.set_value(SECTION, KEY_DREAM_BOSS_CLEARS, dream_boss_clears)
 	cfg.set_value(SECTION, KEY_PENDING_DREAM_BONUS, pending_dream_bonus)
+	cfg.set_value(SECTION, KEY_PENDING_SPECIAL_BONUS, pending_special_bonus)
 	var err: Error = cfg.save(SAVE_PATH)
 	if err != OK:
 		push_warning("[HiScore] save failed (err=%d)" % err)

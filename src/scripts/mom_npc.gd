@@ -67,6 +67,10 @@ func _do_complete_flow() -> void:
 		Game.session_time, perfect, bargained
 	)
 	Game.last_run_was_record = bool(result.get("new_record", false))
+	# v0.40: if mum had a 特別交代 today and the kid bought every required
+	# ingredient for it, queue the completion bonus for tomorrow morning.
+	if Inventory.special_request_complete():
+		HiScore.queue_special_bonus(Inventory.special_request_bonus())
 	Sfx.play_win()
 	# v0.28: route through the 回家路上 interlude before the kitchen — the
 	# scene auto-advances to "kitchen" after WALK_DURATION (or SPACE skip).

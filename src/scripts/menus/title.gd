@@ -187,6 +187,21 @@ func _build_ui() -> void:
 		weekend_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		vbox.add_child(weekend_line)
 
+	# v0.40: 媽媽特別交代 banner — fires on a 7-day cycle (suppressed on
+	# festival days so the festival badge keeps priority).
+	var sr_label: String = Inventory.special_request_label()
+	if not sr_label.is_empty():
+		var sr_line: Label = _make_label(
+			"%s — %s（+NT$%d）" % [
+				sr_label,
+				Inventory.special_request_blurb(),
+				Inventory.special_request_bonus(),
+			],
+			9, Color("#C2548A")  # rose pink, distinct from festival red / weekend gold
+		)
+		sr_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(sr_line)
+
 	if HiScore.has_record():
 		var best: Label = _make_label(
 			"最佳記錄 %s" % HiScore.format_best(), 8, Color("#C8E66D")

@@ -10,10 +10,12 @@ extends GutTest
 ## get the expected list size by default.
 func before_each() -> void:
 	HiScore.day = 1
-	# v0.35: zero the dream bonus so each test starts from a clean slate;
-	# Inventory.reset() consumes pending_dream_bonus.
+	# v0.35 / v0.40: zero the queued bonuses so each test starts from a
+	# clean slate; Inventory.reset() consumes both pending values.
 	HiScore.pending_dream_bonus = 0
+	HiScore.pending_special_bonus = 0
 	Inventory.last_dream_bonus = 0
+	Inventory.last_special_bonus = 0
 	Inventory.reset()
 
 
@@ -476,3 +478,114 @@ func test_inventory_reset_with_no_pending_bonus_leaves_last_dream_bonus_zero() -
 		"with no queued bonus, reset should leave last_dream_bonus at 0")
 	assert_eq(Inventory.money, Inventory.STARTING_MONEY,
 		"weekday with no bonus should equal STARTING_MONEY exactly")
+
+
+# ---------------------------------------------------------------------------
+# v0.40 — 媽媽特別交代 (special requests)
+# ---------------------------------------------------------------------------
+
+func test_inventory_special_request_none_on_regular_weekday() -> void:
+	# Arrange — day 1 is cycle 0 (none of the special-request days).
+	HiScore.day = 1
+	# Act / Assert
+	assert_eq(Inventory.current_special_request(),
+		Inventory.SPECIAL_REQUEST_NONE,
+		"day 1 should have no special request")
+	assert_eq(Inventory.special_request_bonus(), 0,
+		"no request → 0 bonus")
+
+
+func test_inventory_special_request_dad_birthday_on_day_3() -> void:
+	# Arrange — (3-1) % 7 = 2 → DAD_BIRTHDAY
+	HiScore.day = 3
+	# Act / Assert
+	assert_eq(Inventory.current_special_request(),
+		Inventory.SPECIAL_REQUEST_DAD_BIRTHDAY,
+		"day 3 should fire 爸爸生日")
+	assert_eq(Inventory.special_request_bonus(),
+		Inventory.SPECIAL_REQUEST_BONUS_DAD_BIRTHDAY,
+		"day 3 bonus should be DAD_BIRTHDAY value")
+
+
+func test_inventory_special_request_guest_dinner_on_day_6() -> void:
+	HiScore.day = 6
+	assert_eq(Inventory.current_special_request(),
+		Inventory.SPECIAL_REQUEST_GUEST_DINNER,
+		"day 6 should fire 客人晚餐")
+	assert_eq(Inventory.special_request_bonus(),
+		Inventory.SPECIAL_REQUEST_BONUS_GUEST_DINNER)
+
+
+func test_inventory_special_request_repeats_on_7_day_cycle() -> void:
+	# Day 10 = (10-1) % 7 = 2 → DAD_BIRTHDAY again
+	HiScore.day = 10
+	assert_eq(Inventory.current_special_request(),
+		Inventory.SPECIAL_REQUEST_DAD_BIRTHDAY,
+		"day 10 should fire DAD_BIRTHDAY again (7-day cycle)")
+	# Day 13 = (13-1) % 7 = 5 → GUEST_DINNER again
+	HiScore.day = 13
+	assert_eq(Inventory.current_special_request(),
+		Inventory.SPECIAL_REQUEST_GUEST_DINNER,
+		"day 13 should fire GUEST_DINNER again")
+
+
+func test_inventory_festival_overrides_special_request() -> void:
+	# Day 30 is 過年 (festival cycle 29) AND would otherwise be cycle (30-1)%7=1
+	# so no conflict by accident. Force the conflict by checking day 15 which
+	# is mid-autumn AND (15-1)%7 = 0 (also no conflict). Try day 45 = mid-autumn,
+	# (45-1)%7 = 2 → would have been DAD_BIRTHDAY without festival override.
+	HiScore.day = 45
+	assert_ne(Inventory.current_festival(), Inventory.FESTIVAL_NONE,
+		"pre-condition: day 45 must be a festival day")
+	assert_eq(Inventory.current_special_request(),
+		Inventory.SPECIAL_REQUEST_NONE,
+		"festival days must suppress special-request firing")
+
+
+func test_inventory_randomize_required_uses_special_override() -> void:
+	# Arrange — day 3, DAD_BIRTHDAY → required list should be the override.
+	HiScore.day = 3
+	# Act
+	Inventory.randomize_required()
+	# Assert
+	var expected_arr: Array = Inventory.SPECIAL_REQUEST_REQUIRED[
+		Inventory.SPECIAL_REQUEST_DAD_BIRTHDAY]
+	var expected: PackedStringArray = PackedStringArray()
+	for id in expected_arr:
+		expected.append(String(id))
+	assert_eq(Inventory.required_ingredients, expected,
+		"DAD_BIRTHDAY day should override required list — got %s"
+		% str(Inventory.required_ingredients))
+
+
+func test_inventory_special_request_complete_requires_all_override_items() -> void:
+	# Arrange — day 3 (DAD_BIRTHDAY), buy 3 of the 4 required.
+	HiScore.day = 3
+	Inventory.reset()
+	Inventory.buy("chicken", 0)
+	Inventory.buy("scallion", 0)
+	Inventory.buy("soy_sauce", 0)
+	# Act / Assert
+	assert_false(Inventory.special_request_complete(),
+		"missing one ingredient → request not complete")
+	# Buy the last one
+	Inventory.buy("egg", 0)
+	assert_true(Inventory.special_request_complete(),
+		"all 4 ingredients bought → request complete")
+
+
+func test_inventory_reset_applies_special_bonus_to_money() -> void:
+	# Arrange — queue a special-request bonus.
+	HiScore.day = 1  # weekday, no festival, no special
+	HiScore.pending_special_bonus = Inventory.SPECIAL_REQUEST_BONUS_DAD_BIRTHDAY
+	# Act
+	Inventory.reset()
+	# Assert
+	assert_eq(Inventory.money, Inventory.STARTING_MONEY
+		+ Inventory.SPECIAL_REQUEST_BONUS_DAD_BIRTHDAY,
+		"queued special bonus should add to STARTING_MONEY on reset")
+	assert_eq(Inventory.last_special_bonus,
+		Inventory.SPECIAL_REQUEST_BONUS_DAD_BIRTHDAY,
+		"last_special_bonus should mirror the consumed amount")
+	assert_eq(HiScore.pending_special_bonus, 0,
+		"reset should zero the pending special bonus")
