@@ -385,6 +385,75 @@ func test_dream_boss_defeat_marks_defeated_and_clears_alive() -> void:
 	assert_true(scene._boss_defeated, "boss_defeated flag should latch")
 
 
+# ---------------------------------------------------------------------------
+# v0.38 — SEASIDE theme variant
+# ---------------------------------------------------------------------------
+
+func test_dream_theme_pinned_to_standard_in_test_mode() -> void:
+	# Arrange — even in test_mode the dream should always pin to STANDARD
+	# regardless of HiScore state, so other dream tests remain deterministic.
+	HiScore.dream_boss_clears = 1  # would normally select SEASIDE
+	# Act
+	var scene: Dream = await _make_scene()
+	# Assert
+	assert_eq(scene.dream_theme, Dream.DreamTheme.STANDARD,
+		"test_mode should always pin dream_theme to STANDARD — got %s"
+		% scene.dream_theme)
+
+
+func test_dream_seaside_boss_projectile_aims_toward_player() -> void:
+	# Arrange — manually configure scene with SEASIDE theme + alive boss,
+	# then trigger one fire cadence by zeroing _boss_fire_t. Player to the
+	# RIGHT of the boss so the splat must have positive vx if aimed.
+	var scene: Dream = await _make_scene()
+	scene.dream_theme = Dream.DreamTheme.SEASIDE
+	scene._boss = {
+		"pos": Vector2(60.0, 60.0),
+		"hp": scene.BOSS_HP_MAX,
+	}
+	scene._boss_alive = true
+	scene._player_pos = Vector2(220.0, 142.0)  # right + down
+
+	# Act — _step_boss is normally gated by _process(test_mode skip), so
+	# call it directly with a delta large enough to cross _boss_fire_t.
+	scene._boss_fire_t = 0.0
+	scene._step_boss(0.016)
+
+	# Assert
+	assert_eq(scene._boss_projectiles.size(), 1,
+		"boss should fire one splat on cadence — got %d projectiles"
+		% scene._boss_projectiles.size())
+	var proj: Dictionary = scene._boss_projectiles[0]
+	assert_gt(float(proj["vel"].x), 0.0,
+		"SEASIDE splat with player on the right should have vx > 0 — got %f"
+		% float(proj["vel"].x))
+	assert_gt(float(proj["vel"].y), 0.0,
+		"splat should still trend downward — got vy=%f"
+		% float(proj["vel"].y))
+
+
+func test_dream_standard_boss_projectile_drops_straight_down() -> void:
+	# Arrange — STANDARD theme baseline: same setup, expect 0 vx.
+	var scene: Dream = await _make_scene()
+	scene.dream_theme = Dream.DreamTheme.STANDARD
+	scene._boss = {
+		"pos": Vector2(60.0, 60.0),
+		"hp": scene.BOSS_HP_MAX,
+	}
+	scene._boss_alive = true
+	scene._player_pos = Vector2(220.0, 142.0)
+
+	# Act
+	scene._boss_fire_t = 0.0
+	scene._step_boss(0.016)
+
+	# Assert
+	var proj: Dictionary = scene._boss_projectiles[0]
+	assert_almost_eq(float(proj["vel"].x), 0.0, 0.001,
+		"STANDARD splat should drop straight down (vx ≈ 0) — got vx=%f"
+		% float(proj["vel"].x))
+
+
 func test_dream_advance_records_kills_to_hiscore() -> void:
 	# Arrange — fresh HiScore (cleared in before_each); pretend the player
 	# ended their dream with 4 small-fry kills and no boss clear.

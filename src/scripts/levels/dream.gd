@@ -21,6 +21,29 @@ const VIEWPORT_W: int = 320
 const VIEWPORT_H: int = 180
 
 # ---------------------------------------------------------------------------
+# Theme variants (v0.38)
+# ---------------------------------------------------------------------------
+#
+# The dream now alternates between two visual + behavioural themes, picked
+# from HiScore.dream_boss_clears at _ready time so consecutive weekend
+# clears feel different rather than identical replays.
+#
+#   STANDARD — original v0.33/v0.34 night-market dream: purple sky,
+#              brick floor, hanging lanterns. Boss drops sauce splats
+#              straight down.
+#   SEASIDE  — ocean-night variant: indigo→teal sky with a moon,
+#              wooden boardwalk floor, string lights overhead. Boss
+#              attacks track the player (aimed splat at spawn).
+
+enum DreamTheme { STANDARD, SEASIDE }
+# Stored as int so external test code can assign Dream.Theme values
+# without tripping GDScript's strict-mode "external class member"
+# type-check. Renamed from `_theme` to `dream_theme` because the
+# underscore-prefixed name collided with an inherited member lookup
+# in GDScript 4.6's stricter parser.
+var dream_theme: int = DreamTheme.STANDARD
+
+# ---------------------------------------------------------------------------
 # Tunables
 # ---------------------------------------------------------------------------
 
@@ -117,6 +140,20 @@ const COLOR_BOSS_GLOW: Color = Color("#7AC940")     ## eye glow
 const COLOR_BOSS_FLASH: Color = Color("#F5EDDA")    ## hit-flash highlight
 const COLOR_BOSS_PROJ: Color = Color("#5A2A12")     ## sauce splat (matches tako sauce)
 const COLOR_BOSS_PROJ_RIM: Color = Color("#3A1A0A")
+
+# v0.38 SEASIDE theme palette — indigo sky, teal water hint, wood floor,
+# warm string lights. Re-uses the boss/enemy colours (oden + tako stay red
+# and brown — they're food, theme doesn't change them).
+const SEA_COLOR_SKY_TOP: Color = Color("#1A2A5A")
+const SEA_COLOR_SKY_BOTTOM: Color = Color("#0A1A3A")
+const SEA_COLOR_MOON: Color = Color("#F5EDDA")
+const SEA_COLOR_MOON_HALO: Color = Color("#F2D6A8")
+const SEA_COLOR_HORIZON: Color = Color("#3A6A8A")    ## thin water-line band
+const SEA_COLOR_FLOOR_PLANK_A: Color = Color("#5A3A22")
+const SEA_COLOR_FLOOR_PLANK_B: Color = Color("#3A2818")
+const SEA_COLOR_FLOOR_TOP: Color = Color("#8A5A32")
+const SEA_COLOR_LIGHT_BULB: Color = Color("#F2E2A0")
+const SEA_COLOR_LIGHT_WIRE: Color = Color("#3A2818")
 const COLOR_HEART: Color = Color("#C2241A")
 const COLOR_HEART_DIM: Color = Color("#3A1A28")
 const COLOR_TEXT: Color = Color("#F5EDDA")
@@ -183,6 +220,15 @@ func _ready() -> void:
 	if not Game.test_mode:
 		Music.play_market()
 	_player_pos = Vector2(VIEWPORT_W / 2, FLOOR_Y)
+	# v0.38: alternate between STANDARD and SEASIDE themes based on the
+	# player's lifetime boss clears. First clear → SEASIDE next, second
+	# → STANDARD again, and so on. Test mode pins to STANDARD so unit
+	# tests don't depend on HiScore state.
+	var hs: Node = get_node_or_null("/root/HiScore")
+	var clears: int = int(hs.dream_boss_clears) if hs != null else 0
+	dream_theme = DreamTheme.SEASIDE if (clears % 2 == 1) else DreamTheme.STANDARD
+	if Game.test_mode:
+		dream_theme = DreamTheme.STANDARD
 	_build_overlays()
 	set_process_unhandled_input(true)
 
@@ -513,9 +559,24 @@ func _step_boss(delta: float) -> void:
 	_boss_fire_t -= delta
 	if _boss_fire_t <= 0.0:
 		_boss_fire_t = BOSS_FIRE_INTERVAL
+		# v0.38: SEASIDE boss aims at the player on spawn instead of dropping
+		# straight down. Speed is normalized to BOSS_PROJECTILE_VY so the
+		# attack difficulty stays roughly comparable.
+		var spawn_pos: Vector2 = Vector2(pos.x, pos.y + BOSS_H * 0.5)
+		var vel: Vector2
+		if dream_theme == DreamTheme.SEASIDE:
+			var dir_vec: Vector2 = (_player_pos - spawn_pos).normalized()
+			# Clamp downward bias so the splat never travels purely sideways
+			# (would feel cheap if it crossed the whole screen at head height).
+			if dir_vec.y < 0.2:
+				dir_vec.y = 0.2
+				dir_vec = dir_vec.normalized()
+			vel = dir_vec * BOSS_PROJECTILE_VY
+		else:
+			vel = Vector2(0.0, BOSS_PROJECTILE_VY)
 		_boss_projectiles.append({
-			"pos": Vector2(pos.x, pos.y + BOSS_H * 0.5),
-			"vel": Vector2(0.0, BOSS_PROJECTILE_VY),
+			"pos": spawn_pos,
+			"vel": vel,
 			"age": 0.0,
 		})
 		if not Game.test_mode:
@@ -572,8 +633,11 @@ func _check_endings() -> void:
 		_show_outro_card()
 		return
 	if _boss_defeated:
-		# Beat the boss — biggest win ending.
-		_outro_text = "打倒大魔王！"
+		# Beat the boss — biggest win ending. Theme picks the flavour text.
+		_outro_text = (
+			"海王沉海底！" if dream_theme == DreamTheme.SEASIDE
+			else "打倒大魔王！"
+		)
 		_won = true
 		_outro_t = OUTRO_HOLD
 		_show_outro_card()
@@ -675,6 +739,9 @@ func _draw() -> void:
 
 
 func _draw_sky() -> void:
+	if dream_theme == DreamTheme.SEASIDE:
+		_draw_sky_seaside()
+		return
 	# Vertical gradient via 2 stacked rects (cheap)
 	draw_rect(Rect2(0, 0, VIEWPORT_W, FLOOR_Y / 2), COLOR_SKY_TOP)
 	draw_rect(Rect2(0, FLOOR_Y / 2, VIEWPORT_W, FLOOR_Y - FLOOR_Y / 2),
@@ -689,9 +756,42 @@ func _draw_sky() -> void:
 		draw_rect(Rect2(int(p[0]), int(p[1]), 1, 1), COLOR_STAR)
 
 
+## v0.38 SEASIDE — indigo gradient with a moon and a thin water-line
+## horizon stripe. Stars in the upper band only (lower band is "water").
+func _draw_sky_seaside() -> void:
+	# Sky gradient
+	draw_rect(Rect2(0, 0, VIEWPORT_W, FLOOR_Y / 2), SEA_COLOR_SKY_TOP)
+	draw_rect(Rect2(0, FLOOR_Y / 2, VIEWPORT_W, FLOOR_Y - FLOOR_Y / 2),
+		SEA_COLOR_SKY_BOTTOM)
+	# Horizon water-line — single dark teal stripe just above the floor
+	var horizon_y: int = FLOOR_Y - 18
+	draw_rect(Rect2(0, horizon_y, VIEWPORT_W, 4), SEA_COLOR_HORIZON)
+	draw_rect(Rect2(0, horizon_y, VIEWPORT_W, 1),
+		SEA_COLOR_HORIZON.lightened(0.15))
+	# Moon — round-ish rect with halo, top-right
+	var moon_x: int = 248
+	var moon_y: int = 22
+	var halo: Color = SEA_COLOR_MOON_HALO
+	halo.a = 0.30
+	draw_rect(Rect2(moon_x - 6, moon_y - 1, 16, 12), halo)
+	draw_rect(Rect2(moon_x - 4, moon_y, 12, 10), SEA_COLOR_MOON)
+	# Bite out of the moon (crescent hint) — small dark wedge
+	draw_rect(Rect2(moon_x + 4, moon_y + 1, 4, 8), SEA_COLOR_SKY_TOP)
+	# Stars only in the upper band
+	var positions: Array = [
+		[18, 14], [54, 24], [92, 8], [128, 32], [168, 20],
+		[208, 12], [40, 38], [78, 46], [128, 50],
+	]
+	for p in positions:
+		draw_rect(Rect2(int(p[0]), int(p[1]), 1, 1), COLOR_STAR)
+
+
 ## Background-lantern row swaying — non-interactive set dressing that
 ## echoes the night-market lantern motif so the dream stays "in world".
 func _draw_bg_lanterns() -> void:
+	if dream_theme == DreamTheme.SEASIDE:
+		_draw_bg_string_lights()
+		return
 	var rope_y: int = 96
 	draw_rect(Rect2(0, rope_y, VIEWPORT_W, 1), Color("#3A1A0A"))
 	for i in 5:
@@ -709,7 +809,39 @@ func _draw_bg_lanterns() -> void:
 		draw_rect(Rect2(x - 4, rope_y + 11, 9, 1), COLOR_BG_LANTERN_GLOW)
 
 
+## v0.38 SEASIDE — twinkling string-light row instead of paper lanterns.
+## Each bulb has a stagger phase so they alternate-blink. Wire dips slightly.
+func _draw_bg_string_lights() -> void:
+	var rope_y: int = 96
+	# Wire — slight dip in the middle by drawing two lines that meet lower.
+	for x in range(0, VIEWPORT_W, 2):
+		var dip: int = int(round(sin(float(x) / float(VIEWPORT_W) * PI) * 2.0))
+		draw_rect(Rect2(x, rope_y + dip, 2, 1), SEA_COLOR_LIGHT_WIRE)
+	# Bulbs — 9 evenly spaced, each twinkling on its own phase
+	for i in 9:
+		var x: float = 18.0 + float(i) * 32.0
+		var phase: float = float(i) * 0.7
+		var sine_dip: float = sin(float(x) / float(VIEWPORT_W) * PI) * 2.0
+		var bx: float = x
+		var by: float = float(rope_y) + sine_dip + 1.0
+		var lit: bool = sin(_t * 1.6 + phase) > -0.2
+		var bulb: Color = SEA_COLOR_LIGHT_BULB if lit else \
+			SEA_COLOR_LIGHT_BULB.darkened(0.55)
+		# Halo (translucent) — only when lit
+		if lit:
+			var halo: Color = bulb
+			halo.a = 0.35
+			draw_rect(Rect2(bx - 3, by - 1, 7, 5), halo)
+		# Bulb body
+		draw_rect(Rect2(bx - 1, by, 3, 3), bulb)
+		# Cap on top
+		draw_rect(Rect2(bx - 1, by - 1, 3, 1), SEA_COLOR_LIGHT_WIRE)
+
+
 func _draw_floor() -> void:
+	if dream_theme == DreamTheme.SEASIDE:
+		_draw_floor_seaside()
+		return
 	# Alternating brick band
 	for i in (VIEWPORT_W / 8) + 1:
 		var bx: float = float(i * 8)
@@ -717,6 +849,21 @@ func _draw_floor() -> void:
 		draw_rect(Rect2(bx, FLOOR_Y, 8, VIEWPORT_H - FLOOR_Y), c)
 	# Highlight stripe along the top
 	draw_rect(Rect2(0, FLOOR_Y, VIEWPORT_W, 1), COLOR_FLOOR_TOP)
+
+
+## v0.38 SEASIDE — wooden boardwalk floor with vertical plank seams every
+## 12 px and a warmer top-edge highlight.
+func _draw_floor_seaside() -> void:
+	# Base plank field — alternating stripes, vertical orientation
+	for i in (VIEWPORT_W / 12) + 1:
+		var bx: float = float(i * 12)
+		var c: Color = SEA_COLOR_FLOOR_PLANK_A if i % 2 == 0 else SEA_COLOR_FLOOR_PLANK_B
+		draw_rect(Rect2(bx, FLOOR_Y, 12, VIEWPORT_H - FLOOR_Y), c)
+		# Plank seam (1 px darker line on the right edge)
+		draw_rect(Rect2(bx + 11, FLOOR_Y, 1, VIEWPORT_H - FLOOR_Y),
+			SEA_COLOR_FLOOR_PLANK_B.darkened(0.4))
+	# Warmer highlight along the top edge of the boardwalk
+	draw_rect(Rect2(0, FLOOR_Y, VIEWPORT_W, 1), SEA_COLOR_FLOOR_TOP)
 
 
 ## Floating brick-top platforms. Drawn as a 4-px-tall slab so the player can
