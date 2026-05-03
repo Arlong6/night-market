@@ -155,3 +155,53 @@ func test_stall_vendor_data_covers_all_seven_ingredients() -> void:
 	for ing in ingredients:
 		assert_true(StallNPC.VENDOR_DATA.has(ing),
 			"ingredient '%s' should have a dedicated vendor entry" % ing)
+
+
+# ---------------------------------------------------------------------------
+# v0.39 — barker shouts
+# ---------------------------------------------------------------------------
+
+func test_stall_barker_starts_hidden() -> void:
+	# Arrange
+	var stall: StallNPC = await _make_stall("chicken")
+	# Assert — pre-condition: bubble starts hidden, timer armed for waiting.
+	assert_false(stall._barker_visible,
+		"barker should start hidden so a fresh market is silent")
+	assert_gt(stall._barker_timer, 0.0,
+		"_barker_timer should be armed with a positive wait")
+
+
+func test_stall_barker_timer_in_initial_wait_range() -> void:
+	# Arrange — multiple stalls; verify each ends up in [HIDDEN_MIN, HIDDEN_MAX].
+	for ing in ["chicken", "tofu", "egg"]:
+		var stall: StallNPC = await _make_stall(ing)
+		# Assert
+		assert_between(stall._barker_timer,
+			StallNPC.BARKER_HIDDEN_MIN, StallNPC.BARKER_HIDDEN_MAX,
+			"%s stall initial timer must seed within hidden range — got %f"
+			% [ing, stall._barker_timer])
+
+
+func test_stall_pick_barker_line_returns_string_for_known_ingredient() -> void:
+	# Arrange
+	var stall: StallNPC = await _make_stall("scallion")
+	# Act — try a few times; specific or generic pool, but never empty.
+	for _i in 8:
+		var line: String = stall._pick_barker_line()
+		assert_false(line.is_empty(),
+			"_pick_barker_line should never return empty for a known ingredient")
+
+
+func test_stall_barker_lines_table_covers_every_ingredient() -> void:
+	# Arrange — every ingredient with a stall should have its own line list
+	# so the barker doesn't fall back to generic on the canonical 7.
+	var ingredients: Array[String] = [
+		"chicken", "egg", "scallion", "cabbage",
+		"tofu", "soy_sauce", "mushroom",
+	]
+	# Act / Assert
+	for ing in ingredients:
+		assert_true(StallNPC.BARKER_LINES.has(ing),
+			"ingredient '%s' should have a dedicated barker line list" % ing)
+		assert_false(StallNPC.BARKER_LINES[ing].is_empty(),
+			"barker line list for '%s' must not be empty" % ing)

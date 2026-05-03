@@ -152,6 +152,46 @@ var _sold: bool = false
 ## `_draw` doesn't pay the load cost every frame. Test mode skips load.
 var _tag_font: FontFile = null
 
+# ---------------------------------------------------------------------------
+# Barker shouts (v0.39)
+# ---------------------------------------------------------------------------
+#
+# Each stall periodically pops a small speech bubble above the awning with
+# a flavour line ("便宜啦！", "新鮮的喔～"). Lines are picked at random from
+# BARKER_LINES[ingredient_id] (with a generic fallback). Timer staggers per
+# stall so the market doesn't shout in unison. Suppressed while a dialogue
+# is open or when the player is buying from this very stall.
+
+const BARKER_HIDDEN_MIN: float = 6.0    ## min seconds between shouts
+const BARKER_HIDDEN_MAX: float = 14.0   ## max seconds between shouts
+const BARKER_VISIBLE_DURATION: float = 2.0  ## seconds bubble stays up
+const BARKER_BUBBLE_OFFSET_Y: float = -22.0 ## px above stall origin
+const BARKER_BUBBLE_PAD_X: float = 3.0
+const BARKER_BUBBLE_PAD_Y: float = 2.0
+const BARKER_FONT_SIZE: int = 7
+const COLOR_BARKER_BUBBLE: Color = Color("#F5EDDA")  ## paper cream
+const COLOR_BARKER_RIM: Color = Color("#3A1A0A")     ## ink line
+const COLOR_BARKER_TEXT: Color = Color("#1A0F0A")
+
+const BARKER_LINES: Dictionary = {
+	"chicken":   ["新鮮的雞啊～", "今天現宰！", "便宜啦便宜啦～"],
+	"egg":       ["有機土雞蛋！", "鮮蛋鮮蛋～", "黃澄澄的喔！"],
+	"scallion":  ["三星蔥喔！", "翠綠的青蔥～", "今早剛到貨！"],
+	"cabbage":   ["高山高麗菜！", "脆甜的喔～", "煮湯最讚！"],
+	"tofu":      ["手工板豆腐～", "今早做的！", "嫩嫩的喔！"],
+	"soy_sauce": ["古早味醬油～", "ㄧ年陳釀！", "滷肉必備！"],
+	"mushroom":  ["新鮮香菇～", "山上採的！", "炒菜超香！"],
+}
+## Generic shouts used when ingredient_id has no specific list. Also mixed
+## in occasionally for variety so each stall isn't a single-loop tape.
+const BARKER_LINES_GENERIC: Array[String] = [
+	"來看看～", "便宜啦！", "走過路過別錯過！", "好吃好吃！", "最後一份！",
+]
+
+var _barker_visible: bool = false
+var _barker_text: String = ""
+var _barker_timer: float = 0.0  ## seconds until current state ends
+
 
 func _ready() -> void:
 	super._ready()
@@ -162,6 +202,53 @@ func _ready() -> void:
 			_tag_font.subpixel_positioning = (
 				TextServer.SUBPIXEL_POSITIONING_DISABLED
 			)
+	# v0.39: random initial wait so stalls don't all shout at once.
+	_barker_timer = randf_range(BARKER_HIDDEN_MIN, BARKER_HIDDEN_MAX)
+
+
+## v0.39: extends NPC._process to also tick the barker state machine.
+## In test_mode the timer is frozen so unit tests don't observe random
+## bubble pops; in dialogue mode the timer is also frozen so the player's
+## conversation isn't visually littered.
+func _process(delta: float) -> void:
+	super._process(delta)
+	if Game.test_mode:
+		return
+	if Game.in_dialogue:
+		# Pause the timer + hide an active bubble so the dialogue box reads
+		# without competing speech bubbles.
+		if _barker_visible:
+			_barker_visible = false
+		return
+	_barker_timer -= delta
+	if _barker_timer > 0.0:
+		return
+	# Toggle state
+	if _barker_visible:
+		# End shout — back to silent waiting period.
+		_barker_visible = false
+		_barker_timer = randf_range(BARKER_HIDDEN_MIN, BARKER_HIDDEN_MAX)
+	else:
+		# Start a new shout — pick a line and arm the visible duration.
+		_barker_visible = true
+		_barker_text = _pick_barker_line()
+		_barker_timer = BARKER_VISIBLE_DURATION
+
+
+## v0.39: picks a random barker line for this stall's ingredient.
+## Falls back to BARKER_LINES_GENERIC if no specific list exists.
+## ~25% of the time, picks from generic even when a specific list exists,
+## so each stall has slight unpredictability.
+func _pick_barker_line() -> String:
+	var specific: Array = BARKER_LINES.get(ingredient_id, [])
+	var pool: Array
+	if specific.is_empty() or randf() < 0.25:
+		pool = BARKER_LINES_GENERIC
+	else:
+		pool = specific
+	if pool.is_empty():
+		return ""
+	return String(pool[randi() % pool.size()])
 
 # ---------------------------------------------------------------------------
 # Override draw — stall body + 2px gold top stripe
@@ -249,6 +336,46 @@ func _draw() -> void:
 		draw_rect(Rect2(0.0, heart_y, 1.0, 1.0), COLOR_LOYALTY_HEART)
 		draw_rect(Rect2(-2.0, heart_y + 1.0, 3.0, 1.0), COLOR_LOYALTY_HEART)
 		draw_rect(Rect2(-1.0, heart_y + 2.0, 1.0, 1.0), COLOR_LOYALTY_HEART)
+
+	# v0.39: barker speech bubble — drawn last so it sits on top.
+	if _barker_visible and not _barker_text.is_empty() and _tag_font != null:
+		_draw_barker_bubble()
+
+
+## v0.39: small white speech bubble with the current barker line, anchored
+## above the awning. Includes a 1-px ink rim and a tiny tail pointing down
+## to the stall so it reads as "this stall is shouting".
+func _draw_barker_bubble() -> void:
+	var text: String = _barker_text
+	# Measure the text so the bubble fits snug.
+	var text_size: Vector2 = _tag_font.get_string_size(
+		text, HORIZONTAL_ALIGNMENT_LEFT, -1, BARKER_FONT_SIZE
+	)
+	var w: float = text_size.x + BARKER_BUBBLE_PAD_X * 2.0
+	var h: float = float(BARKER_FONT_SIZE) + BARKER_BUBBLE_PAD_Y * 2.0
+	var x: float = -w * 0.5
+	var y: float = BARKER_BUBBLE_OFFSET_Y - h
+	# Bubble fill
+	draw_rect(Rect2(x, y, w, h), COLOR_BARKER_BUBBLE)
+	# Ink rim (1 px on each edge)
+	draw_rect(Rect2(x, y, w, 1.0), COLOR_BARKER_RIM)
+	draw_rect(Rect2(x, y + h - 1.0, w, 1.0), COLOR_BARKER_RIM)
+	draw_rect(Rect2(x, y, 1.0, h), COLOR_BARKER_RIM)
+	draw_rect(Rect2(x + w - 1.0, y, 1.0, h), COLOR_BARKER_RIM)
+	# Tail — 2-px stub pointing toward the stall body
+	draw_rect(Rect2(-1.0, y + h, 2.0, 1.0), COLOR_BARKER_BUBBLE)
+	draw_rect(Rect2(0.0, y + h + 1.0, 1.0, 1.0), COLOR_BARKER_BUBBLE)
+	# Tail rim — single dark pixel below
+	draw_rect(Rect2(-1.0, y + h, 1.0, 1.0), COLOR_BARKER_RIM)
+	draw_rect(Rect2(1.0, y + h, 1.0, 1.0), COLOR_BARKER_RIM)
+	draw_rect(Rect2(0.0, y + h + 1.0, 1.0, 1.0), COLOR_BARKER_RIM)
+	# Text — left-aligned inside padding
+	var text_x: float = x + BARKER_BUBBLE_PAD_X
+	# Add the font's ascent so glyphs sit on the baseline.
+	var text_y: float = y + BARKER_BUBBLE_PAD_Y + \
+		_tag_font.get_ascent(BARKER_FONT_SIZE)
+	draw_string(_tag_font, Vector2(text_x, text_y), text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, BARKER_FONT_SIZE, COLOR_BARKER_TEXT)
 
 
 # ---------------------------------------------------------------------------
