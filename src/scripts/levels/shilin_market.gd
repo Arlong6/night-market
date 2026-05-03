@@ -129,15 +129,42 @@ const CHATTER_DATA: Array[Dictionary] = [
 ## Each entry seeds a WanderShopper instance. No interaction, just life.
 const SHOPPER_DATA: Array[Dictionary] = [
 	# Upper lane — walking right
+	# v0.36: each entry now picks a "kind" silhouette so the crowd has
+	# distinct people instead of identical adults. Kind values come from
+	# WanderShopper.Kind. Default ADULT = original v0.17 silhouette.
 	{ "lane_y": 104.0, "direction":  1, "speed": 18.0,
-	  "body": Color("#3A5A8A"), "hat": Color("#2A1A0A") },  # blue shirt
+	  "kind": WanderShopper.Kind.ADULT,
+	  "body": Color("#3A5A8A"), "hat": Color("#2A1A0A"),
+	  "accent": Color("#1A2A4A") },                               # blue-shirt salaryman
 	{ "lane_y": 104.0, "direction":  1, "speed": 24.0,
-	  "body": Color("#9A4A3A"), "hat": Color("#3A1A0A") },  # red shirt
+	  "kind": WanderShopper.Kind.KID,
+	  "body": Color("#E8F542"), "hat": Color("#3A1A0A"),
+	  "accent": Color("#3A4A8A") },                               # yellow-shirt kid
+	{ "lane_y": 104.0, "direction":  1, "speed": 14.0,
+	  "kind": WanderShopper.Kind.GRANNY,
+	  "body": Color("#9A6A5A"), "hat": Color("#5A4A4A"),
+	  "accent": Color("#C2241A") },                               # 阿嬤 with red shawl
+	{ "lane_y": 104.0, "direction":  1, "speed": 20.0,
+	  "kind": WanderShopper.Kind.BUSINESSMAN,
+	  "body": Color("#3A2A4A"), "hat": Color("#2A1A0A"),
+	  "accent": Color("#C2241A") },                               # purple-suit + red tie
 	# Lower lane — walking left
 	{ "lane_y": 152.0, "direction": -1, "speed": 16.0,
-	  "body": Color("#5A8A4A"), "hat": Color("#3A1A0A") },  # green shirt
+	  "kind": WanderShopper.Kind.ADULT,
+	  "body": Color("#5A8A4A"), "hat": Color("#3A1A0A"),
+	  "accent": Color("#2A4A2A") },                               # green-shirt
 	{ "lane_y": 152.0, "direction": -1, "speed": 22.0,
-	  "body": Color("#B86C30"), "hat": Color("#5A3A2A") },  # orange shirt
+	  "kind": WanderShopper.Kind.COUPLE,
+	  "body": Color("#3A6A8A"), "hat": Color("#2A1A0A"),
+	  "accent": Color("#C2548A") },                               # blue-pink couple
+	{ "lane_y": 152.0, "direction": -1, "speed": 12.0,
+	  "kind": WanderShopper.Kind.GRANNY,
+	  "body": Color("#5A5A6A"), "hat": Color("#5A5A5A"),
+	  "accent": Color("#3A2A4A") },                               # 阿嬤 grey shawl
+	{ "lane_y": 152.0, "direction": -1, "speed": 28.0,
+	  "kind": WanderShopper.Kind.BUSINESSMAN,
+	  "body": Color("#2A3A4A"), "hat": Color("#1A1A0A"),
+	  "accent": Color("#7AC940") },                               # navy + green tie
 ]
 
 ## Item pickups scattered on the floor — free money / loose change.
@@ -227,6 +254,7 @@ func _ready() -> void:
 	_spawn_stalls()
 	_spawn_chatters()
 	_spawn_shoppers()
+	_spawn_cat()
 	_spawn_items()
 	_spawn_random_events()
 	_spawn_mom()
@@ -293,6 +321,11 @@ func _spawn_shoppers() -> void:
 		s.speed = float(data["speed"])
 		s.body_color = data["body"]
 		s.hat_color = data["hat"]
+		# v0.36: kind + accent are optional — fall back to ADULT silhouette
+		# and a darkened body_color when missing so adding a new entry to
+		# SHOPPER_DATA doesn't crash if you forget the new keys.
+		s.kind = data.get("kind", WanderShopper.Kind.ADULT) as WanderShopper.Kind
+		s.accent_color = data.get("accent", s.body_color.darkened(0.5))
 		# Even spread along the X band — first shopper near left, last near right.
 		var spread: float = float(i) / float(SHOPPER_DATA.size())
 		s.position = Vector2(
@@ -303,6 +336,24 @@ func _spawn_shoppers() -> void:
 		# from there instead of snapping back to x_min on first _process tick.
 		s._x = s.position.x
 		add_child(s)
+
+
+## v0.36: spawns the night-market cat — single tabby that wanders the centre
+## lane between the shopper rows. Pure atmosphere, no interaction. Skipped
+## in test_mode to avoid extra nodes during headless integration tests.
+func _spawn_cat() -> void:
+	if Game.test_mode:
+		return
+	var cat: NightMarketCat = NightMarketCat.new()
+	# Centre lane between the two shopper rows (104 / 152 → midpoint 128).
+	cat.lane_y = 128.0
+	cat.direction = -1 if randi() % 2 == 0 else 1
+	cat.position = Vector2(
+		randf_range(cat.x_min + 24.0, cat.x_max - 24.0),
+		cat.lane_y
+	)
+	cat._x = cat.position.x
+	add_child(cat)
 
 
 ## Spawns the world-flavour NPCs (no shop, no quest blockers).

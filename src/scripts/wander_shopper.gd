@@ -10,6 +10,23 @@ class_name WanderShopper
 extends Node2D
 
 # ---------------------------------------------------------------------------
+# Kinds (v0.36)
+# ---------------------------------------------------------------------------
+#
+# Each shopper picks one silhouette style so the crowd doesn't look like
+# a row of clones. All kinds share the same walk-cycle + lane logic; only
+# the _draw branch differs. New kinds: append here, add a draw helper
+# below, and update SHOPPER_DATA in shilin_market.gd.
+
+enum Kind {
+	ADULT,        ## default — original v0.17 silhouette
+	GRANNY,       ## hunched, taller hat, slower default speed
+	BUSINESSMAN,  ## briefcase blob beside leg
+	KID,          ## smaller body, taller head proportionally
+	COUPLE,       ## two heads / two bodies side by side
+}
+
+# ---------------------------------------------------------------------------
 # Tuning
 # ---------------------------------------------------------------------------
 
@@ -43,6 +60,14 @@ const SHOPPER_W: int = 8
 
 ## Hair / hat colour drawn as a 2px stripe at the top of the head.
 @export var hat_color: Color = Color("#2A1A0A")
+
+## v0.36: silhouette style. See `Kind` enum at the top of the file.
+@export var kind: Kind = Kind.ADULT
+
+## v0.36: secondary accent colour — used for granny's shawl, businessman's
+## briefcase, the couple's second body. Default falls back to a darker
+## tint of body_color in _draw if not overridden.
+@export var accent_color: Color = Color("#5A2A2A")
 
 # ---------------------------------------------------------------------------
 # State
@@ -84,7 +109,16 @@ func _draw() -> void:
 	# 2-step walk via a step phase in {0, 1}; alternates legs each step.
 	var step_phase: int = int(_t / STEP_PERIOD * 2.0) % 2
 	var bob_y: float = -1.0 if step_phase == 0 else 0.0
+	match kind:
+		Kind.GRANNY:      _draw_granny(step_phase, bob_y)
+		Kind.BUSINESSMAN: _draw_businessman(step_phase, bob_y)
+		Kind.KID:         _draw_kid(step_phase, bob_y)
+		Kind.COUPLE:      _draw_couple(step_phase, bob_y)
+		_:                _draw_adult(step_phase, bob_y)
 
+
+## Original v0.17 silhouette — adult shopper.
+func _draw_adult(step_phase: int, bob_y: float) -> void:
 	# Head (6×4) + hair stripe (6×2)
 	draw_rect(Rect2(-3, -6 + bob_y, 6, 4), COLOR_SKIN)
 	draw_rect(Rect2(-3, -6 + bob_y, 6, 2), hat_color)
@@ -98,3 +132,107 @@ func _draw() -> void:
 	else:
 		draw_rect(Rect2(-2, 2 + bob_y, 1, 3), legs)
 		draw_rect(Rect2(0, 2 + bob_y, 2, 3), legs)
+
+
+## 阿嬤 — slightly hunched, white-grey hair, draped accent shawl.
+func _draw_granny(step_phase: int, bob_y: float) -> void:
+	# Hunch — head sits 1px lower than adult.
+	# White-grey hair stripe (use hat_color but lighten slightly).
+	var hair: Color = hat_color.lightened(0.55)
+	# Head
+	draw_rect(Rect2(-3, -5 + bob_y, 6, 4), COLOR_SKIN)
+	# Hair (rounded — 2 px stripe with side stubs)
+	draw_rect(Rect2(-3, -5 + bob_y, 6, 2), hair)
+	draw_rect(Rect2(-3, -3 + bob_y, 1, 1), hair)
+	draw_rect(Rect2(2, -3 + bob_y, 1, 1), hair)
+	# Body
+	draw_rect(Rect2(-3, -1 + bob_y, 6, 4), body_color)
+	# Shawl drape across shoulders (accent stripe over body top)
+	draw_rect(Rect2(-3, -1 + bob_y, 6, 1), accent_color)
+	draw_rect(Rect2(-4, 0 + bob_y, 1, 2), accent_color)
+	draw_rect(Rect2(3, 0 + bob_y, 1, 2), accent_color)
+	# Cane — diagonal stick to the right of body
+	draw_rect(Rect2(3, -1 + bob_y, 1, 1), Color("#3A1A0A"))
+	draw_rect(Rect2(4, 0 + bob_y, 1, 4), Color("#3A1A0A"))
+	# Slow shuffly legs (smaller stride, both same width)
+	var legs: Color = body_color.darkened(0.4)
+	if step_phase == 0:
+		draw_rect(Rect2(-2, 3 + bob_y, 2, 2), legs)
+		draw_rect(Rect2(1, 3 + bob_y, 1, 2), legs)
+	else:
+		draw_rect(Rect2(-2, 3 + bob_y, 1, 2), legs)
+		draw_rect(Rect2(0, 3 + bob_y, 2, 2), legs)
+
+
+## 上班族 — square-shoulder body + briefcase blob beside the trailing leg.
+func _draw_businessman(step_phase: int, bob_y: float) -> void:
+	# Standard adult silhouette as base
+	draw_rect(Rect2(-3, -6 + bob_y, 6, 4), COLOR_SKIN)
+	draw_rect(Rect2(-3, -6 + bob_y, 6, 2), hat_color)
+	# Body — slightly squarer (extra 1px shoulders)
+	draw_rect(Rect2(-4, -2 + bob_y, 8, 4), body_color)
+	# Tie stripe down the middle
+	draw_rect(Rect2(0, -2 + bob_y, 1, 3), accent_color)
+	# Legs (same alternating walk)
+	var legs: Color = body_color.darkened(0.45)
+	if step_phase == 0:
+		draw_rect(Rect2(-2, 2 + bob_y, 2, 3), legs)
+		draw_rect(Rect2(1, 2 + bob_y, 1, 3), legs)
+	else:
+		draw_rect(Rect2(-2, 2 + bob_y, 1, 3), legs)
+		draw_rect(Rect2(0, 2 + bob_y, 2, 3), legs)
+	# Briefcase swings on the side opposite to the leading foot.
+	# 1 px handle + 3×2 box, brown-leather coloured.
+	var case_x: float = 3.0 if direction > 0 else -5.0
+	draw_rect(Rect2(case_x, -1 + bob_y, 1, 1), Color("#5A2A12"))      # handle
+	draw_rect(Rect2(case_x - 1, 0 + bob_y, 3, 2), Color("#8A4A22"))   # body
+	draw_rect(Rect2(case_x - 1, 0 + bob_y, 3, 1), Color("#5A2A12"))   # rim
+
+
+## 小朋友 — shorter body, slightly larger head proportionally, faster bounce.
+func _draw_kid(step_phase: int, bob_y: float) -> void:
+	# Bob harder so the kid looks like they're skipping
+	var kbob: float = bob_y - (1.0 if step_phase == 0 else 0.0)
+	# Head (5×4) — relatively bigger vs body
+	draw_rect(Rect2(-3, -5 + kbob, 6, 4), COLOR_SKIN)
+	draw_rect(Rect2(-3, -5 + kbob, 6, 2), hat_color)
+	# Tiny tuft of hair on top
+	draw_rect(Rect2(-1, -6 + kbob, 2, 1), hat_color)
+	# Smaller body (4×3)
+	draw_rect(Rect2(-2, -1 + kbob, 4, 3), body_color)
+	# Legs (only 2 px tall — kid is shorter)
+	var legs: Color = body_color.darkened(0.35)
+	if step_phase == 0:
+		draw_rect(Rect2(-2, 2 + kbob, 1, 2), legs)
+		draw_rect(Rect2(1, 2 + kbob, 1, 2), legs)
+	else:
+		draw_rect(Rect2(-2, 2 + kbob, 1, 2), legs)
+		draw_rect(Rect2(1, 2 + kbob, 1, 2), legs)
+
+
+## 情侶 — two figures side by side, second one drawn in accent_color.
+## Slightly wider footprint; both bob in lockstep so it reads as one unit.
+func _draw_couple(step_phase: int, bob_y: float) -> void:
+	# Left partner — body_color
+	draw_rect(Rect2(-5, -6 + bob_y, 4, 4), COLOR_SKIN)
+	draw_rect(Rect2(-5, -6 + bob_y, 4, 2), hat_color)
+	draw_rect(Rect2(-5, -2 + bob_y, 4, 4), body_color)
+	# Right partner — accent_color
+	draw_rect(Rect2(1, -6 + bob_y, 4, 4), COLOR_SKIN)
+	draw_rect(Rect2(1, -6 + bob_y, 4, 2), hat_color.lightened(0.3))
+	draw_rect(Rect2(1, -2 + bob_y, 4, 4), accent_color)
+	# Holding hands — single pixel between them at body height
+	draw_rect(Rect2(-1, 0 + bob_y, 2, 1), COLOR_SKIN)
+	# Four legs (alternating)
+	var legs_l: Color = body_color.darkened(0.35)
+	var legs_r: Color = accent_color.darkened(0.35)
+	if step_phase == 0:
+		draw_rect(Rect2(-5, 2 + bob_y, 2, 3), legs_l)
+		draw_rect(Rect2(-2, 2 + bob_y, 1, 3), legs_l)
+		draw_rect(Rect2(1, 2 + bob_y, 2, 3), legs_r)
+		draw_rect(Rect2(4, 2 + bob_y, 1, 3), legs_r)
+	else:
+		draw_rect(Rect2(-5, 2 + bob_y, 1, 3), legs_l)
+		draw_rect(Rect2(-3, 2 + bob_y, 2, 3), legs_l)
+		draw_rect(Rect2(1, 2 + bob_y, 1, 3), legs_r)
+		draw_rect(Rect2(3, 2 + bob_y, 2, 3), legs_r)

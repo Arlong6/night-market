@@ -94,3 +94,45 @@ func test_wander_shopper_freezes_in_test_mode() -> void:
 	s._process(1.0)  # under test_mode this should NOT advance _x
 	assert_almost_eq(s._x, x_before, 0.001,
 		"test_mode should freeze shopper motion")
+
+
+# ---------------------------------------------------------------------------
+# v0.36 — kind variety
+# ---------------------------------------------------------------------------
+
+func test_wander_shopper_default_kind_is_adult() -> void:
+	# Arrange
+	var s: WanderShopper = WanderShopper.new()
+	add_child_autofree(s)
+
+	# Assert
+	assert_eq(s.kind, WanderShopper.Kind.ADULT,
+		"default kind should be ADULT for backward compat with v0.17 callers")
+
+
+func test_wander_shopper_accepts_each_kind_without_crashing() -> void:
+	# Arrange — exercise every kind through one frame so any draw-time crash
+	# (bad rect, missing accent, etc.) shows up in CI.
+	Game.test_mode = false
+	var kinds: Array = [
+		WanderShopper.Kind.ADULT,
+		WanderShopper.Kind.GRANNY,
+		WanderShopper.Kind.BUSINESSMAN,
+		WanderShopper.Kind.KID,
+		WanderShopper.Kind.COUPLE,
+	]
+	for k in kinds:
+		var s: WanderShopper = WanderShopper.new()
+		s.x_min = 0.0
+		s.x_max = 320.0
+		s.lane_y = 100.0
+		s.direction = 1
+		s.kind = k
+		s.body_color = Color("#5A8A5A")
+		s.accent_color = Color("#3A2A4A")
+		add_child_autofree(s)
+
+	await get_tree().process_frame
+
+	# Assert — survival of the frame is the assertion; no crashes means pass.
+	assert_true(true, "all 5 shopper kinds should construct + tick + draw")
