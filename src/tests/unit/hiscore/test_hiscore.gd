@@ -276,3 +276,92 @@ func test_hiscore_clear_wipes_dishes_cooked() -> void:
 	assert_eq(HiScore.unlocked_dish_count(), 0,
 		"clear() should empty the cookbook journal")
 	assert_eq(HiScore.cook_count("三杯雞"), 0)
+
+
+# ---------------------------------------------------------------------------
+# v0.35 — pending dream bonus
+# ---------------------------------------------------------------------------
+
+func test_hiscore_record_dream_boss_clear_queues_bonus() -> void:
+	# Arrange — fresh HiScore, no pending bonus.
+	assert_eq(HiScore.pending_dream_bonus, 0,
+		"pre-condition: pending_dream_bonus starts at 0 after clear()")
+
+	# Act — record a boss-clear dream.
+	HiScore.record_dream(8, true)
+
+	# Assert
+	assert_eq(HiScore.pending_dream_bonus, HiScore.DREAM_BONUS_PER_CLEAR,
+		"a boss-clear should queue DREAM_BONUS_PER_CLEAR — got %d"
+		% HiScore.pending_dream_bonus)
+
+
+func test_hiscore_record_dream_without_boss_clear_does_not_queue_bonus() -> void:
+	# Act — record a partial dream (no boss kill).
+	HiScore.record_dream(4, false)
+
+	# Assert
+	assert_eq(HiScore.pending_dream_bonus, 0,
+		"non-boss-clear dream must not queue a bonus")
+
+
+func test_hiscore_record_dream_back_to_back_clears_stack_bonus() -> void:
+	# Act — two consecutive clears (e.g. weekend Sat + Sun) without claim
+	HiScore.record_dream(8, true)
+	HiScore.record_dream(8, true)
+
+	# Assert
+	assert_eq(HiScore.pending_dream_bonus, HiScore.DREAM_BONUS_PER_CLEAR * 2,
+		"consecutive clears should stack the bonus — got %d"
+		% HiScore.pending_dream_bonus)
+
+
+func test_hiscore_claim_pending_dream_bonus_returns_amount_and_zeroes() -> void:
+	# Arrange
+	HiScore.pending_dream_bonus = 250
+
+	# Act
+	var amount: int = HiScore.claim_pending_dream_bonus()
+
+	# Assert
+	assert_eq(amount, 250, "claim should return the queued amount")
+	assert_eq(HiScore.pending_dream_bonus, 0,
+		"claim should zero pending_dream_bonus after payout")
+
+
+func test_hiscore_claim_pending_dream_bonus_with_zero_returns_zero() -> void:
+	# Arrange — clean state from before_each.
+
+	# Act
+	var amount: int = HiScore.claim_pending_dream_bonus()
+
+	# Assert
+	assert_eq(amount, 0,
+		"claim with no queued bonus should return 0 — got %d" % amount)
+
+
+func test_hiscore_pending_dream_bonus_persists_via_config_file() -> void:
+	# Arrange — queue a bonus then force a save+reload cycle.
+	HiScore.pending_dream_bonus = 300
+	HiScore._save()
+	HiScore.pending_dream_bonus = 0  # simulate volatile state pre-load
+
+	# Act
+	HiScore._load()
+
+	# Assert
+	assert_eq(HiScore.pending_dream_bonus, 300,
+		"pending bonus should persist across save/load — got %d"
+		% HiScore.pending_dream_bonus)
+
+
+func test_hiscore_clear_wipes_pending_dream_bonus() -> void:
+	# Arrange
+	HiScore.pending_dream_bonus = 500
+
+	# Act
+	HiScore.clear()
+
+	# Assert
+	assert_eq(HiScore.pending_dream_bonus, 0,
+		"clear() should zero the pending dream bonus")

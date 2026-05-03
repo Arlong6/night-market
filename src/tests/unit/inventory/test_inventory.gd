@@ -10,6 +10,10 @@ extends GutTest
 ## get the expected list size by default.
 func before_each() -> void:
 	HiScore.day = 1
+	# v0.35: zero the dream bonus so each test starts from a clean slate;
+	# Inventory.reset() consumes pending_dream_bonus.
+	HiScore.pending_dream_bonus = 0
+	Inventory.last_dream_bonus = 0
 	Inventory.reset()
 
 
@@ -421,3 +425,54 @@ func test_inventory_reset_applies_festival_bonus_to_money() -> void:
 	assert_eq(Inventory.money,
 		Inventory.STARTING_MONEY + Inventory.FESTIVAL_BONUS_NEW_YEAR,
 		"reset on 過年 should add the red-envelope bonus to STARTING_MONEY")
+
+
+# ---------------------------------------------------------------------------
+# v0.35 — 夢境餘韻 dream bonus
+# ---------------------------------------------------------------------------
+
+func test_inventory_reset_applies_pending_dream_bonus_to_money() -> void:
+	# Arrange — queue a 100 NT$ dream bonus on a normal weekday (no festival).
+	HiScore.day = 1
+	HiScore.pending_dream_bonus = HiScore.DREAM_BONUS_PER_CLEAR
+
+	# Act
+	Inventory.reset()
+
+	# Assert
+	assert_eq(Inventory.money,
+		Inventory.STARTING_MONEY + HiScore.DREAM_BONUS_PER_CLEAR,
+		"reset should stack the queued dream bonus on top of STARTING_MONEY")
+	assert_eq(Inventory.last_dream_bonus, HiScore.DREAM_BONUS_PER_CLEAR,
+		"reset should store the bonus amount on Inventory.last_dream_bonus")
+	assert_eq(HiScore.pending_dream_bonus, 0,
+		"reset should consume (zero) HiScore.pending_dream_bonus")
+
+
+func test_inventory_reset_dream_bonus_stacks_with_festival_bonus() -> void:
+	# Arrange — 過年 day AND a queued boss-clear bonus.
+	HiScore.day = 30
+	HiScore.pending_dream_bonus = HiScore.DREAM_BONUS_PER_CLEAR
+
+	# Act
+	Inventory.reset()
+
+	# Assert
+	assert_eq(Inventory.money,
+		Inventory.STARTING_MONEY
+			+ Inventory.FESTIVAL_BONUS_NEW_YEAR
+			+ HiScore.DREAM_BONUS_PER_CLEAR,
+		"festival + dream bonuses should both add to starting money")
+
+
+func test_inventory_reset_with_no_pending_bonus_leaves_last_dream_bonus_zero() -> void:
+	# Arrange — already done in before_each (pending=0).
+
+	# Act
+	Inventory.reset()
+
+	# Assert
+	assert_eq(Inventory.last_dream_bonus, 0,
+		"with no queued bonus, reset should leave last_dream_bonus at 0")
+	assert_eq(Inventory.money, Inventory.STARTING_MONEY,
+		"weekday with no bonus should equal STARTING_MONEY exactly")

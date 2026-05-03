@@ -345,7 +345,20 @@ func _run_intro_sequence() -> void:
 		return
 	if Dialogue._active and Dialogue._box != null:
 		Dialogue._box._close()
-	Dialogue.show(["給你 NT$%d… 記得試試 殺價！" % Inventory.STARTING_MONEY])
+	# v0.35: if the kid had a 夢境 boss-clear last night, mum acknowledges
+	# the extra spirit and the queued NT$ gets called out before the wallet
+	# handoff. The bonus is already in Inventory.money via reset().
+	if Inventory.last_dream_bonus > 0:
+		Dialogue.show([
+			"哇！你今天眼睛特別亮～昨晚作了好夢吧？多給你 NT$%d 加菜金！"
+			% Inventory.last_dream_bonus
+		])
+		await get_tree().create_timer(2.0).timeout
+		if _stage == Stage.INTRO_DONE:
+			return
+		if Dialogue._active and Dialogue._box != null:
+			Dialogue._box._close()
+	Dialogue.show(["給你 NT$%d… 記得試試 殺價！" % Inventory.money])
 	await get_tree().create_timer(1.6).timeout
 	if _stage == Stage.INTRO_DONE:
 		return

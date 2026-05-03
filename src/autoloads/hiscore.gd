@@ -28,6 +28,13 @@ const KEY_VENDOR_PURCHASES: String = "vendor_purchases"
 const KEY_DISHES_COOKED: String = "dishes_cooked"
 const KEY_DREAM_BEST_KILLS: String = "dream_best_kills"
 const KEY_DREAM_BOSS_CLEARS: String = "dream_boss_clears"
+const KEY_PENDING_DREAM_BONUS: String = "pending_dream_bonus"
+
+## v0.35: NT$ awarded the next time Inventory.reset() runs, after a dream
+## boss-clear. One boss = one DREAM_BONUS_PER_CLEAR payout. Stacks if the
+## player clears multiple dreams in a row without intervening shopping
+## (e.g. weekend-Saturday-night clear then weekend-Sunday-night clear).
+const DREAM_BONUS_PER_CLEAR: int = 100
 
 ## Sentinel for "no record yet" — easier than a separate Optional flag.
 const NO_RECORD: float = INF
@@ -65,6 +72,12 @@ var dream_best_kills: int = 0
 ## v0.34: number of times the player has defeated 夜市大魔王. Increments on
 ## every boss-clear ending in the dream scene.
 var dream_boss_clears: int = 0
+
+## v0.35: NT$ queued for the next morning's market run, awarded by clearing
+## 夜市大魔王 in a dream sequence. Consumed (and zeroed) by Inventory.reset().
+## Persists so a player who quits between the dream and the next morning
+## still gets their reward.
+var pending_dream_bonus: int = 0
 
 # ---------------------------------------------------------------------------
 # Lifecycle
@@ -207,11 +220,25 @@ func record_dream(kills: int, boss_cleared: bool) -> Dictionary:
 	if boss_cleared:
 		first_boss_clear = dream_boss_clears == 0
 		dream_boss_clears += 1
+		# v0.35: each boss clear queues a one-shot NT$ bonus for the next
+		# market run. Stacking is intentional (consecutive weekend clears).
+		pending_dream_bonus += DREAM_BONUS_PER_CLEAR
 	_save()
 	return {
 		"new_kill_record": new_kill_record,
 		"first_boss_clear": first_boss_clear,
 	}
+
+
+## v0.35: pulls and zeroes the pending dream bonus. Called by Inventory.reset()
+## at the start of every market run so the bonus is awarded exactly once.
+## Returns the amount that was queued (0 if none).
+func claim_pending_dream_bonus() -> int:
+	var amount: int = pending_dream_bonus
+	if amount > 0:
+		pending_dream_bonus = 0
+		_save()
+	return amount
 
 
 ## Toggles the global mute flag, persists, and pushes the change to Sfx + Music.
@@ -250,6 +277,7 @@ func clear() -> void:
 	dishes_cooked = {}
 	dream_best_kills = 0
 	dream_boss_clears = 0
+	pending_dream_bonus = 0
 	if FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 
@@ -286,6 +314,8 @@ func _load() -> void:
 	# v0.34: dream-sequence cross-run records.
 	dream_best_kills = maxi(0, int(cfg.get_value(SECTION, KEY_DREAM_BEST_KILLS, 0)))
 	dream_boss_clears = maxi(0, int(cfg.get_value(SECTION, KEY_DREAM_BOSS_CLEARS, 0)))
+	# v0.35: pending bonus from the most recent boss clear(s).
+	pending_dream_bonus = maxi(0, int(cfg.get_value(SECTION, KEY_PENDING_DREAM_BONUS, 0)))
 	# Push restored mute state to audio autoloads on next frame so they have
 	# finished their own _ready (autoload init order may not guarantee it).
 	call_deferred("_apply_mute")
@@ -303,6 +333,7 @@ func _save() -> void:
 	cfg.set_value(SECTION, KEY_DISHES_COOKED, dishes_cooked)
 	cfg.set_value(SECTION, KEY_DREAM_BEST_KILLS, dream_best_kills)
 	cfg.set_value(SECTION, KEY_DREAM_BOSS_CLEARS, dream_boss_clears)
+	cfg.set_value(SECTION, KEY_PENDING_DREAM_BONUS, pending_dream_bonus)
 	var err: Error = cfg.save(SAVE_PATH)
 	if err != OK:
 		push_warning("[HiScore] save failed (err=%d)" % err)

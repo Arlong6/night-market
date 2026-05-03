@@ -170,6 +170,12 @@ var ingredients: Dictionary[String, bool] = {}
 ## that HUD/intro reads before any reset still get a valid list.
 var required_ingredients: PackedStringArray = PackedStringArray()
 
+## v0.35: how much "夢境餘韻" bonus was applied to `money` on the most recent
+## reset(). 0 if none. The intro reads this so mum can call out the bonus
+## in dialogue. Lives on Inventory rather than HiScore because by the time
+## the intro plays, HiScore's pending value has already been zeroed.
+var last_dream_bonus: int = 0
+
 
 # ---------------------------------------------------------------------------
 # Lifecycle
@@ -325,7 +331,14 @@ func owned_ingredients() -> PackedStringArray:
 ## v0.23: festival days drop a bonus on top of STARTING_MONEY (red envelope
 ## for 過年, mooncake stipend for 中秋).
 func reset() -> void:
-	money = STARTING_MONEY + festival_bonus()
+	# v0.35: claim the queued dream bonus (if any) and stack it on top of
+	# starting money + festival bonus. The claim zeroes HiScore's pending
+	# value, so the bonus is paid out exactly once.
+	var hs: Node = get_node_or_null("/root/HiScore")
+	last_dream_bonus = 0
+	if hs != null and hs.has_method("claim_pending_dream_bonus"):
+		last_dream_bonus = int(hs.claim_pending_dream_bonus())
+	money = STARTING_MONEY + festival_bonus() + last_dream_bonus
 	ingredients = {}
 	randomize_required()
 	money_changed.emit(money)

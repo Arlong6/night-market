@@ -213,6 +213,16 @@ func _build_ui() -> void:
 		dream_stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		vbox.add_child(dream_stats)
 
+	# v0.35: pending dream bonus — appears the morning after a boss clear.
+	# Disappears as soon as Inventory.reset() consumes it on START.
+	if HiScore.pending_dream_bonus > 0:
+		var bonus_line: Label = _make_label(
+			"夢境餘韻：明天加菜金 NT$%d" % HiScore.pending_dream_bonus,
+			10, Color("#F2A227")
+		)
+		bonus_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(bonus_line)
+
 	var spacer2: Control = Control.new()
 	spacer2.custom_minimum_size = Vector2(0, 8)
 	vbox.add_child(spacer2)
