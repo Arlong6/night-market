@@ -28,6 +28,23 @@ extends NPC
 ## pick. Doesn't change `price` itself so display logic can show the original.
 @export var discount: float = 1.0
 
+## v0.47: typhoon-day price markup (e.g. 1.20 = +20%). Stacks multiplicatively
+## on top of `discount` and loyalty discount. The level sets this to
+## TYPHOON_PRICE_MARKUP on stalls that stayed open during a 颱風天 so prices
+## visibly hike during the storm.
+@export var typhoon_markup: float = 1.0
+
+## v0.47: stall is closed for the day (e.g. typhoon weather). Bumping a
+## closed stall shows the closure dialogue instead of the buy prompt, and
+## the awning + icon are dimmed to read "shuttered".
+@export var is_closed: bool = false
+
+## v0.47: lines shown when bumping a closed stall.
+@export var closed_lines: Array[String] = [
+	"今天颱風天，店休一天～",
+	"明天再來啦，注意安全！",
+]
+
 ## Whether the player has already bargained at this stall this run.
 ## Once true, the 殺價 option disappears from the buy prompt.
 var _bargained: bool = false
@@ -306,7 +323,8 @@ func _draw() -> void:
 	var bob_y: float = _idle_bob_offset()
 	# v0.45: typhoon wind shoves the awning + icon sideways. Body of the
 	# stall stays planted so the structure still reads as a fixed booth.
-	var wind_x: float = _wind_sway_x()
+	# v0.47: closed stalls don't sway (boards are nailed down).
+	var wind_x: float = 0.0 if is_closed else _wind_sway_x()
 
 	# Body fill (the stall counter)
 	draw_rect(Rect2(-half, -half + bob_y, NPC_SIZE, NPC_SIZE), COLOR_STALL_BODY)
@@ -374,8 +392,37 @@ func _draw() -> void:
 		draw_rect(Rect2(-1.0, heart_y + 2.0, 1.0, 1.0), COLOR_LOYALTY_HEART)
 
 	# v0.39: barker speech bubble — drawn last so it sits on top.
-	if _barker_visible and not _barker_text.is_empty() and _tag_font != null:
+	# v0.47: closed stalls don't shout (店休 = quiet).
+	if (not is_closed
+			and _barker_visible
+			and not _barker_text.is_empty()
+			and _tag_font != null):
 		_draw_barker_bubble()
+
+	# v0.47: closed stalls get a wooden shutter overlay covering the front,
+	# plus a small "休" sign. Drawn LAST so it occludes the regular stall art.
+	if is_closed:
+		_draw_closed_overlay(half, bob_y)
+
+
+## v0.47: drawn over a closed stall to make the closure unmistakable.
+## Three horizontal wooden boards with vertical seams + a paper "休" sign.
+func _draw_closed_overlay(half: float, bob_y: float) -> void:
+	# Board face — darker brown spanning the front of the stall.
+	draw_rect(Rect2(-half, -half + bob_y, NPC_SIZE, NPC_SIZE),
+		Color("#4A2A12"))
+	# Three plank seams (1-px shadow lines) for visible board separation.
+	for i in 3:
+		var seam_y: float = -half + 4.0 + float(i) * 4.0 + bob_y
+		draw_rect(Rect2(-half, seam_y, NPC_SIZE, 1.0), Color("#2A1A0A"))
+	# Paper sign — small white square with a red character placeholder.
+	var sign_x: float = -2.0
+	var sign_y: float = 0.0 + bob_y
+	draw_rect(Rect2(sign_x, sign_y, 4.0, 4.0), Color("#F5EDDA"))
+	draw_rect(Rect2(sign_x, sign_y, 4.0, 1.0), Color("#2A1A0A"))
+	draw_rect(Rect2(sign_x, sign_y + 3.0, 4.0, 1.0), Color("#2A1A0A"))
+	# 休 stand-in: 2-px red horizontal stripe in the middle of the sign.
+	draw_rect(Rect2(sign_x + 1.0, sign_y + 1.0, 2.0, 2.0), Color("#C2241A"))
 
 
 ## v0.39: small white speech bubble with the current barker line, anchored
@@ -419,6 +466,10 @@ func _draw_barker_bubble() -> void:
 # ---------------------------------------------------------------------------
 
 func on_bumped() -> void:
+	# v0.47: closed stalls (typhoon day) skip the whole buy flow.
+	if is_closed:
+		Dialogue.show(closed_lines)
+		return
 	if _sold:
 		Dialogue.show(sold_out_lines)
 		return
@@ -477,7 +528,10 @@ func _open_buy_choice() -> void:
 	var label: String = Inventory.display_name(ingredient_id)
 	var effective: int = effective_price()
 	var question: String
-	if discount < 0.999:
+	# v0.47: surface the typhoon markup so the player knows why prices spiked.
+	if typhoon_markup > 1.001:
+		question = "買 %s NT$%d (颱風漲價！原 %d)？" % [label, effective, price]
+	elif discount < 0.999:
 		question = "買 %s NT$%d (打折！原價 %d)？" % [label, effective, price]
 	else:
 		question = "買 %s NT$%d？" % [label, effective]
@@ -494,8 +548,12 @@ func _open_buy_choice() -> void:
 ## Current price after the discount + loyalty multipliers (rounded to NT$).
 ## v0.20: loyalty discount stacks multiplicatively on top of `discount`
 ## (which itself stacks the daily-special slot + any bargain success).
+## v0.47: typhoon_markup stacks multiplicatively after — typhoon prices go
+## up before any loyalty / bargain discount applies, so regulars still get
+## a relative deal but the absolute price is higher than a sunny day.
 func effective_price() -> int:
-	return int(roundf(float(price) * discount * _loyalty_discount()))
+	var base: float = float(price) * typhoon_markup * discount * _loyalty_discount()
+	return int(roundf(base))
 
 
 func _on_choice(index: int) -> void:

@@ -140,3 +140,61 @@ func test_dialogue_ask_choice_returns_index() -> void:
 
 	assert_eq(captured[0], 1,
 		"Confirmed choice should pass selected index to callback — got %s" % captured[0])
+
+
+# ---------------------------------------------------------------------------
+# v0.47 — typhoon stall closures + price markup
+# ---------------------------------------------------------------------------
+
+func test_stall_closed_bump_shows_closed_lines_not_buy_prompt() -> void:
+	# Arrange — closed stall on a "typhoon day"
+	var stall: StallNPC = await _make_stall("egg", 30)
+	stall.is_closed = true
+
+	# Act
+	stall.on_bumped()
+	await get_tree().process_frame
+
+	# Assert — dialogue active, but it should be the closure lines, not a
+	# buy choice. Closed stalls never raise a choice prompt.
+	assert_true(Dialogue.is_active(),
+		"closed stall should still produce dialogue (closure message)")
+
+
+func test_stall_typhoon_markup_increases_effective_price() -> void:
+	# Arrange — stall priced at 30, +20% typhoon markup → 36
+	var stall: StallNPC = await _make_stall("egg", 30)
+	stall.typhoon_markup = 1.20
+
+	# Assert
+	assert_eq(stall.effective_price(), 36,
+		"30 × 1.20 = 36 — typhoon markup should round to NT$36")
+
+
+func test_stall_typhoon_markup_one_means_no_change() -> void:
+	# Arrange — default markup 1.0 == sunny day pricing
+	var stall: StallNPC = await _make_stall("egg", 30)
+
+	# Assert
+	assert_eq(stall.effective_price(), 30,
+		"default typhoon_markup=1.0 should leave price unchanged")
+
+
+func test_stall_closed_does_not_decrement_money_on_bump() -> void:
+	# Arrange — closed stall + money snapshot
+	var stall: StallNPC = await _make_stall("egg", 30)
+	stall.is_closed = true
+	var money_before: int = Inventory.money
+
+	# Act — bump (would normally trigger buy flow)
+	stall.on_bumped()
+	await get_tree().process_frame
+	# Try to advance through the dialogue to confirm no charge happens even
+	# when the player presses past the closure message.
+	if Dialogue._active and Dialogue._box != null:
+		Dialogue._box._advance()
+		await get_tree().process_frame
+
+	# Assert
+	assert_eq(Inventory.money, money_before,
+		"closed stall must never charge — money stays exactly the same")

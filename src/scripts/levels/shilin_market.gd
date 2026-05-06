@@ -39,6 +39,10 @@ const STALL_CELLS: Array[Vector2i] = [
 ## naturally walks past it on the way out. Only used on rainy / typhoon days.
 const UMBRELLA_VENDOR_CELL: Vector2i = Vector2i(5, 9)
 
+## v0.47: price multiplier on every open stall when today is a typhoon day.
+## 1.20 = +20% markup; visible in the buy prompt as "颱風漲價！原 X".
+const TYPHOON_PRICE_MARKUP: float = 1.20
+
 ## Per-stall configuration — one entry per STALL_CELLS index.
 ## Total cheapest 5 = 190; with STARTING_MONEY=180 the player MUST bargain
 ## successfully at least once OR pick the cheapest 5 and skip the dearer two.
@@ -318,6 +322,11 @@ func _spawn_stalls() -> void:
 	indices.shuffle()
 	# Pick one stall slot (post-shuffle) to discount by 20%.
 	var discount_slot: int = randi() % STALL_CELLS.size()
+	# v0.47: typhoon day → close ~30% of stalls (deterministic by index so
+	# the player can replan around it) and apply +20% markup to the rest.
+	var typhoon: bool = (
+		Inventory.current_weather() == Inventory.WEATHER_TYPHOON
+	)
 	for slot in STALL_CELLS.size():
 		var data: Dictionary = STALL_DATA[indices[slot]]
 		var stall: StallNPC = StallNPC.new()
@@ -331,6 +340,17 @@ func _spawn_stalls() -> void:
 		stall.intro_lines = intro
 		if slot == discount_slot:
 			stall.discount = 0.8
+		if typhoon:
+			# v0.47: close stalls deterministically by post-shuffle slot index,
+			# but never close one that sells a REQUIRED ingredient — otherwise
+			# the run becomes unwinnable. Open stalls get a +20% markup.
+			var sells_required: bool = (
+				data["id"] in Inventory.required_ingredients
+			)
+			if slot % 3 == 0 and not sells_required:
+				stall.is_closed = true
+			else:
+				stall.typhoon_markup = TYPHOON_PRICE_MARKUP
 		register_npc(stall)
 
 
