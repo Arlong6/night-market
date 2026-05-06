@@ -47,6 +47,11 @@ const TYPHOON_PRICE_MARKUP: float = 1.20
 ## entrance corridor isn't crowded. Tucked into a corner of the market.
 const FORTUNE_TELLER_CELL: Vector2i = Vector2i(2, 5)
 
+## v0.49: 街頭藝人 cell — sits on the opposite corner from the fortune teller
+## so the market has live atmosphere on both ends. Pure flavour NPC; tipping
+## is optional and costs only NT$2 so even broke kids can drop a coin.
+const STREET_MUSICIAN_CELL: Vector2i = Vector2i(22, 9)
+
 ## Per-stall configuration — one entry per STALL_CELLS index.
 ## Total cheapest 5 = 190; with STARTING_MONEY=180 the player MUST bargain
 ## successfully at least once OR pick the cheapest 5 and skip the dearer two.
@@ -276,6 +281,7 @@ func _ready() -> void:
 	_spawn_random_events()
 	_spawn_umbrella_vendor()
 	_spawn_fortune_teller()
+	_spawn_street_musician()
 	_spawn_mom()
 	_spawn_hud()
 	_spawn_lanterns()
@@ -314,6 +320,18 @@ func _spawn_fortune_teller() -> void:
 	teller.cell = FORTUNE_TELLER_CELL
 	teller.lines = ["算命阿婆嘿嘿～"]
 	register_npc(teller)
+
+
+## v0.49: spawns the 街頭藝人 musician at STREET_MUSICIAN_CELL on every run.
+## Pure flavour — bumping shows a song line + optional tip choice. The
+## musician is hardy: shows up in all weather (he wears a hat in rain).
+func _spawn_street_musician() -> void:
+	if not GridWorld.in_bounds(STREET_MUSICIAN_CELL, GRID_W, GRID_H):
+		return
+	var m: StreetMusician = StreetMusician.new()
+	m.cell = STREET_MUSICIAN_CELL
+	m.lines = ["♪ ..."]
+	register_npc(m)
 
 
 func _spawn_hud() -> void:
