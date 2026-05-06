@@ -36,6 +36,8 @@ func before_each() -> void:
 
 func after_each() -> void:
 	_release_all_inputs()
+	# Reset HiScore.day so v0.43 weather tests don't bleed into others.
+	HiScore.day = 1
 
 # ---------------------------------------------------------------------------
 # Tests
@@ -203,3 +205,45 @@ func test_player_facing_horizontal_records_x_sign() -> void:
 	# Assert
 	assert_eq(p.facing.x, -1,
 		"facing.x should be -1 after pressing left — got %d" % p.facing.x)
+
+
+# ---------------------------------------------------------------------------
+# v0.43 — umbrella renders above head on non-sunny days
+# ---------------------------------------------------------------------------
+
+func test_player_draw_umbrella_skips_when_sunny() -> void:
+	# Arrange — force a known sunny day (day 1 puts cycle 0 → SUNNY).
+	HiScore.day = 1
+	var p: PlayerGrid = await _make_player(Vector2i(5, 5), true)
+	# Act — _draw runs every frame; survival is the assertion. We just need
+	# to confirm the helper short-circuits without touching draw state when
+	# weather is sunny (no crash from missing context).
+	p._draw_umbrella(0.0)
+	# Assert
+	assert_eq(Inventory.current_weather(), Inventory.WEATHER_SUNNY,
+		"day 1 should be SUNNY so _draw_umbrella early-returns")
+
+
+func test_player_draw_umbrella_renders_when_rainy() -> void:
+	# Arrange — day 4 in the v0.42 weather cycle is RAINY.
+	HiScore.day = 4
+	var p: PlayerGrid = await _make_player(Vector2i(5, 5), true)
+	# Act — drawing through the engine's render pipeline runs each frame.
+	# Wait one frame so queue_redraw fires the canopy path; survival = pass.
+	await get_tree().process_frame
+	# Assert
+	assert_eq(Inventory.current_weather(), Inventory.WEATHER_RAINY,
+		"day 4 should be RAINY so _draw_umbrella renders the canopy")
+	assert_true(p != null, "player drew one frame in rain without crashing")
+
+
+func test_player_draw_umbrella_renders_when_typhoon() -> void:
+	# Arrange — typhoon special-request day (14 in the 14-day cycle).
+	HiScore.day = 14
+	var p: PlayerGrid = await _make_player(Vector2i(5, 5), true)
+	# Act
+	await get_tree().process_frame
+	# Assert
+	assert_eq(Inventory.current_weather(), Inventory.WEATHER_TYPHOON,
+		"day 14 should be TYPHOON so umbrella uses the storm canopy")
+	assert_true(p != null, "player drew one frame in typhoon without crashing")

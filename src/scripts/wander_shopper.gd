@@ -105,6 +105,16 @@ func _process(delta: float) -> void:
 
 const COLOR_SKIN: Color = Color("#F2D6A8")
 
+## v0.43 — per-kind umbrella canopy colours so a rainy market doesn't look
+## like everyone shopped at the same convenience store.
+const UMBRELLA_COLORS: Dictionary = {
+	Kind.ADULT:       Color("#3A8AC0"),  ## blue
+	Kind.GRANNY:      Color("#D8C040"),  ## yellow plastic
+	Kind.BUSINESSMAN: Color("#1A1A1A"),  ## black office umbrella
+	Kind.KID:         Color("#D04848"),  ## bright red
+	Kind.COUPLE:      Color("#A040A0"),  ## shared purple
+}
+
 func _draw() -> void:
 	# 2-step walk via a step phase in {0, 1}; alternates legs each step.
 	var step_phase: int = int(_t / STEP_PERIOD * 2.0) % 2
@@ -115,6 +125,9 @@ func _draw() -> void:
 		Kind.KID:         _draw_kid(step_phase, bob_y)
 		Kind.COUPLE:      _draw_couple(step_phase, bob_y)
 		_:                _draw_adult(step_phase, bob_y)
+	# v0.43 — every shopper carries an umbrella when it's raining or storming.
+	# COUPLE gets a wider shared umbrella; everyone else uses the standard one.
+	_draw_umbrella(bob_y)
 
 
 ## Original v0.17 silhouette — adult shopper.
@@ -236,3 +249,44 @@ func _draw_couple(step_phase: int, bob_y: float) -> void:
 		draw_rect(Rect2(-3, 2 + bob_y, 2, 3), legs_l)
 		draw_rect(Rect2(1, 2 + bob_y, 1, 3), legs_r)
 		draw_rect(Rect2(3, 2 + bob_y, 2, 3), legs_r)
+
+
+# ---------------------------------------------------------------------------
+# Umbrella (v0.43)
+# ---------------------------------------------------------------------------
+
+## Draws a small umbrella above the shopper's head when the current weather
+## is non-sunny. Reads /root/Inventory.current_weather() so the rain mode is
+## a single source of truth (set in inventory.gd v0.42). COUPLE gets a wider
+## shared umbrella (10px canopy) since they have two heads.
+func _draw_umbrella(bob_y: float) -> void:
+	var inv: Node = get_node_or_null("/root/Inventory")
+	if inv == null or not inv.has_method("current_weather"):
+		return
+	var weather: String = inv.current_weather()
+	if weather == inv.WEATHER_SUNNY:
+		return
+	var canopy: Color = UMBRELLA_COLORS.get(kind, Color("#3A8AC0"))
+	# Typhoon mode darkens the canopy slightly so a stormy crowd reads moodier
+	# than a normal shower.
+	if weather == inv.WEATHER_TYPHOON:
+		canopy = canopy.darkened(0.20)
+	var rim: Color = canopy.darkened(0.30)
+	# Couple gets a wider canopy so it shelters both heads.
+	if kind == Kind.COUPLE:
+		# Spike + wide canopy centred over the gap between the two heads.
+		draw_rect(Rect2(0, -13 + bob_y, 1, 1), rim)
+		draw_rect(Rect2(-5, -12 + bob_y, 11, 1), canopy)
+		draw_rect(Rect2(-6, -11 + bob_y, 13, 1), canopy)
+		draw_rect(Rect2(-6, -11 + bob_y, 1, 1), rim)
+		draw_rect(Rect2(6, -11 + bob_y, 1, 1), rim)
+		# Pole reaches between the two heads (which top out at y≈-6).
+		draw_rect(Rect2(0, -10 + bob_y, 1, 4), Color("#3A1A0A"))
+		return
+	# Standard 7-wide canopy (matches PlayerGrid umbrella shape).
+	draw_rect(Rect2(0, -13 + bob_y, 1, 1), rim)
+	draw_rect(Rect2(-3, -12 + bob_y, 7, 1), canopy)
+	draw_rect(Rect2(-4, -11 + bob_y, 9, 1), canopy)
+	draw_rect(Rect2(-4, -11 + bob_y, 1, 1), rim)
+	draw_rect(Rect2(4, -11 + bob_y, 1, 1), rim)
+	draw_rect(Rect2(0, -10 + bob_y, 1, 4), Color("#3A1A0A"))

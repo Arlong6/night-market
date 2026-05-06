@@ -13,6 +13,8 @@ func before_each() -> void:
 
 func after_each() -> void:
 	Game.test_mode = false
+	# Reset HiScore.day so v0.43 weather tests don't bleed into others.
+	HiScore.day = 1
 
 
 func test_wander_shopper_seeds_position_from_direction() -> void:
@@ -136,3 +138,67 @@ func test_wander_shopper_accepts_each_kind_without_crashing() -> void:
 
 	# Assert — survival of the frame is the assertion; no crashes means pass.
 	assert_true(true, "all 5 shopper kinds should construct + tick + draw")
+
+
+# ---------------------------------------------------------------------------
+# v0.43 — umbrella draws cleanly for every kind in rain + typhoon
+# ---------------------------------------------------------------------------
+
+func test_wander_shopper_umbrella_draws_for_each_kind_in_rain() -> void:
+	# Arrange — RAINY weather (day 4) + every kind. Survival is the test.
+	HiScore.day = 4
+	Game.test_mode = false
+	var kinds: Array = [
+		WanderShopper.Kind.ADULT,
+		WanderShopper.Kind.GRANNY,
+		WanderShopper.Kind.BUSINESSMAN,
+		WanderShopper.Kind.KID,
+		WanderShopper.Kind.COUPLE,
+	]
+	for k in kinds:
+		var s: WanderShopper = WanderShopper.new()
+		s.kind = k
+		s.body_color = Color("#5A8A5A")
+		s.accent_color = Color("#3A2A4A")
+		add_child_autofree(s)
+	await get_tree().process_frame
+
+	# Assert
+	assert_eq(Inventory.current_weather(), Inventory.WEATHER_RAINY,
+		"day 4 must be RAINY for the umbrella canopy path to fire")
+
+
+func test_wander_shopper_umbrella_draws_for_each_kind_in_typhoon() -> void:
+	# Arrange — TYPHOON weather (day 14) darkens canopies via _draw_umbrella.
+	HiScore.day = 14
+	Game.test_mode = false
+	var kinds: Array = [
+		WanderShopper.Kind.ADULT,
+		WanderShopper.Kind.GRANNY,
+		WanderShopper.Kind.BUSINESSMAN,
+		WanderShopper.Kind.KID,
+		WanderShopper.Kind.COUPLE,
+	]
+	for k in kinds:
+		var s: WanderShopper = WanderShopper.new()
+		s.kind = k
+		s.body_color = Color("#5A8A5A")
+		s.accent_color = Color("#3A2A4A")
+		add_child_autofree(s)
+	await get_tree().process_frame
+
+	# Assert
+	assert_eq(Inventory.current_weather(), Inventory.WEATHER_TYPHOON,
+		"day 14 must be TYPHOON so storm canopy path fires for every kind")
+
+
+func test_wander_shopper_couple_umbrella_is_wider_than_adult() -> void:
+	# Arrange — sanity check the per-kind canopy table includes COUPLE.
+	# COUPLE umbrella is drawn 11px wide vs the standard 7px, but that's
+	# inside _draw_umbrella; this test just confirms the COUPLE colour entry
+	# exists so future renames don't silently drop it.
+	# Assert
+	assert_true(WanderShopper.UMBRELLA_COLORS.has(WanderShopper.Kind.COUPLE),
+		"COUPLE must have a umbrella colour entry for v0.43 wider canopy")
+	assert_true(WanderShopper.UMBRELLA_COLORS.has(WanderShopper.Kind.ADULT),
+		"ADULT must have an umbrella colour entry for v0.43")

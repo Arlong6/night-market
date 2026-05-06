@@ -44,6 +44,13 @@ const PLAYER_SKIN: Color = Color("#F2D6A8")
 const PLAYER_HAIR: Color = Color("#3A1A0A")
 const PLAYER_PANTS: Color = Color("#3A4A8A")  ## blue shorts
 
+## v0.43 — umbrella colours, drawn above the head whenever the current
+## weather is non-sunny. Player carries a kid-red umbrella in normal rain
+## and switches to a sturdier blue one for typhoon days.
+const UMBRELLA_RAIN_COLOR: Color = Color("#C04848")
+const UMBRELLA_TYPHOON_COLOR: Color = Color("#3858A8")
+const UMBRELLA_HANDLE_COLOR: Color = Color("#3A1A0A")
+
 ## Maps Godot input action names → cardinal direction vectors.
 const DIRS: Dictionary = {
 	"ui_up": Vector2i(0, -1),
@@ -186,6 +193,9 @@ func _draw() -> void:
 		draw_rect(Rect2(-5.0, 0.0 + bob - arm_lift, 1.0, 2.0), PLAYER_SKIN)
 		draw_rect(Rect2(4.0, 0.0 + bob + arm_lift, 1.0, 2.0), PLAYER_SKIN)
 
+	# --- v0.43 umbrella above head when weather is wet ---------------------
+	_draw_umbrella(bob)
+
 	# --- Legs / shorts -----------------------------------------------------
 	# Alternating foot lift drives the walk cadence; idle = both flat.
 	var left_lift: float = 0.0
@@ -221,6 +231,35 @@ func _draw_head_front(bob: float, face_x: int) -> void:
 		Color("#2A1A0A"))
 	draw_rect(Rect2(1.0 + face_shift, -4.0 + bob, 1.0, 1.0),
 		Color("#2A1A0A"))
+
+
+## v0.43 — small umbrella floating above the player's head when it's raining.
+## Canopy sits two pixels clear of the hair cap (head top is at y=-7) so the
+## hair stays visible. Pole connects canopy to scalp. Shifts with bob so the
+## umbrella stays glued to the head during walk + idle breathing.
+func _draw_umbrella(bob: float) -> void:
+	var inv: Node = get_node_or_null("/root/Inventory")
+	if inv == null or not inv.has_method("current_weather"):
+		return
+	var weather: String = inv.current_weather()
+	if weather == inv.WEATHER_SUNNY:
+		return
+	var canopy: Color = (
+		UMBRELLA_TYPHOON_COLOR
+		if weather == inv.WEATHER_TYPHOON
+		else UMBRELLA_RAIN_COLOR
+	)
+	var rim: Color = canopy.darkened(0.30)
+	# Tiny spike on top so the canopy reads as 3D rather than a flat block.
+	draw_rect(Rect2(0.0, -13.0 + bob, 1.0, 1.0), rim)
+	# Canopy — top row 7px (-3..+3), wider 9px row (-4..+4) below for wing tips.
+	draw_rect(Rect2(-3.0, -12.0 + bob, 7.0, 1.0), canopy)
+	draw_rect(Rect2(-4.0, -11.0 + bob, 9.0, 1.0), canopy)
+	# Rim accent — single dark pixel at each wing tip so the canopy has shape.
+	draw_rect(Rect2(-4.0, -11.0 + bob, 1.0, 1.0), rim)
+	draw_rect(Rect2(4.0, -11.0 + bob, 1.0, 1.0), rim)
+	# Pole — connects canopy bottom (y=-10) to scalp (head top at y=-7).
+	draw_rect(Rect2(0.0, -10.0 + bob, 1.0, 3.0), UMBRELLA_HANDLE_COLOR)
 
 
 ## Back of head — solid hair cap covering the whole head silhouette.
