@@ -133,6 +133,9 @@ func _on_choice(index: int) -> void:
 	Sfx.play_pickup()
 	_spawn_sparkle()
 	_despawning = true
+	# v0.50: record the rescue so the kid earns a follower cat at home from
+	# the next run onwards. Cumulative across runs.
+	HiScore.record_cat_rescue()
 	var freed_cell: Vector2i = cell
 	var on_done: Callable = func() -> void:
 		if is_instance_valid(self):

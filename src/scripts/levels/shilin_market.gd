@@ -282,6 +282,7 @@ func _ready() -> void:
 	_spawn_umbrella_vendor()
 	_spawn_fortune_teller()
 	_spawn_street_musician()
+	_spawn_follower_cat()
 	_spawn_mom()
 	_spawn_hud()
 	_spawn_lanterns()
@@ -332,6 +333,20 @@ func _spawn_street_musician() -> void:
 	m.cell = STREET_MUSICIAN_CELL
 	m.lines = ["♪ ..."]
 	register_npc(m)
+
+
+## v0.50: spawns a follower cat at HOME_CELL once the player has rescued at
+## least one 走丟的小貓. Pure flavour pet — no game effect, doesn't block
+## any cell, follows the player at a 2-step delay via cell_changed.
+func _spawn_follower_cat() -> void:
+	if not HiScore.has_cat_friend():
+		return
+	if _player == null:
+		return
+	var cat: FollowerCat = FollowerCat.new()
+	cat.name = "FollowerCat"
+	add_child(cat)
+	cat.configure(_player)
 
 
 func _spawn_hud() -> void:

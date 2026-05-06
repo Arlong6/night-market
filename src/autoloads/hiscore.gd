@@ -30,6 +30,7 @@ const KEY_DREAM_BEST_KILLS: String = "dream_best_kills"
 const KEY_DREAM_BOSS_CLEARS: String = "dream_boss_clears"
 const KEY_PENDING_DREAM_BONUS: String = "pending_dream_bonus"
 const KEY_PENDING_SPECIAL_BONUS: String = "pending_special_bonus"
+const KEY_CAT_RESCUES: String = "cat_rescues"
 
 ## v0.35: NT$ awarded the next time Inventory.reset() runs, after a dream
 ## boss-clear. One boss = one DREAM_BONUS_PER_CLEAR payout. Stacks if the
@@ -85,6 +86,11 @@ var pending_dream_bonus: int = 0
 ## separate field so the morning-intro can phrase mum's two thank-yous
 ## independently rather than lumping them together.
 var pending_special_bonus: int = 0
+
+## v0.50: number of times the player has rescued a 走丟的小貓 across all runs.
+## Once cat_rescues >= 1 a follower cat appears at HOME_CELL on every market
+## spawn — pure flavour pet, no gameplay effect. Increments via record_cat_rescue().
+var cat_rescues: int = 0
 
 # ---------------------------------------------------------------------------
 # Lifecycle
@@ -189,6 +195,19 @@ func record_purchase(ingredient_id: String) -> void:
 ## runs. 0 if never. Used to derive the vendor-loyalty tier.
 func purchase_count(ingredient_id: String) -> int:
 	return vendor_purchases.get(ingredient_id, 0)
+
+
+## v0.50: increments cat_rescues and persists. Called by LostCat after the
+## thank-you dialogue closes so the next run knows the player has already
+## befriended at least one cat.
+func record_cat_rescue() -> void:
+	cat_rescues += 1
+	_save()
+
+
+## v0.50: convenience predicate gating the follower-cat spawn at HOME_CELL.
+func has_cat_friend() -> bool:
+	return cat_rescues >= 1
 
 
 ## v0.24: marks the named dish as cooked at least once and increments its
@@ -345,6 +364,8 @@ func _load() -> void:
 	pending_dream_bonus = maxi(0, int(cfg.get_value(SECTION, KEY_PENDING_DREAM_BONUS, 0)))
 	# v0.40: pending bonus from the most recent special-request completion.
 	pending_special_bonus = maxi(0, int(cfg.get_value(SECTION, KEY_PENDING_SPECIAL_BONUS, 0)))
+	# v0.50: cumulative cat rescues — gates the follower-cat spawn.
+	cat_rescues = maxi(0, int(cfg.get_value(SECTION, KEY_CAT_RESCUES, 0)))
 	# Push restored mute state to audio autoloads on next frame so they have
 	# finished their own _ready (autoload init order may not guarantee it).
 	call_deferred("_apply_mute")
@@ -364,6 +385,7 @@ func _save() -> void:
 	cfg.set_value(SECTION, KEY_DREAM_BOSS_CLEARS, dream_boss_clears)
 	cfg.set_value(SECTION, KEY_PENDING_DREAM_BONUS, pending_dream_bonus)
 	cfg.set_value(SECTION, KEY_PENDING_SPECIAL_BONUS, pending_special_bonus)
+	cfg.set_value(SECTION, KEY_CAT_RESCUES, cat_rescues)
 	var err: Error = cfg.save(SAVE_PATH)
 	if err != OK:
 		push_warning("[HiScore] save failed (err=%d)" % err)
