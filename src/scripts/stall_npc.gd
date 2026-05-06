@@ -227,12 +227,28 @@ func _process(delta: float) -> void:
 	if _barker_visible:
 		# End shout — back to silent waiting period.
 		_barker_visible = false
-		_barker_timer = randf_range(BARKER_HIDDEN_MIN, BARKER_HIDDEN_MAX)
+		# v0.42: vendors shout less in the rain. 1.5× hidden range on
+		# rainy days, 2.0× on typhoon days (when nobody wants to be heard
+		# over the wind anyway).
+		var slow: float = _barker_weather_slow()
+		_barker_timer = randf_range(BARKER_HIDDEN_MIN, BARKER_HIDDEN_MAX) * slow
 	else:
 		# Start a new shout — pick a line and arm the visible duration.
 		_barker_visible = true
 		_barker_text = _pick_barker_line()
 		_barker_timer = BARKER_VISIBLE_DURATION
+
+
+## v0.42: returns the multiplier applied to the barker hidden-period range
+## based on Inventory.current_weather(). 1.0 sunny, 1.5 rainy, 2.0 typhoon.
+func _barker_weather_slow() -> float:
+	var inv: Node = get_node_or_null("/root/Inventory")
+	if inv == null or not inv.has_method("current_weather"):
+		return 1.0
+	match String(inv.current_weather()):
+		"rainy":   return 1.5
+		"typhoon": return 2.0
+		_:         return 1.0
 
 
 ## v0.39: picks a random barker line for this stall's ingredient.

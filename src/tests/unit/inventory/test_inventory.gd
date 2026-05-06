@@ -675,3 +675,53 @@ func test_inventory_special_request_typhoon_stockpile_excludes_chicken() -> void
 		"颱風天囤糧 should exclude fresh chicken")
 	assert_does_not_have(typhoon_list, "scallion",
 		"颱風天囤糧 should exclude fresh scallion")
+
+
+# ---------------------------------------------------------------------------
+# v0.42 — weather
+# ---------------------------------------------------------------------------
+
+func test_inventory_weather_default_is_sunny() -> void:
+	# Arrange — day 1 is cycle 0 (not the rainy cycle index 3).
+	HiScore.day = 1
+	# Act / Assert
+	assert_eq(Inventory.current_weather(), Inventory.WEATHER_SUNNY,
+		"day 1 should be sunny")
+	assert_almost_eq(Inventory.weather_player_slow(), 1.0, 0.001,
+		"sunny day should not slow the player")
+
+
+func test_inventory_weather_rainy_on_5_day_cycle() -> void:
+	# (4-1) % 5 = 3 → RAINY
+	HiScore.day = 4
+	assert_eq(Inventory.current_weather(), Inventory.WEATHER_RAINY,
+		"day 4 should be rainy (cycle 3)")
+	assert_almost_eq(Inventory.weather_player_slow(),
+		Inventory.WEATHER_PLAYER_SLOW_RAIN, 0.001,
+		"rainy day should slow the player by RAIN multiplier")
+	# (9-1) % 5 = 3 → RAINY again
+	HiScore.day = 9
+	assert_eq(Inventory.current_weather(), Inventory.WEATHER_RAINY,
+		"day 9 should be rainy again (5-day cycle)")
+
+
+func test_inventory_weather_typhoon_on_typhoon_special_request_day() -> void:
+	# Arrange — day 14 fires the 颱風天 special request.
+	HiScore.day = 14
+	# Act / Assert
+	assert_eq(Inventory.current_special_request(),
+		Inventory.SPECIAL_REQUEST_TYPHOON_STOCKPILE,
+		"pre-condition: day 14 should be 颱風天")
+	assert_eq(Inventory.current_weather(), Inventory.WEATHER_TYPHOON,
+		"颱風天 should produce TYPHOON weather")
+	assert_almost_eq(Inventory.weather_player_slow(),
+		Inventory.WEATHER_PLAYER_SLOW_TYPHOON, 0.001,
+		"typhoon should slow the player by TYPHOON multiplier")
+
+
+func test_inventory_weather_typhoon_overrides_rain_cycle() -> void:
+	# Day 14 is also (14-1) % 5 = 3, the rain cycle. Typhoon must take
+	# priority over the ambient rain cycle.
+	HiScore.day = 14
+	assert_eq(Inventory.current_weather(), Inventory.WEATHER_TYPHOON,
+		"typhoon override should beat the rain-cycle index")

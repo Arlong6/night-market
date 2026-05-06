@@ -271,6 +271,11 @@ func _attempt_step(dir: Vector2i) -> void:
 		SPRINT_STEP_DURATION if Input.is_key_pressed(KEY_SHIFT)
 		else STEP_DURATION
 	)
+	# v0.42: weather slows the walk (rain ≈ 1.25×, typhoon ≈ 1.55×). Sprint
+	# is also affected so dashing through a typhoon still feels heavy.
+	var inv: Node = get_node_or_null("/root/Inventory")
+	if inv != null and inv.has_method("weather_player_slow"):
+		dur *= float(inv.weather_player_slow())
 	# v0.32: footstep tick — alternate L/R foot via _step_count parity so
 	# the click sounds like a walk pattern, not a single repeated tone.
 	var sfx: Node = get_node_or_null("/root/Sfx")

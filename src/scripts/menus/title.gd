@@ -202,6 +202,16 @@ func _build_ui() -> void:
 		sr_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		vbox.add_child(sr_line)
 
+	# v0.42: weather banner on plain rainy days. 颱風 days already get the
+	# 颱風天 special-request banner above so don't double up.
+	if Inventory.current_weather() == Inventory.WEATHER_RAINY \
+			and Inventory.special_request_label().is_empty():
+		var weather_line: Label = _make_label(
+			"☔ 下雨天，記得帶傘～", 9, Color("#A0C4E0")
+		)
+		weather_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(weather_line)
+
 	if HiScore.has_record():
 		var best: Label = _make_label(
 			"最佳記錄 %s" % HiScore.format_best(), 8, Color("#C8E66D")

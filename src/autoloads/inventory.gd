@@ -514,6 +514,58 @@ func special_request_blurb() -> String:
 	return SPECIAL_REQUEST_BLURBS.get(current_special_request(), "")
 
 
+# ---------------------------------------------------------------------------
+# v0.42 — weather
+# ---------------------------------------------------------------------------
+#
+# A 5-day cycle drops a rainy day into roughly every working week. The
+# 颱風天 special request hard-overrides the cycle to TYPHOON so heavy rain
+# always lands on stockpile day. Sunny is the default.
+#
+# Effects (consumed by other systems, not Inventory itself):
+#   * PlayerGrid slows walk cadence by WEATHER_PLAYER_SLOW
+#   * ShilinMarket draws diagonal rain streaks
+#   * NightMarketCat skips spawn (the cat is dry by choice)
+#   * StallNPC stretches the barker hidden-period multiplier (less shouting)
+
+const WEATHER_SUNNY: String = "sunny"
+const WEATHER_RAINY: String = "rainy"
+const WEATHER_TYPHOON: String = "typhoon"
+
+## (day - 1) % 5 index that triggers an ambient rainy day.
+const WEATHER_RAINY_CYCLE: int = 3   ## day 4, 9, 14, 19, 24 …
+
+## Multiplier applied to player STEP_DURATION when the weather slows them.
+## 1.25 on rain (slight squelch); 1.55 on typhoon (real wind resistance).
+const WEATHER_PLAYER_SLOW_RAIN: float = 1.25
+const WEATHER_PLAYER_SLOW_TYPHOON: float = 1.55
+
+## Returns one of WEATHER_SUNNY / RAINY / TYPHOON for today. 颱風天 special
+## request forces TYPHOON. Rainy cycle index forces RAINY. Otherwise SUNNY.
+func current_weather() -> String:
+	if current_special_request() == SPECIAL_REQUEST_TYPHOON_STOCKPILE:
+		return WEATHER_TYPHOON
+	var hs: Node = get_node_or_null("/root/HiScore")
+	if hs == null:
+		return WEATHER_SUNNY
+	var d: int = int(hs.day)
+	if d <= 0:
+		return WEATHER_SUNNY
+	var cycle: int = (d - 1) % 5
+	if cycle == WEATHER_RAINY_CYCLE:
+		return WEATHER_RAINY
+	return WEATHER_SUNNY
+
+
+## Multiplier applied to PlayerGrid.STEP_DURATION based on today's weather.
+## 1.0 on sunny days; >1.0 to make the kid trudge in rain.
+func weather_player_slow() -> float:
+	match current_weather():
+		WEATHER_RAINY:   return WEATHER_PLAYER_SLOW_RAIN
+		WEATHER_TYPHOON: return WEATHER_PLAYER_SLOW_TYPHOON
+		_:               return 1.0
+
+
 ## NT$ bonus awarded if the player completes the active special request.
 ## 0 when no request is active.
 func special_request_bonus() -> int:

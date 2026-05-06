@@ -341,8 +341,11 @@ func _spawn_shoppers() -> void:
 ## v0.36: spawns the night-market cat — single tabby that wanders the centre
 ## lane between the shopper rows. Pure atmosphere, no interaction. Skipped
 ## in test_mode to avoid extra nodes during headless integration tests.
+## v0.42: also skipped on rainy / typhoon days — the cat stays dry.
 func _spawn_cat() -> void:
 	if Game.test_mode:
+		return
+	if Inventory.current_weather() != Inventory.WEATHER_SUNNY:
 		return
 	var cat: NightMarketCat = NightMarketCat.new()
 	# Centre lane between the two shopper rows (104 / 152 → midpoint 128).
@@ -397,8 +400,12 @@ func _spawn_random_events() -> void:
 		_spawn_wallet()
 	if randf() < LOST_CAT_CHANCE:
 		_spawn_lost_cat()
-	if randf() < RAIN_CHANCE:
-		_schedule_rain()
+	# v0.42: rain is now weather-driven instead of a random 30% shower.
+	# RAINY days (cycle 3 every 5 days) → light persistent rain.
+	# 颱風 special-request days → heavy persistent rain. Otherwise no rain.
+	# The old random RAIN_CHANCE path is preserved as a fallback for sunny
+	# days so the player still occasionally sees a brief shower for variety.
+	_spawn_weather_rain()
 	if Inventory.is_weekend() and not Game.test_mode:
 		_spawn_red_envelope()
 
@@ -465,6 +472,31 @@ func _start_rain() -> void:
 		return
 	var rain: RainOverlay = RainOverlay.new()
 	rain.name = "Rain"
+	add_child(rain)
+
+
+## v0.42: spawns a persistent weather-driven rain overlay based on
+## Inventory.current_weather(). Skips entirely on sunny days and in
+## test_mode. Heavy intensity for typhoon, light for ambient rainy.
+## A persistent overlay shares the "Rain" node name so the legacy
+## transient shower path can't double-stack on top.
+func _spawn_weather_rain() -> void:
+	if Game.test_mode:
+		return
+	var w: String = Inventory.current_weather()
+	if w == Inventory.WEATHER_SUNNY:
+		# Preserve the legacy v0.21 random shower so sunny days still
+		# occasionally get a brief sprinkle. Lower the chance from 30% →
+		# 12% since deterministic rain now covers the predictable cases.
+		if randf() < 0.12:
+			_schedule_rain()
+		return
+	if has_node("Rain"):
+		return
+	var rain: RainOverlay = RainOverlay.new()
+	rain.name = "Rain"
+	rain.persistent = true
+	rain.intensity = "heavy" if w == Inventory.WEATHER_TYPHOON else "light"
 	add_child(rain)
 
 
