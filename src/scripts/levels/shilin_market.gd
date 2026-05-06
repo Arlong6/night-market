@@ -412,6 +412,7 @@ func _spawn_random_events() -> void:
 	# days so the player still occasionally sees a brief shower for variety.
 	_spawn_weather_rain()
 	_spawn_puddles()
+	_spawn_wind()
 	if Inventory.is_weekend() and not Game.test_mode:
 		_spawn_red_envelope()
 
@@ -504,6 +505,22 @@ func _spawn_weather_rain() -> void:
 	rain.persistent = true
 	rain.intensity = "heavy" if w == Inventory.WEATHER_TYPHOON else "light"
 	add_child(rain)
+
+
+## v0.45: spawns a leaf / debris wind overlay on typhoon days only.
+## Sunny + rainy days don't have visible wind. Skipped in test_mode.
+func _spawn_wind() -> void:
+	if Game.test_mode:
+		return
+	if Inventory.current_weather() != Inventory.WEATHER_TYPHOON:
+		return
+	if has_node("Wind"):
+		return
+	var wind: WindOverlay = WindOverlay.new()
+	wind.name = "Wind"
+	# Random direction so successive typhoons don't always blow the same way.
+	wind.direction = 1 if randf() < 0.5 else -1
+	add_child(wind)
 
 
 ## v0.44: spawns 3-6 puddles at random walkable cells on rainy / typhoon

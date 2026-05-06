@@ -270,6 +270,21 @@ func _pick_barker_line() -> String:
 # Override draw — stall body + 2px gold top stripe
 # ---------------------------------------------------------------------------
 
+## v0.45 — wind sway X offset for the awning. Returns 0 unless today is
+## TYPHOON. On typhoon days the awning whips ±2px on a fast sin so it
+## looks like the wind keeps pushing it. Bob phase is shared via
+## _bob_time so neighbouring stalls don't sway in lockstep.
+func _wind_sway_x() -> float:
+	var inv: Node = get_node_or_null("/root/Inventory")
+	if inv == null or not inv.has_method("current_weather"):
+		return 0.0
+	if inv.current_weather() != inv.WEATHER_TYPHOON:
+		return 0.0
+	var phase: float = _bob_time * 6.0
+	# Quantise to integer pixels so sway reads crisp at 320x180.
+	return roundf(sin(phase) * 2.0)
+
+
 func _draw_color() -> Color:
 	return COLOR_STALL_BODY
 
@@ -289,6 +304,9 @@ const FOOD_ICON_COLOR: Dictionary = {
 func _draw() -> void:
 	var half: float = NPC_SIZE / 2.0
 	var bob_y: float = _idle_bob_offset()
+	# v0.45: typhoon wind shoves the awning + icon sideways. Body of the
+	# stall stays planted so the structure still reads as a fixed booth.
+	var wind_x: float = _wind_sway_x()
 
 	# Body fill (the stall counter)
 	draw_rect(Rect2(-half, -half + bob_y, NPC_SIZE, NPC_SIZE), COLOR_STALL_BODY)
@@ -301,16 +319,18 @@ func _draw() -> void:
 	# Awning — 2 angled striped panels hovering above the stall, evoking the
 	# canvas-tarp covers you'd see at every Taiwan night-market booth.
 	# v0.26: stripe pair varies per ingredient via AWNING_PALETTE.
+	# v0.45: awning sways with wind_x on typhoon days so the canopy whips.
 	var awning_y: float = -half - 4.0 + bob_y
 	var palette: Array = _awning_palette()
 	var stripe_a: Color = palette[0]
 	var stripe_b: Color = palette[1]
 	for i in 4:
-		var x: float = -half + float(i) * 4.0
+		var x: float = -half + float(i) * 4.0 + wind_x
 		var c: Color = stripe_a if i % 2 == 0 else stripe_b
 		draw_rect(Rect2(x, awning_y, 4.0, 2.0), c)
 	# Awning bottom hem — 1px dark line for definition
-	draw_rect(Rect2(-half, awning_y + 2.0, NPC_SIZE, 1.0), Color("#2A1A0A"))
+	draw_rect(Rect2(-half + wind_x, awning_y + 2.0, NPC_SIZE, 1.0),
+		Color("#2A1A0A"))
 
 	# v0.27: vendor head silhouette on the LEFT half of the body, food icon
 	# on the right. Side-by-side composition makes every stall feel manned
@@ -326,7 +346,7 @@ func _draw() -> void:
 	var icon_color: Color = (
 		Color("#888888") if _sold else raw_color
 	)
-	var icon_x: float = 1.0
+	var icon_x: float = 1.0 + wind_x
 	var icon_y: float = awning_y + 4.0
 	draw_rect(Rect2(icon_x, icon_y, 4.0, 4.0), icon_color)
 	# Icon outline (1px ink border, top + bottom)
