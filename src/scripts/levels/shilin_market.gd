@@ -237,6 +237,11 @@ var _items_by_cell: Dictionary[Vector2i, ItemPickup] = {}
 ## they live in a separate dictionary from _npcs_by_cell.
 var _lost_cats_by_cell: Dictionary[Vector2i, LostCat] = {}
 
+## v0.44 — puddles spawned on rainy / typhoon days. Indexed by cell so the
+## cell_changed handler can splash when the player walks onto one. Puddles
+## don't block movement (still walkable) and persist for the whole run.
+var _puddles_by_cell: Dictionary[Vector2i, Puddle] = {}
+
 ## Camera shake state — triggered on wall bumps. Decays linearly to 0.
 var _shake_t: float = 0.0
 const SHAKE_DURATION: float = 0.15
@@ -406,6 +411,7 @@ func _spawn_random_events() -> void:
 	# The old random RAIN_CHANCE path is preserved as a fallback for sunny
 	# days so the player still occasionally sees a brief shower for variety.
 	_spawn_weather_rain()
+	_spawn_puddles()
 	if Inventory.is_weekend() and not Game.test_mode:
 		_spawn_red_envelope()
 
@@ -500,6 +506,32 @@ func _spawn_weather_rain() -> void:
 	add_child(rain)
 
 
+## v0.44: spawns 3-6 puddles at random walkable cells on rainy / typhoon
+## days. Heavy puddles on typhoon days, lighter on regular rain. Skipped
+## in test_mode and on sunny days.
+func _spawn_puddles() -> void:
+	if Game.test_mode:
+		return
+	var w: String = Inventory.current_weather()
+	if w == Inventory.WEATHER_SUNNY:
+		return
+	var heavy: bool = (w == Inventory.WEATHER_TYPHOON)
+	var count: int = 6 if heavy else 4
+	for i in count:
+		var pick: Vector2i = _random_free_cell()
+		if pick == Vector2i(-1, -1):
+			return
+		# Don't double-stack on a cell that already has a puddle.
+		if _puddles_by_cell.has(pick):
+			continue
+		var puddle: Puddle = Puddle.new()
+		puddle.cell = pick
+		puddle.heavy = heavy
+		puddle.position = GridWorld.cell_to_px(pick)
+		add_child(puddle)
+		_puddles_by_cell[pick] = puddle
+
+
 ## Picks any walkable cell that isn't reserved (home, mom, existing items
 ## or cats). Returns Vector2i(-1, -1) if no candidates remain.
 func _random_free_cell() -> Vector2i:
@@ -514,6 +546,9 @@ func _random_free_cell() -> Vector2i:
 			if _items_by_cell.has(c):
 				continue
 			if _lost_cats_by_cell.has(c):
+				continue
+			# v0.44: don't stack a puddle on top of an existing one.
+			if _puddles_by_cell.has(c):
 				continue
 			candidates.append(c)
 	if candidates.is_empty():
@@ -550,12 +585,36 @@ func _spawn_bonus_pickup() -> void:
 
 
 ## Called when the player finishes a step. Picks up any item on that cell.
+## v0.44: also splashes any puddle the player walked through.
 func _on_player_cell_changed(new_cell: Vector2i) -> void:
+	# v0.44 — splash on puddle. Puddle persists; only the burst is one-shot.
+	var puddle: Puddle = _puddles_by_cell.get(new_cell, null)
+	if puddle != null:
+		_splash_puddle(puddle)
 	var item: ItemPickup = _items_by_cell.get(new_cell, null)
 	if item == null:
 		return
 	_items_by_cell.erase(new_cell)
 	item.collect()
+
+
+## v0.44: short blue particle burst centred on the puddle so the player
+## gets a clear "I stepped in water" feedback. Particles spray outward +
+## upward with very low gravity so they read as droplets, not dirt.
+func _splash_puddle(puddle: Puddle) -> void:
+	if Game.test_mode:
+		return
+	var burst: ParticleBurst = ParticleBurst.new()
+	burst.position = puddle.position + Vector2(0.0, 3.0)
+	burst.count = 8 if puddle.heavy else 5
+	burst.color = Color("#A0C4E0", 0.9)  ## same pale-cyan as light rain
+	burst.speed_min = 30.0
+	burst.speed_max = 70.0
+	burst.particle_size = 1.0
+	burst.lifetime = 0.30
+	burst.gravity_scale = 0.6
+	burst.upward_bias = 0.7
+	add_child(burst)
 
 
 # ---------------------------------------------------------------------------
