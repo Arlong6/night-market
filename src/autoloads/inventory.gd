@@ -157,12 +157,13 @@ const FESTIVAL_BLURBS: Dictionary[String, String] = {
 
 # ---------------------------------------------------------------------------
 # v0.40 — 媽媽特別交代 (special requests)
+# v0.41 — expanded from 2 → 5 requests on a 14-day cycle
 # ---------------------------------------------------------------------------
 #
 # Layered on top of the normal day-theme + festival system. Special requests
-# fire on a 7-day cycle (skipping festival days) so the player gets a
-# narratively-flavoured shopping run roughly twice a week — different from
-# both the day-theme cadence and the rare festival.
+# fire on a 14-day cycle (skipping festival days) so the player gets a
+# narratively-flavoured shopping run roughly 5 times every 2 weeks — week 2
+# uses different requests than week 1 so the cadence stays fresh.
 #
 # Each request:
 #   * overrides must_include + size in randomize_required()
@@ -174,36 +175,69 @@ const FESTIVAL_BLURBS: Dictionary[String, String] = {
 const SPECIAL_REQUEST_NONE: String = ""
 const SPECIAL_REQUEST_DAD_BIRTHDAY: String = "dad_birthday"
 const SPECIAL_REQUEST_GUEST_DINNER: String = "guest_dinner"
+const SPECIAL_REQUEST_GRANNY_SICK: String = "granny_sick"
+const SPECIAL_REQUEST_SCHOOL_BAZAAR: String = "school_bazaar"
+const SPECIAL_REQUEST_TYPHOON_STOCKPILE: String = "typhoon_stockpile"
 
-## (day - 1) % 7 indices that trigger each request. Skipped silently when a
+## Length of the special-request cycle in days. (day - 1) % SPECIAL_CYCLE_LEN
+## maps the current day to a cycle index; matching one of the SPECIAL_REQUEST_DAY_*
+## constants below fires that request.
+const SPECIAL_CYCLE_LEN: int = 14
+
+## (day - 1) % 14 indices that trigger each request. Skipped silently when a
 ## festival day is also active so the festival keeps narrative priority.
-const SPECIAL_REQUEST_DAY_DAD_BIRTHDAY: int = 2  ## days 3, 10, 17, 24…
-const SPECIAL_REQUEST_DAY_GUEST_DINNER: int = 5  ## days 6, 13, 20, 27…
+## Spread out so no two requests land back-to-back.
+const SPECIAL_REQUEST_DAY_DAD_BIRTHDAY: int = 2       ## days 3, 17, 31, …
+const SPECIAL_REQUEST_DAY_GUEST_DINNER: int = 5       ## days 6, 20, 34, …
+const SPECIAL_REQUEST_DAY_SCHOOL_BAZAAR: int = 9      ## days 10, 24, 38, …
+const SPECIAL_REQUEST_DAY_GRANNY_SICK: int = 11       ## days 12, 26, 40, …
+const SPECIAL_REQUEST_DAY_TYPHOON_STOCKPILE: int = 13 ## days 14, 28, 42, …
 
-## Bonus NT$ awarded on completion of each special request.
+## Bonus NT$ awarded on completion of each special request. Larger lists +
+## thematically-significant requests pay more.
 const SPECIAL_REQUEST_BONUS_DAD_BIRTHDAY: int = 80
 const SPECIAL_REQUEST_BONUS_GUEST_DINNER: int = 60
+const SPECIAL_REQUEST_BONUS_GRANNY_SICK: int = 50      ## small list, smaller payout
+const SPECIAL_REQUEST_BONUS_SCHOOL_BAZAAR: int = 70
+const SPECIAL_REQUEST_BONUS_TYPHOON_STOCKPILE: int = 90
 
 ## Required ingredient list per special request — overrides the day-theme
 ## must_include + size when active. Plain Array literals are the only
 ## const-expression form; consumers (`randomize_required`,
 ## `special_request_complete`) iterate them directly without a cast.
 const SPECIAL_REQUEST_REQUIRED: Dictionary = {
+	# Birthday — 三杯雞 ingredients (chicken, scallion, soy_sauce) + egg.
 	SPECIAL_REQUEST_DAD_BIRTHDAY: ["chicken", "scallion", "soy_sauce", "egg"],
+	# Guest dinner — 滿漢全席, the full 7.
 	SPECIAL_REQUEST_GUEST_DINNER: [
 		"chicken", "egg", "scallion", "cabbage", "tofu", "soy_sauce", "mushroom"
+	],
+	# Granny sick — light healing soup: tofu + cabbage + mushroom.
+	SPECIAL_REQUEST_GRANNY_SICK: ["tofu", "cabbage", "mushroom"],
+	# School bazaar — 蛋餅 (egg pancake) ingredients: egg + scallion + soy_sauce.
+	SPECIAL_REQUEST_SCHOOL_BAZAAR: ["egg", "scallion", "soy_sauce"],
+	# Typhoon stockpile — durable goods only (no fresh chicken / scallion which
+	# spoil fast in a power outage).
+	SPECIAL_REQUEST_TYPHOON_STOCKPILE: [
+		"soy_sauce", "tofu", "cabbage", "mushroom", "egg"
 	],
 }
 
 ## Short labels used by title screen + mum's intro.
 const SPECIAL_REQUEST_LABELS: Dictionary[String, String] = {
-	SPECIAL_REQUEST_DAD_BIRTHDAY: "🎂 爸爸生日",
-	SPECIAL_REQUEST_GUEST_DINNER: "🍽 客人晚餐",
+	SPECIAL_REQUEST_DAD_BIRTHDAY:      "🎂 爸爸生日",
+	SPECIAL_REQUEST_GUEST_DINNER:      "🍽 客人晚餐",
+	SPECIAL_REQUEST_GRANNY_SICK:       "🤒 奶奶生病",
+	SPECIAL_REQUEST_SCHOOL_BAZAAR:     "🏫 學校義賣",
+	SPECIAL_REQUEST_TYPHOON_STOCKPILE: "🌀 颱風天",
 }
 ## Longer flavour blurbs.
 const SPECIAL_REQUEST_BLURBS: Dictionary[String, String] = {
-	SPECIAL_REQUEST_DAD_BIRTHDAY: "今天爸爸生日，要做三杯雞慶祝～",
-	SPECIAL_REQUEST_GUEST_DINNER: "客人要來晚餐，請把全部食材都買齊！",
+	SPECIAL_REQUEST_DAD_BIRTHDAY:      "今天爸爸生日，要做三杯雞慶祝～",
+	SPECIAL_REQUEST_GUEST_DINNER:      "客人要來晚餐，請把全部食材都買齊！",
+	SPECIAL_REQUEST_GRANNY_SICK:       "奶奶感冒了，做點清淡的給她吃～",
+	SPECIAL_REQUEST_SCHOOL_BAZAAR:     "學校義賣要做蛋餅，幫媽媽買材料！",
+	SPECIAL_REQUEST_TYPHOON_STOCKPILE: "颱風要來了！囤點放得久的～",
 }
 
 # ---------------------------------------------------------------------------
@@ -448,9 +482,9 @@ func festival_bonus() -> int:
 # v0.40 — special request helpers
 # ---------------------------------------------------------------------------
 
-## Returns one of SPECIAL_REQUEST_NONE / DAD_BIRTHDAY / GUEST_DINNER for
-## today, based on (HiScore.day - 1) % 7. Festival days take priority and
-## suppress any special request that would otherwise fire.
+## Returns the special-request key for today, or SPECIAL_REQUEST_NONE.
+## Cycle is (HiScore.day - 1) % SPECIAL_CYCLE_LEN. Festival days take
+## priority and suppress any special request that would otherwise fire.
 func current_special_request() -> String:
 	if current_festival() != FESTIVAL_NONE:
 		return SPECIAL_REQUEST_NONE
@@ -460,11 +494,13 @@ func current_special_request() -> String:
 	var d: int = int(hs.day)
 	if d <= 0:
 		return SPECIAL_REQUEST_NONE
-	var cycle: int = (d - 1) % 7
-	if cycle == SPECIAL_REQUEST_DAY_DAD_BIRTHDAY:
-		return SPECIAL_REQUEST_DAD_BIRTHDAY
-	if cycle == SPECIAL_REQUEST_DAY_GUEST_DINNER:
-		return SPECIAL_REQUEST_GUEST_DINNER
+	var cycle: int = (d - 1) % SPECIAL_CYCLE_LEN
+	match cycle:
+		SPECIAL_REQUEST_DAY_DAD_BIRTHDAY:      return SPECIAL_REQUEST_DAD_BIRTHDAY
+		SPECIAL_REQUEST_DAY_GUEST_DINNER:      return SPECIAL_REQUEST_GUEST_DINNER
+		SPECIAL_REQUEST_DAY_SCHOOL_BAZAAR:     return SPECIAL_REQUEST_SCHOOL_BAZAAR
+		SPECIAL_REQUEST_DAY_GRANNY_SICK:       return SPECIAL_REQUEST_GRANNY_SICK
+		SPECIAL_REQUEST_DAY_TYPHOON_STOCKPILE: return SPECIAL_REQUEST_TYPHOON_STOCKPILE
 	return SPECIAL_REQUEST_NONE
 
 
@@ -482,9 +518,12 @@ func special_request_blurb() -> String:
 ## 0 when no request is active.
 func special_request_bonus() -> int:
 	match current_special_request():
-		SPECIAL_REQUEST_DAD_BIRTHDAY: return SPECIAL_REQUEST_BONUS_DAD_BIRTHDAY
-		SPECIAL_REQUEST_GUEST_DINNER: return SPECIAL_REQUEST_BONUS_GUEST_DINNER
-		_:                            return 0
+		SPECIAL_REQUEST_DAD_BIRTHDAY:      return SPECIAL_REQUEST_BONUS_DAD_BIRTHDAY
+		SPECIAL_REQUEST_GUEST_DINNER:      return SPECIAL_REQUEST_BONUS_GUEST_DINNER
+		SPECIAL_REQUEST_GRANNY_SICK:       return SPECIAL_REQUEST_BONUS_GRANNY_SICK
+		SPECIAL_REQUEST_SCHOOL_BAZAAR:     return SPECIAL_REQUEST_BONUS_SCHOOL_BAZAAR
+		SPECIAL_REQUEST_TYPHOON_STOCKPILE: return SPECIAL_REQUEST_BONUS_TYPHOON_STOCKPILE
+		_:                                 return 0
 
 
 ## True iff every required ingredient (per the active special request OR

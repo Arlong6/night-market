@@ -516,17 +516,24 @@ func test_inventory_special_request_guest_dinner_on_day_6() -> void:
 		Inventory.SPECIAL_REQUEST_BONUS_GUEST_DINNER)
 
 
-func test_inventory_special_request_repeats_on_7_day_cycle() -> void:
-	# Day 10 = (10-1) % 7 = 2 → DAD_BIRTHDAY again
-	HiScore.day = 10
+func test_inventory_special_request_repeats_on_14_day_cycle() -> void:
+	# v0.41: cycle expanded to 14 days. Day 17 = (17-1) % 14 = 2 → DAD again.
+	HiScore.day = 17
 	assert_eq(Inventory.current_special_request(),
 		Inventory.SPECIAL_REQUEST_DAD_BIRTHDAY,
-		"day 10 should fire DAD_BIRTHDAY again (7-day cycle)")
-	# Day 13 = (13-1) % 7 = 5 → GUEST_DINNER again
-	HiScore.day = 13
+		"day 17 should fire DAD_BIRTHDAY again (14-day cycle)")
+	# Day 20 = (20-1) % 14 = 5 → GUEST_DINNER again.
+	HiScore.day = 20
 	assert_eq(Inventory.current_special_request(),
 		Inventory.SPECIAL_REQUEST_GUEST_DINNER,
-		"day 13 should fire GUEST_DINNER again")
+		"day 20 should fire GUEST_DINNER again")
+	# Day 10 was DAD on the old 7-day cycle; on the 14-day cycle it's NONE
+	# because (10-1) % 14 = 9 doesn't map to anything.
+	# Wait — v0.41 ALSO maps cycle 9 to SCHOOL_BAZAAR. Verify that.
+	HiScore.day = 10
+	assert_eq(Inventory.current_special_request(),
+		Inventory.SPECIAL_REQUEST_SCHOOL_BAZAAR,
+		"day 10 should fire SCHOOL_BAZAAR (cycle index 9)")
 
 
 func test_inventory_festival_overrides_special_request() -> void:
@@ -589,3 +596,82 @@ func test_inventory_reset_applies_special_bonus_to_money() -> void:
 		"last_special_bonus should mirror the consumed amount")
 	assert_eq(HiScore.pending_special_bonus, 0,
 		"reset should zero the pending special bonus")
+
+
+# ---------------------------------------------------------------------------
+# v0.41 — additional special requests
+# ---------------------------------------------------------------------------
+
+func test_inventory_special_request_school_bazaar_on_day_10() -> void:
+	HiScore.day = 10  # (10-1) % 14 = 9
+	assert_eq(Inventory.current_special_request(),
+		Inventory.SPECIAL_REQUEST_SCHOOL_BAZAAR,
+		"day 10 should fire 學校義賣 (cycle 9)")
+	assert_eq(Inventory.special_request_bonus(),
+		Inventory.SPECIAL_REQUEST_BONUS_SCHOOL_BAZAAR)
+
+
+func test_inventory_special_request_granny_sick_on_day_12() -> void:
+	HiScore.day = 12  # (12-1) % 14 = 11
+	assert_eq(Inventory.current_special_request(),
+		Inventory.SPECIAL_REQUEST_GRANNY_SICK,
+		"day 12 should fire 奶奶生病 (cycle 11)")
+	assert_eq(Inventory.special_request_bonus(),
+		Inventory.SPECIAL_REQUEST_BONUS_GRANNY_SICK)
+
+
+func test_inventory_special_request_typhoon_on_day_14() -> void:
+	HiScore.day = 14  # (14-1) % 14 = 13
+	assert_eq(Inventory.current_special_request(),
+		Inventory.SPECIAL_REQUEST_TYPHOON_STOCKPILE,
+		"day 14 should fire 颱風天 (cycle 13)")
+	assert_eq(Inventory.special_request_bonus(),
+		Inventory.SPECIAL_REQUEST_BONUS_TYPHOON_STOCKPILE)
+
+
+func test_inventory_special_request_all_have_label_blurb_required_bonus() -> void:
+	# Arrange — every defined request key must have all four lookup fields,
+	# else the title screen / intro / mum bonus path would silently break.
+	var keys: Array[String] = [
+		Inventory.SPECIAL_REQUEST_DAD_BIRTHDAY,
+		Inventory.SPECIAL_REQUEST_GUEST_DINNER,
+		Inventory.SPECIAL_REQUEST_GRANNY_SICK,
+		Inventory.SPECIAL_REQUEST_SCHOOL_BAZAAR,
+		Inventory.SPECIAL_REQUEST_TYPHOON_STOCKPILE,
+	]
+	for k in keys:
+		assert_true(Inventory.SPECIAL_REQUEST_LABELS.has(k),
+			"request '%s' must have a LABEL entry" % k)
+		assert_true(Inventory.SPECIAL_REQUEST_BLURBS.has(k),
+			"request '%s' must have a BLURB entry" % k)
+		assert_true(Inventory.SPECIAL_REQUEST_REQUIRED.has(k),
+			"request '%s' must have a REQUIRED entry" % k)
+		assert_false(Inventory.SPECIAL_REQUEST_REQUIRED[k].is_empty(),
+			"request '%s' REQUIRED list must not be empty" % k)
+
+
+func test_inventory_special_request_granny_sick_complete_with_three_items() -> void:
+	# Arrange — day 12 (granny sick): 3-item list.
+	HiScore.day = 12
+	Inventory.reset()
+	assert_eq(Inventory.required_ingredients.size(), 3,
+		"granny sick should have a 3-item required list")
+	# Buy two of the three
+	Inventory.buy("tofu", 0)
+	Inventory.buy("cabbage", 0)
+	assert_false(Inventory.special_request_complete(),
+		"missing mushroom → not complete")
+	# Buy the last
+	Inventory.buy("mushroom", 0)
+	assert_true(Inventory.special_request_complete(),
+		"all 3 items bought → granny sick complete")
+
+
+func test_inventory_special_request_typhoon_stockpile_excludes_chicken() -> void:
+	# Typhoon = durable goods. Chicken (fresh) must not be in the list.
+	var typhoon_list: Array = Inventory.SPECIAL_REQUEST_REQUIRED[
+		Inventory.SPECIAL_REQUEST_TYPHOON_STOCKPILE]
+	assert_does_not_have(typhoon_list, "chicken",
+		"颱風天囤糧 should exclude fresh chicken")
+	assert_does_not_have(typhoon_list, "scallion",
+		"颱風天囤糧 should exclude fresh scallion")
