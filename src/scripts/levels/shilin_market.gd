@@ -43,6 +43,10 @@ const UMBRELLA_VENDOR_CELL: Vector2i = Vector2i(5, 9)
 ## 1.20 = +20% markup; visible in the buy prompt as "颱風漲價！原 X".
 const TYPHOON_PRICE_MARKUP: float = 1.20
 
+## v0.48: 算命阿婆 cell — set far from the umbrella vendor so the rainy-day
+## entrance corridor isn't crowded. Tucked into a corner of the market.
+const FORTUNE_TELLER_CELL: Vector2i = Vector2i(2, 5)
+
 ## Per-stall configuration — one entry per STALL_CELLS index.
 ## Total cheapest 5 = 190; with STARTING_MONEY=180 the player MUST bargain
 ## successfully at least once OR pick the cheapest 5 and skip the dearer two.
@@ -271,6 +275,7 @@ func _ready() -> void:
 	_spawn_items()
 	_spawn_random_events()
 	_spawn_umbrella_vendor()
+	_spawn_fortune_teller()
 	_spawn_mom()
 	_spawn_hud()
 	_spawn_lanterns()
@@ -297,6 +302,18 @@ func _spawn_umbrella_vendor() -> void:
 	vendor.cell = UMBRELLA_VENDOR_CELL
 	vendor.lines = ["買支傘吧！下雨天用得到～"]
 	register_npc(vendor)
+
+
+## v0.48: spawns the 算命阿婆 booth at FORTUNE_TELLER_CELL on every run.
+## Pure gameplay — costs NT$5, refunds randomly, capped to 1 consult/run.
+## Stays open in all weather (the booth has a tarp).
+func _spawn_fortune_teller() -> void:
+	if not GridWorld.in_bounds(FORTUNE_TELLER_CELL, GRID_W, GRID_H):
+		return
+	var teller: FortuneTeller = FortuneTeller.new()
+	teller.cell = FORTUNE_TELLER_CELL
+	teller.lines = ["算命阿婆嘿嘿～"]
+	register_npc(teller)
 
 
 func _spawn_hud() -> void:
