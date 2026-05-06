@@ -725,3 +725,104 @@ func test_inventory_weather_typhoon_overrides_rain_cycle() -> void:
 	HiScore.day = 14
 	assert_eq(Inventory.current_weather(), Inventory.WEATHER_TYPHOON,
 		"typhoon override should beat the rain-cycle index")
+
+
+# ---------------------------------------------------------------------------
+# v0.46 — umbrella vendor / has_umbrella flag
+# ---------------------------------------------------------------------------
+
+func test_inventory_has_umbrella_false_after_reset() -> void:
+	# Arrange — reset already ran in before_each.
+	# Assert
+	assert_false(Inventory.has_umbrella,
+		"Each new run should start umbrella-less so the kid has to buy one")
+
+
+func test_inventory_buy_umbrella_succeeds_when_affordable() -> void:
+	# Arrange — make sure money > UMBRELLA_PRICE (default STARTING_MONEY=220)
+	# Act
+	var before: int = Inventory.money
+	var bought: bool = Inventory.buy_umbrella()
+
+	# Assert
+	assert_true(bought, "buy_umbrella should succeed when player has enough money")
+	assert_true(Inventory.has_umbrella,
+		"has_umbrella should flip true after a successful purchase")
+	assert_eq(Inventory.money, before - Inventory.UMBRELLA_PRICE,
+		"money should decrease by UMBRELLA_PRICE")
+
+
+func test_inventory_buy_umbrella_fails_when_already_owned() -> void:
+	# Arrange
+	Inventory.buy_umbrella()  # first purchase
+	var before: int = Inventory.money
+
+	# Act — try buying again
+	var bought_again: bool = Inventory.buy_umbrella()
+
+	# Assert
+	assert_false(bought_again,
+		"second purchase should fail — kid already has an umbrella")
+	assert_eq(Inventory.money, before,
+		"money must not decrease when re-purchase is rejected")
+
+
+func test_inventory_buy_umbrella_fails_when_broke() -> void:
+	# Arrange — drain money below price
+	Inventory.money = Inventory.UMBRELLA_PRICE - 1
+
+	# Act
+	var bought: bool = Inventory.buy_umbrella()
+
+	# Assert
+	assert_false(bought, "should fail when money < UMBRELLA_PRICE")
+	assert_false(Inventory.has_umbrella,
+		"has_umbrella must stay false on failed purchase")
+
+
+func test_inventory_weather_player_slow_one_when_umbrella_owned_in_rain() -> void:
+	# Arrange — rainy day + bought umbrella
+	HiScore.day = 4
+	Inventory.has_umbrella = true
+
+	# Act / Assert
+	assert_almost_eq(Inventory.weather_player_slow(), 1.0, 0.001,
+		"with umbrella the kid walks at full speed even when raining")
+
+
+func test_inventory_weather_player_slow_one_when_umbrella_owned_in_typhoon() -> void:
+	# Arrange — typhoon day + umbrella
+	HiScore.day = 14
+	Inventory.has_umbrella = true
+
+	# Act / Assert — umbrella should negate even the heavy typhoon multiplier
+	assert_almost_eq(Inventory.weather_player_slow(), 1.0, 0.001,
+		"umbrella beats typhoon slowdown too")
+
+
+func test_inventory_needs_umbrella_true_on_rainy_when_unowned() -> void:
+	# Arrange
+	HiScore.day = 4
+
+	# Assert
+	assert_true(Inventory.needs_umbrella(),
+		"rainy + no umbrella → needs_umbrella() should return true")
+
+
+func test_inventory_needs_umbrella_false_on_sunny() -> void:
+	# Arrange — day 1 is sunny in the cycle
+	HiScore.day = 1
+
+	# Assert
+	assert_false(Inventory.needs_umbrella(),
+		"sunny day → never need an umbrella regardless of has_umbrella")
+
+
+func test_inventory_needs_umbrella_false_after_purchase() -> void:
+	# Arrange
+	HiScore.day = 4
+	Inventory.buy_umbrella()
+
+	# Assert
+	assert_false(Inventory.needs_umbrella(),
+		"after buying, needs_umbrella() should report false")

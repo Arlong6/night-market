@@ -244,6 +244,10 @@ func _draw_umbrella(bob: float) -> void:
 	var weather: String = inv.current_weather()
 	if weather == inv.WEATHER_SUNNY:
 		return
+	# v0.46: kid only carries an umbrella if they remembered to buy one
+	# from the umbrella vendor. Without it, they get rained on (slow walk).
+	if not bool(inv.has_umbrella):
+		return
 	var canopy: Color = (
 		UMBRELLA_TYPHOON_COLOR
 		if weather == inv.WEATHER_TYPHOON

@@ -447,6 +447,10 @@ func reset() -> void:
 	money = (STARTING_MONEY + festival_bonus()
 		+ last_dream_bonus + last_special_bonus)
 	ingredients = {}
+	# v0.46: kid forgets the umbrella every morning. Each rainy day starts
+	# with no umbrella so the player has to buy one from the market vendor
+	# (or just walk slow and get wet).
+	has_umbrella = false
 	randomize_required()
 	money_changed.emit(money)
 
@@ -537,8 +541,17 @@ const WEATHER_RAINY_CYCLE: int = 3   ## day 4, 9, 14, 19, 24 …
 
 ## Multiplier applied to player STEP_DURATION when the weather slows them.
 ## 1.25 on rain (slight squelch); 1.55 on typhoon (real wind resistance).
+## v0.46 — only applied when the player does NOT have an umbrella.
 const WEATHER_PLAYER_SLOW_RAIN: float = 1.25
 const WEATHER_PLAYER_SLOW_TYPHOON: float = 1.55
+
+## v0.46: umbrella vendor — small market stall opens on rainy / typhoon days
+## and sells one umbrella for UMBRELLA_PRICE NT$. has_umbrella resets to
+## false on every reset() so each morning is a fresh "did I bring one?"
+## decision. With an umbrella the kid walks at normal speed AND draws an
+## umbrella sprite over their head.
+const UMBRELLA_PRICE: int = 5
+var has_umbrella: bool = false
 
 ## Returns one of WEATHER_SUNNY / RAINY / TYPHOON for today. 颱風天 special
 ## request forces TYPHOON. Rainy cycle index forces RAINY. Otherwise SUNNY.
@@ -558,12 +571,36 @@ func current_weather() -> String:
 
 
 ## Multiplier applied to PlayerGrid.STEP_DURATION based on today's weather.
-## 1.0 on sunny days; >1.0 to make the kid trudge in rain.
+## 1.0 on sunny days; >1.0 to make the kid trudge in rain. v0.46 — having
+## an umbrella negates the slowdown so buying one is a real upgrade.
 func weather_player_slow() -> float:
+	if has_umbrella:
+		return 1.0
 	match current_weather():
 		WEATHER_RAINY:   return WEATHER_PLAYER_SLOW_RAIN
 		WEATHER_TYPHOON: return WEATHER_PLAYER_SLOW_TYPHOON
 		_:               return 1.0
+
+
+## v0.46: convenience predicate for the title-screen banner + UmbrellaVendor
+## visibility check. True iff today is wet AND the kid hasn't bought a brolly.
+func needs_umbrella() -> bool:
+	if has_umbrella:
+		return false
+	return current_weather() != WEATHER_SUNNY
+
+
+## v0.46: spends UMBRELLA_PRICE and flips has_umbrella. Returns true iff the
+## purchase actually happened (enough money + didn't already own one).
+func buy_umbrella() -> bool:
+	if has_umbrella:
+		return false
+	if money < UMBRELLA_PRICE:
+		return false
+	money -= UMBRELLA_PRICE
+	has_umbrella = true
+	money_changed.emit(money)
+	return true
 
 
 ## NT$ bonus awarded if the player completes the active special request.

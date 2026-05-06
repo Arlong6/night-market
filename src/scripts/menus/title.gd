@@ -204,10 +204,12 @@ func _build_ui() -> void:
 
 	# v0.42: weather banner on plain rainy days. 颱風 days already get the
 	# 颱風天 special-request banner above so don't double up.
+	# v0.46: hint that an umbrella vendor sells brollies for NT$5.
 	if Inventory.current_weather() == Inventory.WEATHER_RAINY \
 			and Inventory.special_request_label().is_empty():
 		var weather_line: Label = _make_label(
-			"☔ 下雨天，記得帶傘～", 9, Color("#A0C4E0")
+			"☔ 下雨天，市場有賣傘 NT$%d" % Inventory.UMBRELLA_PRICE,
+			9, Color("#A0C4E0")
 		)
 		weather_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		vbox.add_child(weather_line)

@@ -224,9 +224,11 @@ func test_player_draw_umbrella_skips_when_sunny() -> void:
 		"day 1 should be SUNNY so _draw_umbrella early-returns")
 
 
-func test_player_draw_umbrella_renders_when_rainy() -> void:
-	# Arrange — day 4 in the v0.42 weather cycle is RAINY.
+func test_player_draw_umbrella_renders_when_rainy_and_owned() -> void:
+	# Arrange — day 4 in the v0.42 weather cycle is RAINY. v0.46 requires
+	# has_umbrella=true before the canopy draws.
 	HiScore.day = 4
+	Inventory.has_umbrella = true
 	var p: PlayerGrid = await _make_player(Vector2i(5, 5), true)
 	# Act — drawing through the engine's render pipeline runs each frame.
 	# Wait one frame so queue_redraw fires the canopy path; survival = pass.
@@ -235,11 +237,14 @@ func test_player_draw_umbrella_renders_when_rainy() -> void:
 	assert_eq(Inventory.current_weather(), Inventory.WEATHER_RAINY,
 		"day 4 should be RAINY so _draw_umbrella renders the canopy")
 	assert_true(p != null, "player drew one frame in rain without crashing")
+	# Cleanup so the flag doesn't bleed into other tests.
+	Inventory.has_umbrella = false
 
 
-func test_player_draw_umbrella_renders_when_typhoon() -> void:
+func test_player_draw_umbrella_renders_when_typhoon_and_owned() -> void:
 	# Arrange — typhoon special-request day (14 in the 14-day cycle).
 	HiScore.day = 14
+	Inventory.has_umbrella = true
 	var p: PlayerGrid = await _make_player(Vector2i(5, 5), true)
 	# Act
 	await get_tree().process_frame
@@ -247,3 +252,17 @@ func test_player_draw_umbrella_renders_when_typhoon() -> void:
 	assert_eq(Inventory.current_weather(), Inventory.WEATHER_TYPHOON,
 		"day 14 should be TYPHOON so umbrella uses the storm canopy")
 	assert_true(p != null, "player drew one frame in typhoon without crashing")
+	Inventory.has_umbrella = false
+
+
+func test_player_draw_umbrella_skips_when_rainy_but_not_owned() -> void:
+	# Arrange — v0.46 retcon: rainy + no umbrella means kid is wet, no canopy.
+	HiScore.day = 4
+	Inventory.has_umbrella = false
+	var p: PlayerGrid = await _make_player(Vector2i(5, 5), true)
+	# Act — calling the helper directly so we don't need a render context
+	p._draw_umbrella(0.0)  # should early-return, no draw_rect calls
+	# Assert
+	assert_false(Inventory.has_umbrella,
+		"sanity: precondition for the v0.46 retcon path")
+	assert_true(p != null, "_draw_umbrella early-return without crash")

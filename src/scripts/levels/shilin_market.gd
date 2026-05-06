@@ -35,6 +35,10 @@ const STALL_CELLS: Array[Vector2i] = [
 	Vector2i(20, 5),
 ]
 
+## v0.46: umbrella vendor cell — sits near the home/mom side so the player
+## naturally walks past it on the way out. Only used on rainy / typhoon days.
+const UMBRELLA_VENDOR_CELL: Vector2i = Vector2i(5, 9)
+
 ## Per-stall configuration — one entry per STALL_CELLS index.
 ## Total cheapest 5 = 190; with STARTING_MONEY=180 the player MUST bargain
 ## successfully at least once OR pick the cheapest 5 and skip the dearer two.
@@ -262,6 +266,7 @@ func _ready() -> void:
 	_spawn_cat()
 	_spawn_items()
 	_spawn_random_events()
+	_spawn_umbrella_vendor()
 	_spawn_mom()
 	_spawn_hud()
 	_spawn_lanterns()
@@ -274,6 +279,20 @@ func _spawn_mom() -> void:
 	var mom: MomNPC = MomNPC.new()
 	mom.cell = MOM_CELL
 	register_npc(mom)
+
+
+## v0.46: spawns an umbrella vendor at UMBRELLA_VENDOR_CELL ONLY on
+## rainy / typhoon days when the player doesn't already own one. Sunny days
+## leave the cell walkable so the player can use it as a normal corridor.
+func _spawn_umbrella_vendor() -> void:
+	if Inventory.current_weather() == Inventory.WEATHER_SUNNY:
+		return
+	if not GridWorld.in_bounds(UMBRELLA_VENDOR_CELL, GRID_W, GRID_H):
+		return
+	var vendor: UmbrellaVendor = UmbrellaVendor.new()
+	vendor.cell = UMBRELLA_VENDOR_CELL
+	vendor.lines = ["買支傘吧！下雨天用得到～"]
+	register_npc(vendor)
 
 
 func _spawn_hud() -> void:
