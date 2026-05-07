@@ -286,6 +286,7 @@ func _ready() -> void:
 	_spawn_mom()
 	_spawn_hud()
 	_spawn_lanterns()
+	_spawn_sky_overlay()
 	_player.bumped.connect(_on_player_bumped)
 	_player.cell_changed.connect(_on_player_cell_changed)
 	Music.play_market()
@@ -359,6 +360,14 @@ func _spawn_lanterns() -> void:
 	_lanterns = Lanterns.new()
 	_lanterns.name = "Lanterns"
 	add_child(_lanterns)
+
+
+## v0.51: spawns the dusk → night sky overlay. Pure visual; reads
+## Game.session_time to deepen its tint as the run progresses.
+func _spawn_sky_overlay() -> void:
+	var sky: SkyOverlay = SkyOverlay.new()
+	sky.name = "Sky"
+	add_child(sky)
 
 
 func _spawn_stalls() -> void:
