@@ -309,6 +309,18 @@ func ingredient_count() -> int:
 	return ingredients.size()
 
 
+## v0.52: grants a free ingredient (e.g. lottery prize). No-op if already
+## owned. Returns true iff the grant actually added a new ingredient.
+func grant_ingredient(ingredient_id: String) -> bool:
+	if ingredient_id.is_empty():
+		return false
+	if has(ingredient_id):
+		return false
+	ingredients[ingredient_id] = true
+	ingredient_added.emit(ingredient_id)
+	return true
+
+
 ## v0.13: true iff the given id is in the random required-list for this run.
 ## HUD uses this to decide which ingredients show on the checklist.
 func is_required(id: String) -> bool:

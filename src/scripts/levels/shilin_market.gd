@@ -52,6 +52,10 @@ const FORTUNE_TELLER_CELL: Vector2i = Vector2i(2, 5)
 ## is optional and costs only NT$2 so even broke kids can drop a coin.
 const STREET_MUSICIAN_CELL: Vector2i = Vector2i(22, 9)
 
+## v0.52: 抽獎攤 cell — placed on the upper row near the central corridor
+## so the player walks past it on the way back from upper-row stalls.
+const LOTTERY_BOOTH_CELL: Vector2i = Vector2i(15, 5)
+
 ## Per-stall configuration — one entry per STALL_CELLS index.
 ## Total cheapest 5 = 190; with STARTING_MONEY=180 the player MUST bargain
 ## successfully at least once OR pick the cheapest 5 and skip the dearer two.
@@ -282,6 +286,7 @@ func _ready() -> void:
 	_spawn_umbrella_vendor()
 	_spawn_fortune_teller()
 	_spawn_street_musician()
+	_spawn_lottery_booth()
 	_spawn_follower_cat()
 	_spawn_mom()
 	_spawn_hud()
@@ -334,6 +339,19 @@ func _spawn_street_musician() -> void:
 	m.cell = STREET_MUSICIAN_CELL
 	m.lines = ["♪ ..."]
 	register_npc(m)
+
+
+## v0.52: spawns the 抽獎攤 lottery box at LOTTERY_BOOTH_CELL on every run.
+## NT$10 per draw, capped at 3 draws/run; positive expected value but high
+## variance — sister mechanic to the fortune teller (cheap small refunds)
+## with bigger jackpots and a chance at a free ingredient.
+func _spawn_lottery_booth() -> void:
+	if not GridWorld.in_bounds(LOTTERY_BOOTH_CELL, GRID_W, GRID_H):
+		return
+	var booth: LotteryBooth = LotteryBooth.new()
+	booth.cell = LOTTERY_BOOTH_CELL
+	booth.lines = ["抽獎來來來～"]
+	register_npc(booth)
 
 
 ## v0.50: spawns a follower cat at HOME_CELL once the player has rescued at
