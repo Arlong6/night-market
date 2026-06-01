@@ -37,7 +37,7 @@
 #   Each entry: name, status, source, referenced_by[], attributes{}, added, revised
 
 version: 1
-last_updated: ""
+last_updated: 2026-05-29
 
 # ─── ENTITIES ────────────────────────────────────────────────────────────────
 # Named game-world objects: enemies, NPCs, characters, factions, bosses.
@@ -106,7 +106,42 @@ items: []
 #   output_range[min, max], added
 # Optional: expression (the actual formula), notes
 
-formulas: []
+formulas:
+  - name: unresolved_count
+    status: active
+    source: design/gdd/game-session-state.md
+    referenced_by:
+      - design/gdd/game-session-state.md
+      # Future dependents (add when designed):
+      # - design/gdd/symbol-binding.md       # #9 — UI displays this counter
+      # - design/gdd/notebook-ui.md          # #16 — renders the counter widget
+    variables:
+      - slots_in_vignette
+      - binding_map
+      - correct_table
+    output_range: [0, 5]
+    expression: "|slots_in(v)| - |slots_in(v) ∩ correctly_bound_slots|"
+    notes: "The 'N/M 待解' counter. 0 = vignette complete; max = total slots in that vignette (typically 3–5). Counter does NOT distinguish unguessed from wrong-guessed (per GDD Mechanic #2 spec)."
+    added: 2026-05-29
+    revised: ""
+
+  - name: vignette_valid
+    status: active
+    source: design/gdd/game-session-state.md
+    referenced_by:
+      - design/gdd/game-session-state.md
+      # Future dependents (add when designed):
+      # - design/gdd/cascade-shimmer.md      # #10 — triggered by transition true
+      # - design/gdd/vignette-state-machine.md  # #8 — drives vignette lifecycle
+    variables:
+      - slots_in_vignette
+      - binding_map
+      - correct_table
+    output_range: [false, true]
+    expression: "∀ slot ∈ slots_in(v) : binding_map[slot] == correct_table[slot]"
+    notes: "Predicate; true triggers cascade. Both 'every slot bound' AND 'every binding matches correct_table' required."
+    added: 2026-05-29
+    revised: ""
 
 # Example:
 #
@@ -139,7 +174,55 @@ formulas: []
 #
 # Required fields: name, status, source, referenced_by, value, unit, added
 
-constants: []
+constants:
+  - name: total_semantic_slots
+    status: active
+    source: design/gdd/game-session-state.md
+    referenced_by:
+      - design/gdd/game-session-state.md
+      - design/gdd/lexicon-village-elder-question.md  # keystone artifact §3 enumerates 25 slots
+      - design/gdd/input-system.md                # #2 — keyboard a11y rule requires arrow-nav over 25-icon palette
+      # Future dependents (add when designed):
+      # - design/gdd/symbol-binding.md          # #9 — binding_map size
+      # - design/gdd/procedural-language-generator.md  # #12 — produces 25 phonetic forms
+      # - design/gdd/notebook-ui.md             # #16 — palette holds 25 meaning icons
+    value: 25
+    unit: semantic_slots
+    notes: "Sum of 21 content words (across 7 vignettes) + 4 grammar particles. Within systems-designer's 17–20 unique glyph cap; total slots ≠ unique glyphs (some slots share phonemes in their encoding)."
+    added: 2026-05-29
+    revised: ""
+
+  - name: vignette_count
+    status: active
+    source: design/gdd/game-session-state.md
+    referenced_by:
+      - design/gdd/game-session-state.md
+      - design/gdd/lexicon-village-elder-question.md  # 7 NPC vignette tableaux
+      # Future dependents:
+      # - design/gdd/vignette-content-authoring.md  # #13
+      # - design/gdd/vignette-state-machine.md      # #8
+      # - design/gdd/cascade-shimmer.md             # #10
+      # - design/gdd/elder-climax-flow.md           # #15 — requires all 7 cascaded
+    value: 7
+    unit: vignettes
+    notes: "Baker, Blacksmith, Fisher, Weaver, Child, Traveler, Storyteller. MVP ships only Baker; full count by Vertical Slice."
+    added: 2026-05-29
+    revised: ""
+
+  - name: slots_per_vignette_range
+    status: active
+    source: design/gdd/game-session-state.md
+    referenced_by:
+      - design/gdd/game-session-state.md
+      - design/gdd/lexicon-village-elder-question.md
+      # Future dependents:
+      # - design/gdd/vignette-content-authoring.md  # #13 — authoring constraint
+      # - design/gdd/notebook-ui.md                 # #16 — per-vignette page layout must fit max 5 slots
+    value: [3, 5]
+    unit: slots_per_vignette
+    notes: "Range, not fixed value. ≥1 enforced as authoring constraint (zero-slot vignettes forbidden — see game-session-state.md Edge Cases). ≤7 recommended for notebook page legibility (see #16 when designed)."
+    added: 2026-05-29
+    revised: ""
 
 # Example:
 #
