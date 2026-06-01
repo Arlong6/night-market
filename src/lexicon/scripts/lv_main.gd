@@ -9,6 +9,7 @@ const LVVillage = preload("res://lexicon/scripts/lv_village.gd")
 const LVEnding = preload("res://lexicon/scripts/lv_ending.gd")
 const LVNotebookUI = preload("res://lexicon/scripts/lv_notebook_ui.gd")
 const LVCascadeShimmer = preload("res://lexicon/scripts/lv_cascade_shimmer.gd")
+const LVThemeSetup = preload("res://lexicon/scripts/lv_theme_setup.gd")
 
 var _title_ctrl: LVTitle = null
 var _village: LVVillage = null
@@ -17,6 +18,8 @@ var _notebook: LVNotebookUI = null
 var _shimmer: LVCascadeShimmer = null
 
 func _ready() -> void:
+	# Apply CJK font BEFORE building any UI labels (must happen first)
+	LVThemeSetup.apply_default_cjk_font()
 	_build_subscenes()
 	_wire_boot()
 	# Inhibit LVBoot's auto-scene-swap; we manage children manually

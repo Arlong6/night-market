@@ -25,26 +25,61 @@ func _ready() -> void:
 	_wire_signals()
 
 func _build_background() -> void:
-	# Parchment background placeholder
-	var bg := ColorRect.new()
-	bg.color = Color(0.82, 0.74, 0.58, 1.0)
-	bg.size = Vector2(320, 180)
-	bg.position = Vector2(0, 0)
-	add_child(bg)
+	# Layered parchment background: sky band (top) + ground (bottom)
+	var sky := ColorRect.new()
+	sky.color = Color(0.78, 0.72, 0.55, 1.0)
+	sky.size = Vector2(320, 110)
+	sky.position = Vector2(0, 0)
+	add_child(sky)
+	var ground := ColorRect.new()
+	ground.color = Color(0.62, 0.54, 0.38, 1.0)
+	ground.size = Vector2(320, 70)
+	ground.position = Vector2(0, 110)
+	add_child(ground)
+	# Sun/horizon line accent
+	var horizon := ColorRect.new()
+	horizon.color = Color(0.95, 0.82, 0.55, 0.6)
+	horizon.size = Vector2(320, 2)
+	horizon.position = Vector2(0, 110)
+	add_child(horizon)
+	# Distant village rooftops (stylized rectangles)
+	for i in 5:
+		var roof := ColorRect.new()
+		roof.color = Color(0.45, 0.32, 0.22, 1.0)
+		roof.size = Vector2(30, 14)
+		roof.position = Vector2(15 + i * 60, 96)
+		add_child(roof)
+	# Title text in the scene corner
+	var place_label := Label.new()
+	place_label.text = "村莊"
+	place_label.position = Vector2(8, 8)
+	place_label.add_theme_font_size_override("font_size", 10)
+	place_label.add_theme_color_override("font_color", Color(0.3, 0.2, 0.1, 0.7))
+	add_child(place_label)
+	# Hint text bottom
+	var hint := Label.new()
+	hint.text = "點 NPC 對話 · N 開筆記本"
+	hint.position = Vector2(80, 168)
+	hint.add_theme_font_size_override("font_size", 8)
+	hint.add_theme_color_override("font_color", Color(0.3, 0.2, 0.1, 0.55))
+	add_child(hint)
 
 func _build_npcs() -> void:
 	# Baker at world position (120, 100) per LVVignetteContent
 	_baker = LVNPC.new()
 	_baker.npc_id = &"BAKER"
-	_baker.placeholder_color = Color(0.9, 0.6, 0.3, 1.0)  # bread-orange
+	_baker.body_color = Color(0.85, 0.55, 0.3, 1.0)  # apron-ochre
+	_baker.skin_color = Color(0.95, 0.8, 0.65, 1.0)
+	_baker.held_item_text = "麵包"
 	_baker.position = LVVignetteContent.BAKER_WORLD_POSITION
 	add_child(_baker)
 	# Elder at village center (160, 90)
 	_elder = LVNPC.new()
 	_elder.npc_id = &"ELDER"
-	_elder.placeholder_color = Color(0.5, 0.5, 0.7, 1.0)  # elder-purple
+	_elder.body_color = Color(0.45, 0.32, 0.5, 1.0)  # plum robe
+	_elder.skin_color = Color(0.9, 0.78, 0.65, 1.0)
 	_elder.tableau_duration = 0.01  # elder has no real tableau
-	_elder.position = Vector2(160, 90)
+	_elder.position = Vector2(200, 90)
 	add_child(_elder)
 
 func _build_dialogue_display() -> void:
