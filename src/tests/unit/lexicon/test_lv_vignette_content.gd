@@ -125,3 +125,85 @@ func test_unknown_vignette_returns_empty() -> void:
 	var content: Dictionary = LVVignetteContent.get_content(&"UNKNOWN_NPC")
 	# Assert
 	assert_true(content.is_empty())
+
+# ─── Smith vignette ───────────────────────────────────────────────────────────
+
+func test_smith_content_has_three_slots() -> void:
+	var slots: Array = LVVignetteContent.SLOTS_IN_VIGNETTE.get(&"SMITH", [])
+	assert_eq(slots.size(), 3)
+	assert_true(slots.has(&"NOUN_IRON"))
+	assert_true(slots.has(&"NOUN_HAMMER"))
+	assert_true(slots.has(&"VERB_MAKE"))
+
+func test_smith_content_has_all_line_groups() -> void:
+	var content: Dictionary = LVVignetteContent.get_content(&"SMITH")
+	assert_true(content.has(&"intro_tokens"))
+	assert_true(content.has(&"action_tokens"))
+	assert_true(content.has(&"closing_tokens"))
+	assert_true(content.has(&"idle_tokens"))
+	assert_true(content.has(&"world_position"))
+
+func test_smith_world_position_in_viewport() -> void:
+	var pos: Vector2 = LVVignetteContent.SMITH_WORLD_POSITION
+	assert_between(pos.x, 0.0, 320.0)
+	assert_between(pos.y, 0.0, 180.0)
+
+func test_render_smith_intro_unresolved() -> void:
+	var content: Dictionary = LVVignetteContent.get_content(&"SMITH")
+	var rendered: String = LVVignetteContent.render_tokens(content.intro_tokens[0], [])
+	# Expected: "krun." (iron.)
+	assert_eq(rendered, "krun.")
+
+func test_render_smith_action_line_resolved() -> void:
+	var content: Dictionary = LVVignetteContent.get_content(&"SMITH")
+	# Line 0: "dakka pora." → "鎚 做."
+	var rendered: String = LVVignetteContent.render_tokens(
+		content.action_tokens[0], [&"NOUN_HAMMER", &"VERB_MAKE"])
+	assert_eq(rendered, "鎚 做.")
+
+# ─── Fisher vignette ──────────────────────────────────────────────────────────
+
+func test_fisher_content_has_three_slots() -> void:
+	var slots: Array = LVVignetteContent.SLOTS_IN_VIGNETTE.get(&"FISHER", [])
+	assert_eq(slots.size(), 3)
+	assert_true(slots.has(&"NOUN_WATER"))
+	assert_true(slots.has(&"NOUN_FISH"))
+	assert_true(slots.has(&"VERB_COME"))
+
+func test_fisher_content_has_all_line_groups() -> void:
+	var content: Dictionary = LVVignetteContent.get_content(&"FISHER")
+	assert_true(content.has(&"intro_tokens"))
+	assert_true(content.has(&"action_tokens"))
+	assert_true(content.has(&"closing_tokens"))
+	assert_true(content.has(&"idle_tokens"))
+	assert_true(content.has(&"world_position"))
+
+func test_fisher_world_position_in_viewport() -> void:
+	var pos: Vector2 = LVVignetteContent.FISHER_WORLD_POSITION
+	assert_between(pos.x, 0.0, 320.0)
+	assert_between(pos.y, 0.0, 180.0)
+
+func test_render_fisher_intro_unresolved() -> void:
+	var content: Dictionary = LVVignetteContent.get_content(&"FISHER")
+	var rendered: String = LVVignetteContent.render_tokens(content.intro_tokens[0], [])
+	# Expected: "sela." (water.)
+	assert_eq(rendered, "sela.")
+
+func test_render_fisher_action_line_2_resolved() -> void:
+	var content: Dictionary = LVVignetteContent.get_content(&"FISHER")
+	# Line 1: "mira nai sela." (all 3 slots) → "魚 來 水."
+	var rendered: String = LVVignetteContent.render_tokens(
+		content.action_tokens[1], [&"NOUN_FISH", &"VERB_COME", &"NOUN_WATER"])
+	assert_eq(rendered, "魚 來 水.")
+
+# All three NPCs have distinct world positions
+func test_npc_world_positions_distinct() -> void:
+	var p_baker: Vector2 = LVVignetteContent.BAKER_WORLD_POSITION
+	var p_smith: Vector2 = LVVignetteContent.SMITH_WORLD_POSITION
+	var p_fisher: Vector2 = LVVignetteContent.FISHER_WORLD_POSITION
+	assert_ne(p_baker, p_smith)
+	assert_ne(p_smith, p_fisher)
+	assert_ne(p_baker, p_fisher)
+	# Spread across viewport (smith leftmost, baker middle, fisher rightmost)
+	assert_lt(p_smith.x, p_baker.x)
+	assert_lt(p_baker.x, p_fisher.x)

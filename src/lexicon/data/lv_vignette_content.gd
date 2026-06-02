@@ -22,6 +22,8 @@ const CORRECT_TABLE: Dictionary = {
 
 const SLOTS_IN_VIGNETTE: Dictionary = {
 	&"BAKER": [&"NOUN_BREAD", &"VERB_GIVE", &"ADJ_WARM"],
+	&"SMITH": [&"NOUN_IRON", &"NOUN_HAMMER", &"VERB_MAKE"],
+	&"FISHER": [&"NOUN_WATER", &"NOUN_FISH", &"VERB_COME"],
 }
 
 # ─── Baker vignette content (per vignette-content-baker.md) ───────────────────
@@ -70,6 +72,99 @@ const BAKER_IDLE_TOKENS: Array = [
 ]
 
 const BAKER_WORLD_POSITION: Vector2 = Vector2(120, 100)
+
+# ─── Smith (blacksmith) vignette content ──────────────────────────────────────
+
+const SMITH_INTRO_TOKENS: Array = [
+	# Line 1: "krun." (iron.)
+	[
+		{"type": "LEXICON_SLOT", "value": &"NOUN_IRON"},
+		{"type": "PUNCTUATION", "value": "."},
+	]
+]
+
+const SMITH_ACTION_TOKENS: Array = [
+	# Line 1 (concurrent with hammer-strike): "dakka pora." (hammer make.)
+	[
+		{"type": "LEXICON_SLOT", "value": &"NOUN_HAMMER"},
+		{"type": "LEXICON_SLOT", "value": &"VERB_MAKE"},
+		{"type": "PUNCTUATION", "value": "."},
+	],
+	# Line 2 (concurrent with finished horseshoe handed off): "pora krun." (make iron.)
+	[
+		{"type": "LEXICON_SLOT", "value": &"VERB_MAKE"},
+		{"type": "LEXICON_SLOT", "value": &"NOUN_IRON"},
+		{"type": "PUNCTUATION", "value": "."},
+	]
+]
+
+const SMITH_CLOSING_TOKENS: Array = [
+	# Line 1: "pora dakka ka?" (make hammer? — invitational)
+	[
+		{"type": "LEXICON_SLOT", "value": &"VERB_MAKE"},
+		{"type": "LEXICON_SLOT", "value": &"NOUN_HAMMER"},
+		{"type": "PART_Q", "value": &"ka"},
+		{"type": "PUNCTUATION", "value": "?"},
+	]
+]
+
+const SMITH_IDLE_TOKENS: Array = [
+	# Post-cascade idle: same invitational line
+	[
+		{"type": "LEXICON_SLOT", "value": &"VERB_MAKE"},
+		{"type": "LEXICON_SLOT", "value": &"NOUN_HAMMER"},
+		{"type": "PART_Q", "value": &"ka"},
+		{"type": "PUNCTUATION", "value": "?"},
+	]
+]
+
+const SMITH_WORLD_POSITION: Vector2 = Vector2(50, 110)
+
+# ─── Fisher vignette content ──────────────────────────────────────────────────
+
+const FISHER_INTRO_TOKENS: Array = [
+	# Line 1: "sela." (water.)
+	[
+		{"type": "LEXICON_SLOT", "value": &"NOUN_WATER"},
+		{"type": "PUNCTUATION", "value": "."},
+	]
+]
+
+const FISHER_ACTION_TOKENS: Array = [
+	# Line 1: "mira." (fish.)
+	[
+		{"type": "LEXICON_SLOT", "value": &"NOUN_FISH"},
+		{"type": "PUNCTUATION", "value": "."},
+	],
+	# Line 2: "mira nai sela." (fish come [from] water.)
+	[
+		{"type": "LEXICON_SLOT", "value": &"NOUN_FISH"},
+		{"type": "LEXICON_SLOT", "value": &"VERB_COME"},
+		{"type": "LEXICON_SLOT", "value": &"NOUN_WATER"},
+		{"type": "PUNCTUATION", "value": "."},
+	]
+]
+
+const FISHER_CLOSING_TOKENS: Array = [
+	# Line 1: "nai mira ka?" (come fish? — invitational)
+	[
+		{"type": "LEXICON_SLOT", "value": &"VERB_COME"},
+		{"type": "LEXICON_SLOT", "value": &"NOUN_FISH"},
+		{"type": "PART_Q", "value": &"ka"},
+		{"type": "PUNCTUATION", "value": "?"},
+	]
+]
+
+const FISHER_IDLE_TOKENS: Array = [
+	[
+		{"type": "LEXICON_SLOT", "value": &"VERB_COME"},
+		{"type": "LEXICON_SLOT", "value": &"NOUN_FISH"},
+		{"type": "PART_Q", "value": &"ka"},
+		{"type": "PUNCTUATION", "value": "?"},
+	]
+]
+
+const FISHER_WORLD_POSITION: Vector2 = Vector2(250, 110)
 
 # ─── Lexicon → seed glyph strings ─────────────────────────────────────────────
 # Maps semantic slot → string the player sees while undecoded.
@@ -141,18 +236,39 @@ static func get_content(vignette_id: StringName) -> Dictionary:
 				&"idle_tokens": BAKER_IDLE_TOKENS,
 				&"world_position": BAKER_WORLD_POSITION,
 			}
+		&"SMITH":
+			return {
+				&"intro_tokens": SMITH_INTRO_TOKENS,
+				&"action_tokens": SMITH_ACTION_TOKENS,
+				&"closing_tokens": SMITH_CLOSING_TOKENS,
+				&"idle_tokens": SMITH_IDLE_TOKENS,
+				&"world_position": SMITH_WORLD_POSITION,
+			}
+		&"FISHER":
+			return {
+				&"intro_tokens": FISHER_INTRO_TOKENS,
+				&"action_tokens": FISHER_ACTION_TOKENS,
+				&"closing_tokens": FISHER_CLOSING_TOKENS,
+				&"idle_tokens": FISHER_IDLE_TOKENS,
+				&"world_position": FISHER_WORLD_POSITION,
+			}
 		_:
 			return {}
 
 ## Render a slot's current text form. If confirmed, returns decoded; else returns glyph.
-static func render_slot_text(slot_id: StringName, is_confirmed: bool) -> String:
+## [param runtime_override] optional Dictionary from #12 ProcGen; if a slot is
+## present in the override, it takes priority over the MVP SEED_GLYPHS const.
+static func render_slot_text(slot_id: StringName, is_confirmed: bool, runtime_override: Dictionary = {}) -> String:
 	if is_confirmed:
 		return RESOLVED_STRINGS.get(slot_id, "[%s]" % slot_id)
+	if runtime_override.has(slot_id):
+		return runtime_override[slot_id]
 	return SEED_GLYPHS.get(slot_id, "[?%s]" % slot_id)
 
 ## Render a full token sequence to a single string given current confirmed_slots.
 ## Used by #11 Dialogue display for live rendering.
-static func render_tokens(tokens: Array, confirmed_slots: Array) -> String:
+## [param runtime_override] optional ProcGen dict; passed through to render_slot_text.
+static func render_tokens(tokens: Array, confirmed_slots: Array, runtime_override: Dictionary = {}) -> String:
 	var parts: PackedStringArray = []
 	var confirmed_set: Dictionary = {}
 	for s in confirmed_slots:
@@ -163,7 +279,7 @@ static func render_tokens(tokens: Array, confirmed_slots: Array) -> String:
 		match t_type:
 			"LEXICON_SLOT":
 				var slot: StringName = t_value as StringName
-				parts.append(render_slot_text(slot, confirmed_set.has(slot)))
+				parts.append(render_slot_text(slot, confirmed_set.has(slot), runtime_override))
 			"UI_TEXT":
 				parts.append(String(t_value))  # localized strings TBD via #21
 			"PUNCTUATION":

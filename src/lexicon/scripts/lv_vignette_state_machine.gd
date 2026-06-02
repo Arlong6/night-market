@@ -118,6 +118,15 @@ func on_dialogue_cancelled() -> void:
 func get_state() -> int:
 	return _state
 
+## True when this NPC is actively engaged in player-facing dialogue
+## (INTRO / ACTION / CLOSING / COMPLETE_PENDING). False in DORMANT or CASCADED.
+## Used by the village scene to route confirm/cancel input to the right NPC.
+func is_in_dialogue() -> bool:
+	return _state == VignetteState.INTRO \
+		or _state == VignetteState.ACTION \
+		or _state == VignetteState.CLOSING \
+		or _state == VignetteState.COMPLETE_PENDING
+
 ## Force-advance from ACTION (safety net per AC-11; called by an external timer).
 func force_advance_action_timeout() -> void:
 	if _state == VignetteState.ACTION:

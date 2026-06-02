@@ -12,11 +12,16 @@ const LVDialogueDisplay = preload("res://lexicon/scripts/lv_dialogue_display.gd"
 const LVVignetteContent = preload("res://lexicon/data/lv_vignette_content.gd")
 
 var _baker: LVNPC = null
+var _smith: LVNPC = null
+var _fisher: LVNPC = null
 var _elder: LVNPC = null
 var _dialogue_display: LVDialogueDisplay = null
 
-## Track baker cascade so we can enable elder click for MVP "ending trigger".
+## Track which NPC vignettes have cascaded; elder ending unlocks once
+## ALL three (baker + smith + fisher) are done. (MVP shortcut: baker-only.)
 var _baker_cascaded: bool = false
+var _smith_cascaded: bool = false
+var _fisher_cascaded: bool = false
 
 func _ready() -> void:
 	_build_background()
@@ -73,13 +78,29 @@ func _build_npcs() -> void:
 	_baker.held_item_text = "麵包"
 	_baker.position = LVVignetteContent.BAKER_WORLD_POSITION
 	add_child(_baker)
-	# Elder at village center (160, 90)
+	# Smith at world position (50, 110) — far left
+	_smith = LVNPC.new()
+	_smith.npc_id = &"SMITH"
+	_smith.body_color = Color(0.35, 0.25, 0.2, 1.0)  # soot-leather
+	_smith.skin_color = Color(0.85, 0.65, 0.5, 1.0)  # darker tan
+	_smith.held_item_text = "鐵"
+	_smith.position = LVVignetteContent.SMITH_WORLD_POSITION
+	add_child(_smith)
+	# Fisher at world position (250, 110) — far right
+	_fisher = LVNPC.new()
+	_fisher.npc_id = &"FISHER"
+	_fisher.body_color = Color(0.3, 0.45, 0.55, 1.0)  # sea-blue coat
+	_fisher.skin_color = Color(0.92, 0.78, 0.6, 1.0)
+	_fisher.held_item_text = "魚"
+	_fisher.position = LVVignetteContent.FISHER_WORLD_POSITION
+	add_child(_fisher)
+	# Elder at village top-center (160, 60) — raised above horizon so distinct
 	_elder = LVNPC.new()
 	_elder.npc_id = &"ELDER"
 	_elder.body_color = Color(0.45, 0.32, 0.5, 1.0)  # plum robe
 	_elder.skin_color = Color(0.9, 0.78, 0.65, 1.0)
 	_elder.tableau_duration = 0.01  # elder has no real tableau
-	_elder.position = Vector2(200, 90)
+	_elder.position = Vector2(160, 60)
 	add_child(_elder)
 
 func _build_dialogue_display() -> void:
@@ -116,23 +137,37 @@ func _wire_signals() -> void:
 			area.input_event.connect(_on_elder_input)
 
 func _on_confirm() -> void:
-	# Route confirm to whichever NPC is in active dialogue (whose state machine is showing)
-	# For MVP, route to baker if baker is in a dialogue state
-	if _baker and _baker.get_state_machine():
-		var sm = _baker.get_state_machine()
-		# Forward advance if dialogue is showing
-		if _dialogue_display and _dialogue_display.get_state() == _dialogue_display.DialogueState.SHOWING:
-			# Phase 1: skip typewriter; Phase 2: advance state machine
-			if not _dialogue_display.is_typewriter_complete():
-				_dialogue_display.advance()
-			else:
-				_dialogue_display.advance()
-				sm.on_advance_pressed()
+	# Route confirm to whichever NPC has an active dialogue state machine.
+	if _dialogue_display == null:
+		return
+	if _dialogue_display.get_state() != _dialogue_display.DialogueState.SHOWING:
+		return
+	if not _dialogue_display.is_typewriter_complete():
+		_dialogue_display.advance()
+		return
+	_dialogue_display.advance()
+	# Phase 2: advance the active NPC's state machine
+	var active: LVNPC = _active_npc()
+	if active and active.get_state_machine():
+		active.get_state_machine().on_advance_pressed()
 
 func _on_cancel() -> void:
-	if _baker and _dialogue_display and _dialogue_display.get_state() == _dialogue_display.DialogueState.SHOWING:
+	if _dialogue_display and _dialogue_display.get_state() == _dialogue_display.DialogueState.SHOWING:
 		_dialogue_display.hide_dialogue()
-		_baker.cancel_dialogue()
+		var active: LVNPC = _active_npc()
+		if active:
+			active.cancel_dialogue()
+
+## Find the NPC whose state machine is currently engaged in dialogue.
+## Returns null if none.
+func _active_npc() -> LVNPC:
+	for npc in [_baker, _smith, _fisher]:
+		if npc == null:
+			continue
+		var sm = npc.get_state_machine()
+		if sm and sm.has_method("is_in_dialogue") and sm.is_in_dialogue():
+			return npc
+	return null
 
 func _on_elder_input(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
 	if event is InputEventMouseButton:
@@ -144,5 +179,12 @@ func _on_elder_input(_viewport: Node, event: InputEvent, _shape_idx: int) -> voi
 				ss.transition_to_ending()
 
 func _on_vignette_completed(v: StringName) -> void:
-	if v == &"BAKER":
-		_baker_cascaded = true
+	match v:
+		&"BAKER": _baker_cascaded = true
+		&"SMITH": _smith_cascaded = true
+		&"FISHER": _fisher_cascaded = true
+
+## All three vignettes cascaded → elder click triggers ending.
+## MVP fallback: baker-only suffices (so MVP play loop still works).
+func _ending_unlocked() -> bool:
+	return _baker_cascaded

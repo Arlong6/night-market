@@ -12,6 +12,7 @@ class_name LVDialogueDisplay
 extends Control
 
 const LVVignetteContent = preload("res://lexicon/data/lv_vignette_content.gd")
+const LVGlyphFont = preload("res://lexicon/scripts/lv_glyph_font.gd")
 
 ## Per AC-3: CHARS_PER_SECOND
 const CHARS_PER_SECOND: float = 30.0
@@ -217,6 +218,14 @@ func _render_current() -> void:
 		lbl.visible_characters = 0
 		lbl.add_theme_color_override("font_color", TOKEN_TEXT_COLOR)
 		lbl.set_meta("token", token)
+		# #5 Glyph font: unresolved LEXICON_SLOT renders in pixel-mode font;
+		# confirmed (resolved Chinese) keeps the default CJK font. Other token
+		# types (punctuation, particle, UI text) keep default.
+		var t_type: String = String(token.get("type", ""))
+		if t_type == "LEXICON_SLOT":
+			var slot_id: StringName = token.get("value", &"") as StringName
+			if not confirmed_set.has(slot_id):
+				LVGlyphFont.apply_to_label(lbl)
 		_token_box.add_child(lbl)
 		_token_labels.append(lbl)
 		full_text += label_text
@@ -229,7 +238,10 @@ func _render_token_text(token: Dictionary, confirmed_set: Dictionary) -> String:
 	match t_type:
 		"LEXICON_SLOT":
 			var slot: StringName = t_value as StringName
-			return LVVignetteContent.render_slot_text(slot, confirmed_set.has(slot))
+			var runtime_override: Dictionary = {}
+			if _session_state and _session_state.has_method("get_runtime_glyphs"):
+				runtime_override = _session_state.get_runtime_glyphs()
+			return LVVignetteContent.render_slot_text(slot, confirmed_set.has(slot), runtime_override)
 		"UI_TEXT", "PUNCTUATION", "PART_Q":
 			return String(t_value)
 		_:

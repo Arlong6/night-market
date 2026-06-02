@@ -170,6 +170,86 @@ func test_no_triple_phoneme_runs() -> void:
 			assert_false(all_v or all_c,
 				"Glyph '%s' contains triple-phoneme run at %d (%s%s%s)" % [glyph, i, a, b, c])
 
+# ─── Phase B integration tests (LVSessionState + LVVignetteContent) ─────────
+
+const LVVignetteContent = preload("res://lexicon/data/lv_vignette_content.gd")
+
+# AC-9 — MVP fallback intact (no runtime_override → SEED_GLYPHS used)
+func test_mvp_fallback_intact_when_no_override() -> void:
+	# Act
+	var glyph: String = LVVignetteContent.render_slot_text(&"NOUN_BREAD", false, {})
+	# Assert
+	assert_eq(glyph, "mura")  # MVP const SEED_GLYPHS[NOUN_BREAD]
+
+# Phase B — runtime override takes priority over SEED_GLYPHS
+func test_runtime_override_wins_over_seed_glyphs() -> void:
+	# Arrange
+	var override: Dictionary = {&"NOUN_BREAD": "kelo"}
+	# Act
+	var glyph: String = LVVignetteContent.render_slot_text(&"NOUN_BREAD", false, override)
+	# Assert
+	assert_eq(glyph, "kelo")
+
+# Phase B — confirmed slot still uses RESOLVED_STRINGS regardless of override
+func test_confirmed_slot_ignores_runtime_override() -> void:
+	# Arrange
+	var override: Dictionary = {&"NOUN_BREAD": "kelo"}
+	# Act
+	var glyph: String = LVVignetteContent.render_slot_text(&"NOUN_BREAD", true, override)
+	# Assert
+	assert_eq(glyph, "麵包")  # MVP resolved Chinese
+
+# Phase B — LVSessionState auto-generates runtime glyphs from non-zero seed
+func test_session_state_auto_generates_glyphs_from_seed() -> void:
+	# Arrange
+	var ss = get_node_or_null("/root/LVSessionState")
+	assert_not_null(ss)
+	ss.init_session(42, {&"NOUN_BREAD": &"icon_bread"}, {&"BAKER": [&"NOUN_BREAD"]})
+	# Act
+	var glyphs: Dictionary = ss.get_runtime_glyphs()
+	# Assert
+	assert_true(glyphs.has(&"NOUN_BREAD"))
+	assert_false(glyphs[&"NOUN_BREAD"] == "mura",
+		"Procedural glyph for NOUN_BREAD should differ from MVP const 'mura' under seed=42")
+	# Cleanup
+	ss.destroy_session()
+
+# Phase B — seed 0 means MVP fallback (no procedural generation)
+func test_session_state_seed_zero_uses_fallback() -> void:
+	# Arrange
+	var ss = get_node_or_null("/root/LVSessionState")
+	assert_not_null(ss)
+	ss.init_session(0, {&"NOUN_BREAD": &"icon_bread"}, {&"BAKER": [&"NOUN_BREAD"]})
+	# Act
+	var glyphs: Dictionary = ss.get_runtime_glyphs()
+	# Assert: runtime_glyphs is empty → render path falls back to SEED_GLYPHS
+	assert_eq(glyphs.size(), 0)
+	# Cleanup
+	ss.destroy_session()
+
+# Phase B — destroy_session clears runtime glyphs
+func test_destroy_session_clears_runtime_glyphs() -> void:
+	# Arrange
+	var ss = get_node_or_null("/root/LVSessionState")
+	ss.init_session(42, {&"NOUN_BREAD": &"icon_bread"}, {&"BAKER": [&"NOUN_BREAD"]})
+	assert_true(ss.get_runtime_glyphs().size() > 0)
+	# Act
+	ss.destroy_session()
+	# Assert
+	assert_eq(ss.get_runtime_glyphs().size(), 0)
+
+# Phase B — set_runtime_glyphs manual override (for share-codes/tests)
+func test_set_runtime_glyphs_manual() -> void:
+	# Arrange
+	var ss = get_node_or_null("/root/LVSessionState")
+	ss.init_session(0, {}, {})  # empty session
+	# Act
+	ss.set_runtime_glyphs({&"NOUN_BREAD": "wkit"})
+	# Assert
+	assert_eq(ss.get_runtime_glyphs()[&"NOUN_BREAD"], "wkit")
+	# Cleanup
+	ss.destroy_session()
+
 # Length sanity — generated glyphs are 1-8 characters
 func test_glyph_length_is_sane() -> void:
 	# Arrange

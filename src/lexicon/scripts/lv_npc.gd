@@ -62,7 +62,7 @@ func _build_visuals() -> void:
 func _readable_name() -> String:
 	match npc_id:
 		&"BAKER": return "麵包師"
-		&"BLACKSMITH": return "鐵匠"
+		&"SMITH", &"BLACKSMITH": return "鐵匠"
 		&"FISHER": return "漁夫"
 		&"WEAVER": return "織女"
 		&"CHILD": return "小孩"

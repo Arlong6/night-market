@@ -18,10 +18,12 @@ const TEST_LINE_2 := [
 ]
 
 func before_each() -> void:
-	# Ensure global LVSessionState is in PLAYING phase so dialogue's phase gate passes
+	# Ensure global LVSessionState is in PLAYING phase so dialogue's phase gate passes.
+	# Use seed=0 so render falls back to MVP SEED_GLYPHS const ("mura" etc.) —
+	# dialogue display tests target rendering API, not procedural language identity.
 	var global_ss = get_node_or_null("/root/LVSessionState")
 	if global_ss:
-		global_ss.init_session(1, {&"NOUN_BREAD": &"icon_bread"}, {&"BAKER": [&"NOUN_BREAD"]})
+		global_ss.init_session(0, {&"NOUN_BREAD": &"icon_bread"}, {&"BAKER": [&"NOUN_BREAD"]})
 	dd = LVDialogueDisplay.new()
 	add_child_autofree(dd)
 	# Wait one frame so _ready completes (creates Label, etc.)

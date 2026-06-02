@@ -43,6 +43,10 @@ var _slots_in_vignette: Dictionary = {}
 ## Deterministic language seed for #12 procedural generator (0 is legal per AC-20)
 var _language_seed: int = 0
 
+## Runtime glyph dict produced by #12 LVProcGen. Empty when MVP fallback is in
+## use; populated when init_session is called with seed-driven generation.
+var _runtime_glyphs: Dictionary = {}
+
 ## Wall-clock start snapshot (Time.get_ticks_msec at PLAYING entry)
 var _timer_start_ms: int = 0
 
@@ -78,6 +82,13 @@ func init_session(seed: int, correct_table_in: Dictionary, slots_in_vignette_in:
 	_timer_start_ms = Time.get_ticks_msec()
 	_timer_end_ms = 0
 	_game_phase = GamePhase.PLAYING
+	# Generate runtime glyphs from seed (Phase B integration). Seed 0 → fall back
+	# to MVP const SEED_GLYPHS; non-zero → procedural per-run language.
+	_runtime_glyphs.clear()
+	if seed != 0:
+		const LVProcGen = preload("res://lexicon/scripts/lv_proc_gen.gd")
+		var slot_ids: Array = _collect_unique_slots(slots_in_vignette_in)
+		_runtime_glyphs = LVProcGen.generate_glyphs(seed, slot_ids)
 
 ## Destroy all session state. Called by #1 Boot at Ending→Title transition.
 func destroy_session() -> void:
@@ -86,6 +97,7 @@ func destroy_session() -> void:
 	_vignette_cascaded.clear()
 	_correct_table.clear()
 	_slots_in_vignette.clear()
+	_runtime_glyphs.clear()
 	_language_seed = 0
 	_timer_start_ms = 0
 	_timer_end_ms = 0
@@ -161,6 +173,16 @@ func get_game_phase() -> int:
 func get_language_seed() -> int:
 	return _language_seed
 
+## Runtime glyphs (procedural). Empty Dictionary means "use MVP fallback".
+## Returned as a defensive copy.
+func get_runtime_glyphs() -> Dictionary:
+	return _runtime_glyphs.duplicate()
+
+## Manually set runtime glyphs (overrides what init_session generated).
+## Useful for tests + share-code workflows.
+func set_runtime_glyphs(glyphs: Dictionary) -> void:
+	_runtime_glyphs = glyphs.duplicate(true)
+
 ## Transition PLAYING → ENDING. Snapshots timer atomically BEFORE emitting signal
 ## (AC-10). Idempotent: a second call has no effect.
 func transition_to_ending() -> void:
@@ -179,6 +201,17 @@ func session_elapsed_ms() -> int:
 	return end_ms - _timer_start_ms
 
 # ─── Private helpers ──────────────────────────────────────────────────────────
+
+## Collect unique slot IDs across all vignettes (used for proc gen kick-off).
+func _collect_unique_slots(slots_in_vignette_in: Dictionary) -> Array:
+	var seen: Dictionary = {}
+	var out: Array = []
+	for vignette_id in slots_in_vignette_in.keys():
+		for slot_id in slots_in_vignette_in[vignette_id]:
+			if not seen.has(slot_id):
+				seen[slot_id] = true
+				out.append(slot_id)
+	return out
 
 func _is_slot_correctly_bound(slot_id: StringName) -> bool:
 	if not _binding_map.has(slot_id):
