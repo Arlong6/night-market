@@ -31,6 +31,8 @@ const COLOR_FADED: Color = Color(0.7, 0.65, 0.55, 0.8)
 const COLOR_PEAK: Color = Color(1.0, 0.9, 0.5, 1.0)
 const COLOR_RESOLVED: Color = Color(0.15, 0.1, 0.05, 1.0)
 
+const LVChime = preload("res://lexicon/scripts/lv_chime.gd")
+
 enum ShimmerState { IDLE, RIPPLE_ACTIVE, QUEUE_GAP }
 
 # ─── State ────────────────────────────────────────────────────────────────────
@@ -45,6 +47,12 @@ var _reduced_motion: bool = false
 var _session_state: Object = null
 var _input: Object = null
 var _dialogue_display: Object = null
+
+# Cached chime stream (generated on first ripple, reused thereafter)
+static var _chime_stream: AudioStreamWAV = null
+
+# Track most-recent chime player for testability
+var _last_chime_player: Node = null
 
 # ─── Signals ──────────────────────────────────────────────────────────────────
 
@@ -309,8 +317,33 @@ func _slots_for(vignette_id: StringName) -> Array:
 	return LVVignetteContent.SLOTS_IN_VIGNETTE.get(vignette_id, [])
 
 func _play_chime(origin_screen: Vector2, viewport_rect: Rect2) -> void:
-	# AC-11 / AC-13: pan computed and stored; actual chime asset gated to art/audio pipeline.
-	# We expose the computed pan via shimmer_started signal listeners; no AudioStreamPlayer
-	# is created here when the asset isn't bundled (game remains meaningful muted).
-	var _pan: float = compute_pan(origin_screen.x, viewport_rect.size.x)
-	# Intentionally no-op for MVP — chime asset attaches in production audio pipeline.
+	# AC-11: pan via AudioStreamPlayer2D position relative to viewport center.
+	#         Default AudioListener2D origin is (0,0), so positioning the 2D player
+	#         at (origin_screen - viewport_center) yields natural stereo pan.
+	# AC-13: if audio bus is muted at the Server level, the call is a no-op; visual is unaffected.
+	if get_tree() == null:
+		return
+	var stream: AudioStreamWAV = _get_chime_stream()
+	if stream == null:
+		return
+	var player := AudioStreamPlayer2D.new()
+	player.stream = stream
+	var viewport_center: Vector2 = viewport_rect.size * 0.5
+	player.position = origin_screen - viewport_center
+	player.attenuation = 0.5  # gentle drop — keep audibility across small viewport
+	player.max_distance = 800.0
+	add_child(player)
+	player.play()
+	# Cleanup after playback finishes
+	if player.finished.is_connected(player.queue_free) == false:
+		player.finished.connect(player.queue_free)
+	_last_chime_player = player
+
+func _get_chime_stream() -> AudioStreamWAV:
+	if _chime_stream == null:
+		_chime_stream = LVChime.generate()
+	return _chime_stream
+
+## Test hook — returns true if a chime player was created on the most recent ripple.
+func did_play_chime() -> bool:
+	return is_instance_valid(_last_chime_player)

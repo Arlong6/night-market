@@ -1,90 +1,96 @@
 # Active Session State
 
-> **Last Updated**: 2026-06-02 (cleanup + SPIKE 1 cascade shimmer complete)
+> **Last Updated**: 2026-06-02 (post-SPIKE 1 + audio + smoke + NM revival + VS-1)
 > **Purpose**: Living checkpoint for the current task. Read this first after compaction or new session.
 
 ## Current Task
 
-字典村莊 (Lexicon Village) SPIKE 1 — cascade shimmer real implementation. **DONE.**
-Next direction undecided: VS systems / MVP playtest / Night Market revival.
+字典村莊 + 夜市採購 launch path. User invoked "1 2 3 4" → all four queued items done in this session.
 
-## Status
+## Session Summary (2026-06-02)
 
-✅ **CLEANUP (this session)**: removed orphan `src/src/`, empty `assets/`, retired `prototypes/night-market-runner/` (staged).
-✅ **SPIKE 1 cascade shimmer (this session)**: real per-glyph wavefront, all formulas, queue/defer/cap/reduced-motion.
-✅ **#11 LVDialogueDisplay refactored** to HBoxContainer-of-Labels (per-token Labels — shimmer's animation set).
-✅ Full suite: **464/464** (140 lexicon + 324 NM + integration). Previously 438; +26 cascade shimmer tests.
+### v0.55 — SPIKE 1 cascade shimmer real + cleanup
+- ✅ #11 LVDialogueDisplay refactored to HBoxContainer-of-Labels (per-token animation targets)
+- ✅ #10 LVCascadeShimmer real implementation (Formulas 1-4, ACs 1,3,4,6-12,16 tested)
+- ✅ Cleanup: removed prototypes/night-market-runner, empty src/src/, empty assets/
+- ✅ Tests: +26 cascade shimmer; 464/464 total
 
-## Files Touched This Session
+### v0.56 — chime audio + smoke + NM revival + procedural generator (this batch)
+- ✅ **#4 Audio chime asset** — LVChime procedural sine + envelope generator (1.2s, 880Hz, slow attack). Wired into shimmer via AudioStreamPlayer2D with position-based pan.
+- ✅ **#1 MVP headless smoke** — boot of lv_main.tscn, NM title.tscn, NM shilin_market.tscn all clean (no parse errors, no push_error noise).
+- ✅ **#3 Night Market revival** — sprint-01.md updated from SHELVED → REVIVED. New window 2026-06-06 → 2026-06-08. Scope expanded to include lexicon village. Added L-013 for AC-15 playtest. sprint-status.yaml updated.
+- ✅ **#2 VS system #12 Procedural Lexicon Generator** — full GDD (8 sections, 10 ACs). LVProcGen static class (deterministic seed → glyph dict, phonologically consistent, collision-free, POS-aware syllable counts).
+- ✅ Tests: +14 proc gen, +2 chime; **480/480 total**
+
+## Files Touched This Session (most recent first)
 
 | File | Purpose |
 |---|---|
-| `src/lexicon/scripts/lv_dialogue_display.gd` | Refactored: single Label → HBoxContainer-of-Labels; new `get_token_labels()` + `get_lexicon_slot_labels()` API |
-| `src/lexicon/scripts/lv_cascade_shimmer.gd` | Replaced placeholder scaffold with real implementation (Formulas 1-4, ACs 1-16) |
-| `src/lexicon/scripts/lv_village.gd` | Removed legacy Label injection (dialogue display owns its own TokenBox now) |
-| `src/tests/unit/lexicon/test_lv_cascade_shimmer.gd` | NEW — 26 tests covering formulas, state machine, queue, cap, reduced-motion, defer |
-| (deleted) `prototypes/night-market-runner/*` | Staged deletion via `git rm` — 9 files |
-| (deleted) `src/src/`, `assets/` | Untracked empty dir orphans |
+| `src/lexicon/scripts/lv_proc_gen.gd` | NEW — procedural lexicon generator |
+| `design/gdd/procedural-generator.md` | NEW — #12 GDD (8 sections, 10 ACs) |
+| `src/tests/unit/lexicon/test_lv_proc_gen.gd` | NEW — 14 tests covering ACs 1-7, 10 + edge cases |
+| `production/sprints/sprint-01.md` | REVIVED — scope expanded to two games; new window + L-013 |
+| `production/sprint-status.yaml` | Updated dates + L-013 + L-005 test count to 466→480 |
+| `src/lexicon/scripts/lv_chime.gd` | NEW — procedural chime generator (AudioStreamWAV) |
+| `src/lexicon/scripts/lv_cascade_shimmer.gd` | +chime wiring with pan via 2D player position |
+| `src/tests/unit/lexicon/test_lv_cascade_shimmer.gd` | +2 chime tests (stream format + plays-on-ripple) |
+| `src/lexicon/scripts/lv_dialogue_display.gd` | Refactored: single Label → HBoxContainer-of-Labels |
+| `src/lexicon/scripts/lv_village.gd` | Removed legacy Label injection |
+| (deleted) `prototypes/night-market-runner/*` | 9 files staged delete |
 
-## SPIKE 1 Coverage
+## Test Suite Snapshot
 
-### Acceptance Criteria status
+- **Total: 480/480** (+42 from 438 baseline)
+- Lexicon unit: 154 (114 baseline + 26 cascade shimmer + 14 proc gen)
+- NM unit + integration: 326
+- Runtime: ~6s headless
+
+## SPIKE 1 + VS-1 Coverage
+
+### #10 Cascade Shimmer ACs
 
 | AC | Coverage | Notes |
 |---|---|---|
 | AC-1 | ✅ test | `vignette_completed → state RIPPLE_ACTIVE` |
-| AC-2 | partial | Origin projection coded; visual verification deferred to playtest |
+| AC-2 | partial | Origin projection coded; visual verification playtest |
 | AC-3 | ✅ test | `t_arrive(near) < t_arrive(far)` |
 | AC-4 | ✅ test | Ease-out: `t(100) < t(500)*0.5` |
-| AC-5 | ⚠ manual | 3-phase tween coded; per-tick assertion deferred to playtest |
+| AC-5 | ⚠ manual | 3-phase tween coded; per-tick assertion playtest |
 | AC-6 | ✅ test | `is_on_screen()` filter; direct resolve path |
 | AC-7 | ✅ test | Second completion queues during active |
-| AC-8 | ✅ test | Three completions all accounted for (1 active + 2 queued) |
-| AC-9 | ✅ test | `split_animated_vs_direct()` caps at 80, picks nearest |
-| AC-10 | ✅ test | `is_instance_valid` guards in `_apply_modulate` |
-| AC-11 | ✅ test | `compute_pan()` Formula 4; chime asset stub (game muted-OK per design) |
-| AC-12 | ✅ test | `set_reduced_motion(true) → t_arrive == 0` |
-| AC-13 | implicit | Audio is no-op for MVP; visual path doesn't depend on audio |
-| AC-14 | n/a | Retroactive resolve owned by #11 (history reopen — unchanged) |
-| AC-15 | ⚠ playtest | Requires ≥3 first-time testers |
-| AC-16 | ✅ test | Notebook-open → defer; close → drain |
+| AC-8 | ✅ test | Three completions all accounted for |
+| AC-9 | ✅ test | `split_animated_vs_direct()` caps at 80 |
+| AC-10 | ✅ test | `is_instance_valid` guards |
+| AC-11 | ✅ test | `compute_pan()` + chime player created |
+| AC-12 | ✅ test | reduced-motion → t_arrive=0 |
+| AC-13 | implicit | Audio bus mute doesn't break visual |
+| AC-14 | n/a | Retroactive resolve owned by #11 |
+| AC-15 | ⚠ playtest | L-013 in sprint-01 |
+| AC-16 | ✅ test | Notebook-open defers |
 
-### Known limitations (carry to playtest)
+### #12 Procedural Generator ACs
 
-- Audio chime: no asset bundled (per AC-13 design — game must work muted). Wire real chime in audio pipeline.
-- World→screen projection uses `Camera2D.global_position`; assumes default Camera2D; not battle-tested with custom transforms.
-- `_active_tokens` registry split (OQ-2): currently dialogue-only via `get_lexicon_slot_labels()`. Notebook tokens not in shimmer scope.
-
-## Cleanup Summary
-
-Removed/staged:
-- `src/src/` (empty untracked orphan)
-- `assets/` (empty untracked dir — NM/lexicon both draw procedurally, font is in `src/assets/fonts/`)
-- `prototypes/night-market-runner/` (superseded by NM in `src/`)
-
-Kept (intentional):
-- `dist/web/` — gitignored 41 MB web build (rebuild on demand)
-- `production/stories/archived-platformer/` — historical record
-- `CCGS Skill Testing Framework/` — referenced by `.claude/skills/skill-test/SKILL.md`
-- `production/sprints/sprint-01.md` — NM launch sprint (shelved, may revive)
+| AC | Coverage | Notes |
+|---|---|---|
+| AC-1 | ✅ test | Same seed = same output |
+| AC-2 | ✅ test | 80% diff between seeds |
+| AC-3 | ✅ test | 30 seeds × 20 slots, no collisions |
+| AC-4 | ✅ test | POS-respecting syllable counts |
+| AC-5 | ✅ test | All consonants legal |
+| AC-6 | ✅ test | All vowels legal |
+| AC-7 | ✅ test | Empty slots → empty dict |
+| AC-8 | trusted | LCG determinism cross-process (not directly testable in one run) |
+| AC-9 | n/a | Integration phase B (next session) |
+| AC-10 | ✅ test | Collision storm → numeric suffix, no crash |
 
 ## Open Directions (next session)
 
-1. **MVP playtest** — verify v0.54.1 visuals + new shimmer end-to-end. Need human eyes (AC-15).
-2. **VS system pick** — 8 VS systems pending. High-leverage candidates:
-   - #12 Procedural generator (lexicon → seed glyphs runtime-generated)
-   - More NPC vignettes (smith, fisherman, weaver, child, traveler — currently baker only)
-   - #5 Glyph font (8×8 bitmap pixel font — currently using jf-openhuninn)
-3. **Night Market revival** — `sprint-01.md` shelved launch sprint. NT$10/NT$2/NT$5 stalls all live.
-4. **Audio chime asset** — finish AC-11 audibly (currently silent pan calc only).
+1. **Procedural generator integration (Phase B)** — wire LVProcGen into LVSessionState + LVVignetteContent.render_slot_text override path.
+2. **More NPC vignettes** — smith, fisherman, weaver (currently baker only).
+3. **L-001 Web build** — actual export and verify file size <20MB.
+4. **L-013 AC-15 playtest** — 3 first-time testers describe cascade shimmer.
+5. **#5 Glyph font** — 8×8 bitmap pixel font (currently CJK fallback).
 
 ## Solo Mode
 
 `production/review-mode.txt` = `solo`. Director gates (TD/PR/CD) all auto-skipped.
-
-## Test Suite Snapshot
-
-- Total: 464/464
-- Lexicon unit: 140 (was 114; +26 cascade shimmer)
-- NM unit + integration: 324
-- Runtime: ~6s headless

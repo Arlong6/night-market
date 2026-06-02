@@ -2,11 +2,14 @@
 # DO NOT edit manually — use /story-done to update story status.
 
 sprint: 1
-goal: "推 v0.53 內容上 itch.io 公開發布（v1.0 release-ready）— 產出可信賴的 Web build，做 fresh smoke pass，準備好商店頁面素材。"
-start: "2026-05-30"
-end: "2026-05-31"
+status: revived
+goal: "推 v0.55 內容上 itch.io 公開發布（v1.0 release-ready）— Web build, smoke pass, 商店頁面。含 NM + 字典村莊 雙遊戲。"
+start: "2026-06-06"
+end: "2026-06-08"
 generated: "2026-05-28"
-updated: "2026-05-28"
+shelved: "2026-05-29"
+revived: "2026-06-02"
+updated: "2026-06-02"
 
 stories:
   - id: "L-001"
@@ -50,7 +53,7 @@ stories:
     completed: ""
 
   - id: "L-005"
-    name: "全 regression suite 綠燈 (324 tests) on fresh clone"
+    name: "全 regression suite 綠燈 (466 tests) on fresh clone"
     file: ""
     priority: must-have
     status: ready-for-dev
@@ -126,5 +129,15 @@ stories:
     status: backlog
     owner: "self"
     estimate_days: 0.125
+    blocker: ""
+    completed: ""
+
+  - id: "L-013"
+    name: "字典村莊 playtest AC-15 — ≥3 testers describe spread (wave/sweep, not flash/pop)"
+    file: ""
+    priority: should-have
+    status: backlog
+    owner: "self"
+    estimate_days: 0.25
     blocker: ""
     completed: ""

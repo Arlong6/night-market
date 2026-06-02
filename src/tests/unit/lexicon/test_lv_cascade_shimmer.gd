@@ -270,3 +270,29 @@ func test_shimmer_fires_slot_resolved_signal() -> void:
 	shimmer.on_vignette_completed(&"BAKER")
 	# Assert: slot_resolved emitted (with NOUN_BREAD for BAKER's slot list)
 	assert_signal_emitted(shimmer, "slot_resolved")
+
+# ─── Audio chime tests (AC-11 / AC-13) ────────────────────────────────────────
+
+# AC-11 — chime stream generated with correct format
+func test_chime_stream_generates_with_expected_format() -> void:
+	# Act
+	const LVChime = preload("res://lexicon/scripts/lv_chime.gd")
+	var stream: AudioStreamWAV = LVChime.generate()
+	# Assert
+	assert_not_null(stream)
+	assert_eq(stream.format, AudioStreamWAV.FORMAT_16_BITS)
+	assert_eq(stream.mix_rate, LVChime.SAMPLE_RATE)
+	assert_false(stream.stereo)  # mono
+	# Data sized for DURATION_SEC × SAMPLE_RATE × 2 bytes/sample
+	var expected_bytes: int = int(LVChime.DURATION_SEC * LVChime.SAMPLE_RATE) * 2
+	assert_eq(stream.data.size(), expected_bytes)
+
+# AC-11 — chime fires when shimmer starts
+func test_shimmer_plays_chime_on_ripple() -> void:
+	# Arrange
+	dd.show_line(BAKER_LINE)
+	dd.advance()
+	# Act
+	shimmer.on_vignette_completed(&"BAKER")
+	# Assert: chime player was created
+	assert_true(shimmer.did_play_chime())
