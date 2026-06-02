@@ -88,20 +88,13 @@ func _build_dialogue_display() -> void:
 	_dialogue_display.add_to_group(&"lv_dialogue_display")
 	_dialogue_display.position = Vector2(20, 140)
 	_dialogue_display.size = Vector2(280, 35)
-	# Custom-sized label inside dialogue display
-	var lbl := Label.new()
-	lbl.name = "Label"
-	lbl.anchor_right = 1.0
-	lbl.anchor_bottom = 1.0
-	lbl.add_theme_color_override("font_color", Color(0.1, 0.05, 0.0, 1.0))
-	# Background for visibility
+	# Background for visibility (dialogue display owns its own TokenBox)
 	var dbg := ColorRect.new()
 	dbg.name = "DBG"
 	dbg.color = Color(1.0, 0.95, 0.85, 0.9)
 	dbg.anchor_right = 1.0
 	dbg.anchor_bottom = 1.0
 	_dialogue_display.add_child(dbg)
-	_dialogue_display.add_child(lbl)
 	add_child(_dialogue_display)
 	# Wire dialogue advance to LVInput.confirm_pressed
 	var inp = get_node_or_null("/root/LVInput")

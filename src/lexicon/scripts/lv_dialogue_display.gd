@@ -1,10 +1,11 @@
 ## LVDialogueDisplay — Lexicon Village #11 Dialogue display
 ##
-## Lean MVP scaffold. Renders dialogue lines as token sequences via
-## LVVignetteContent.render_tokens(); per-token Label nodes for shimmer
-## animation are a Vertical Slice refinement.
+## Renders dialogue lines as HBoxContainer-of-Labels (one Label per token).
+## Per-token Labels are the canonical animation target for #10 Cascade Shimmer.
+## Typewriter advances a global character count distributed across token Labels.
 ##
 ## API: show_line(tokens), advance(), hide(). Listens for typewriter completion.
+## Shimmer-facing API: get_token_labels(), get_lexicon_slot_labels().
 ##
 ## See: design/gdd/dialogue-display.md
 class_name LVDialogueDisplay
@@ -24,6 +25,10 @@ const HISTORY_CAPACITY: int = 20
 ## Per knobs: retroactive (history reopen) glow-in fade duration
 const RETROACTIVE_FADE_SEC: float = 0.3
 
+## Default token Label font color (parchment ink). Matches COLOR_FADED visually
+## but is the legible baseline; cascade shimmer drives modulate via its own palette.
+const TOKEN_TEXT_COLOR: Color = Color(0.1, 0.05, 0.0, 1.0)
+
 # ─── State ────────────────────────────────────────────────────────────────────
 
 enum DialogueState { HIDDEN, SHOWING, FREED }
@@ -36,7 +41,7 @@ var _current_tokens: Array = []
 ## Typewriter elapsed time (seconds).
 var _typewriter_elapsed: float = 0.0
 
-## Full text of current line (rendered).
+## Full text of current line (joined token texts, including inter-token spaces).
 var _full_text: String = ""
 
 ## Total characters in current line (cached).
@@ -54,8 +59,11 @@ var _input: Object = null
 ## Dialogue history — Array of past token sequences (capped at HISTORY_CAPACITY).
 var _history: Array = []
 
-## Label node for rendering current line. Created in _ready or injected.
-var _label: Label = null
+## HBoxContainer hosting per-token Labels.
+var _token_box: HBoxContainer = null
+
+## Per-token Label list (parallel to _current_tokens). Shimmer-queryable.
+var _token_labels: Array = []
 
 # ─── Signals ──────────────────────────────────────────────────────────────────
 
@@ -68,14 +76,7 @@ signal dialogue_hidden
 
 func _ready() -> void:
 	visible = false
-	_label = get_node_or_null("Label")
-	if _label == null:
-		# Auto-create a basic label if not provided by scene
-		_label = Label.new()
-		_label.name = "Label"
-		_label.anchor_right = 1.0
-		_label.anchor_bottom = 1.0
-		add_child(_label)
+	_setup_token_container()
 	_session_state = get_node_or_null("/root/LVSessionState")
 	_input = get_node_or_null("/root/LVInput")
 	# Listen for cascade signal to re-render
@@ -83,19 +84,30 @@ func _ready() -> void:
 		if not _session_state.vignette_completed.is_connected(_on_vignette_completed):
 			_session_state.vignette_completed.connect(_on_vignette_completed)
 
+func _setup_token_container() -> void:
+	_token_box = get_node_or_null("TokenBox") as HBoxContainer
+	if _token_box == null:
+		_token_box = HBoxContainer.new()
+		_token_box.name = "TokenBox"
+		_token_box.anchor_right = 1.0
+		_token_box.anchor_bottom = 1.0
+		# Spacing handled via leading-space in token text; HBox separation = 0.
+		_token_box.add_theme_constant_override("separation", 0)
+		add_child(_token_box)
+	# Legacy scene injection ("Label" child) — ignored; we own rendering now.
+
 func _process(delta: float) -> void:
 	if _state != DialogueState.SHOWING:
 		return
 	if _typewriter_complete:
 		return
 	_typewriter_elapsed += delta
-	var visible_chars: int = int(CHARS_PER_SECOND * _typewriter_elapsed)
-	if visible_chars >= _full_text_length:
-		visible_chars = _full_text_length
+	var total_visible: int = int(CHARS_PER_SECOND * _typewriter_elapsed)
+	if total_visible >= _full_text_length:
+		total_visible = _full_text_length
 		_typewriter_complete = true
 		line_completed.emit()
-	if _label:
-		_label.visible_characters = visible_chars
+	_apply_typewriter(total_visible)
 
 # ─── Public API ───────────────────────────────────────────────────────────────
 
@@ -129,8 +141,7 @@ func advance() -> void:
 		# Skip typewriter — show full line immediately
 		_typewriter_complete = true
 		_typewriter_elapsed = _full_text_length / CHARS_PER_SECOND
-		if _label:
-			_label.visible_characters = _full_text_length
+		_apply_typewriter(_full_text_length)
 		line_completed.emit()
 		return
 	advance_pressed.emit()
@@ -142,6 +153,7 @@ func hide_dialogue() -> void:
 	if not _current_tokens.is_empty():
 		_push_to_history(_current_tokens)
 	_current_tokens = []
+	_clear_token_labels()
 	_full_text = ""
 	_full_text_length = 0
 	_typewriter_elapsed = 0.0
@@ -168,17 +180,85 @@ func get_history() -> Array:
 func is_typewriter_complete() -> bool:
 	return _typewriter_complete
 
+## All per-token Labels (parallel to current tokens). Shimmer reads these.
+func get_token_labels() -> Array:
+	return _token_labels.duplicate()
+
+## LEXICON_SLOT token Labels only — cascade shimmer's animation set.
+func get_lexicon_slot_labels() -> Array:
+	var out: Array = []
+	for lbl in _token_labels:
+		if not is_instance_valid(lbl):
+			continue
+		var token: Variant = lbl.get_meta("token", null)
+		if token is Dictionary and String(token.get("type", "")) == "LEXICON_SLOT":
+			out.append(lbl)
+	return out
+
 # ─── Internal ─────────────────────────────────────────────────────────────────
 
 func _render_current() -> void:
+	_clear_token_labels()
+	var confirmed_set: Dictionary = {}
 	if _session_state:
-		_full_text = LVVignetteContent.render_tokens(_current_tokens, _session_state.get_confirmed_slots())
-	else:
-		_full_text = LVVignetteContent.render_tokens(_current_tokens, [])
+		for s in _session_state.get_confirmed_slots():
+			confirmed_set[s] = true
+	var full_text := ""
+	for i in _current_tokens.size():
+		var token: Dictionary = _current_tokens[i]
+		var token_text: String = _render_token_text(token, confirmed_set)
+		# Leading space for non-first non-punctuation-attached tokens.
+		var prefix := ""
+		if i > 0 and not _is_attached_to_prev(token_text):
+			prefix = " "
+		var label_text := prefix + token_text
+		var lbl := Label.new()
+		lbl.text = label_text
+		lbl.visible_characters = 0
+		lbl.add_theme_color_override("font_color", TOKEN_TEXT_COLOR)
+		lbl.set_meta("token", token)
+		_token_box.add_child(lbl)
+		_token_labels.append(lbl)
+		full_text += label_text
+	_full_text = full_text
 	_full_text_length = _full_text.length()
-	if _label:
-		_label.text = _full_text
-		_label.visible_characters = 0  # typewriter starts at 0
+
+func _render_token_text(token: Dictionary, confirmed_set: Dictionary) -> String:
+	var t_type: String = String(token.get("type", ""))
+	var t_value: Variant = token.get("value", "")
+	match t_type:
+		"LEXICON_SLOT":
+			var slot: StringName = t_value as StringName
+			return LVVignetteContent.render_slot_text(slot, confirmed_set.has(slot))
+		"UI_TEXT", "PUNCTUATION", "PART_Q":
+			return String(t_value)
+		_:
+			return "[?%s]" % t_type
+
+func _is_attached_to_prev(token_text: String) -> bool:
+	if token_text.is_empty():
+		return false
+	var first := token_text.substr(0, 1)
+	return first in [".", "?", "!", ",", ";", ":"]
+
+func _apply_typewriter(total_visible: int) -> void:
+	var remaining: int = total_visible
+	for lbl in _token_labels:
+		if not is_instance_valid(lbl):
+			continue
+		var tlen: int = lbl.text.length()
+		if remaining >= tlen:
+			lbl.visible_characters = -1
+			remaining -= tlen
+		else:
+			lbl.visible_characters = remaining
+			remaining = 0
+
+func _clear_token_labels() -> void:
+	for lbl in _token_labels:
+		if is_instance_valid(lbl):
+			lbl.queue_free()
+	_token_labels.clear()
 
 func _push_to_history(tokens: Array) -> void:
 	_history.append(tokens.duplicate(true))
@@ -186,12 +266,13 @@ func _push_to_history(tokens: Array) -> void:
 		_history.pop_front()
 
 func _on_vignette_completed(_vignette_id: StringName) -> void:
-	# A vignette has cascaded — re-render current line if it contains tokens
-	# from the newly-confirmed slots. For MVP scaffold, just re-render whole line
-	# (without ripple — that's #10's job, deferred). This implements the
-	# "retroactive resolve" by updating the rendered string in-place.
-	if _state == DialogueState.SHOWING:
-		_render_current()
-		# Keep typewriter position
-		if _label and _typewriter_complete:
-			_label.visible_characters = _full_text_length
+	# A vignette has cascaded — re-render current line so newly-confirmed slot
+	# Labels render decoded. Cascade Shimmer (#10) animates the modulate; this
+	# only updates the text content (and resets visible_characters appropriately).
+	if _state != DialogueState.SHOWING:
+		return
+	var was_complete := _typewriter_complete
+	_render_current()
+	if was_complete:
+		_apply_typewriter(_full_text_length)
+		_typewriter_complete = true

@@ -1,105 +1,90 @@
 # Active Session State
 
-> **Last Updated**: 2026-05-29 (game-session-state GDD complete)
+> **Last Updated**: 2026-06-02 (cleanup + SPIKE 1 cascade shimmer complete)
 > **Purpose**: Living checkpoint for the current task. Read this first after compaction or new session.
 
 ## Current Task
 
-Designing individual system GDDs for Lexicon Village. Currently completed: #19 Game session state.
+字典村莊 (Lexicon Village) SPIKE 1 — cascade shimmer real implementation. **DONE.**
+Next direction undecided: VS systems / MVP playtest / Night Market revival.
 
 ## Status
 
-✅ **ALL 13 MVP SYSTEMS DESIGNED** (autonomous batch 2026-05-30).
-🚀 **IMPLEMENTATION IN PROGRESS** (autonomous batch).
+✅ **CLEANUP (this session)**: removed orphan `src/src/`, empty `assets/`, retired `prototypes/night-market-runner/` (staged).
+✅ **SPIKE 1 cascade shimmer (this session)**: real per-glyph wavefront, all formulas, queue/defer/cap/reduced-motion.
+✅ **#11 LVDialogueDisplay refactored** to HBoxContainer-of-Labels (per-token Labels — shimmer's animation set).
+✅ Full suite: **464/464** (140 lexicon + 324 NM + integration). Previously 438; +26 cascade shimmer tests.
 
-| # | System | impl path | tests | status |
-|---|---|---|---|---|
-| 19 | LVSessionState | `src/lexicon/autoloads/lv_session_state.gd` | 23 | ✅ |
-| 2 | LVInput | `src/lexicon/autoloads/lv_input.gd` | 12 | ✅ |
-| 1 | LVBoot | `src/lexicon/autoloads/lv_boot.gd` | 16 | ✅ |
-| 3 | Camera/Viewport | (project.godot) | 5 | ✅ |
-| 9 | LVSymbolBinding | `src/lexicon/scripts/lv_symbol_binding.gd` | 18 | ✅ |
-| 8 | LVVignetteStateMachine | `src/lexicon/scripts/lv_vignette_state_machine.gd` | 13 | ✅ |
-| 13 | LVVignetteContent (baker) | `src/lexicon/data/lv_vignette_content.gd` | 13 | ✅ |
-| 11 | LVDialogueDisplay | `src/lexicon/scripts/lv_dialogue_display.gd` | 14 | ✅ |
-| 7 | LVNPC | `src/lexicon/scripts/lv_npc.gd` | (scene smoke) | ✅ |
-| 6 | LVVillage | `src/lexicon/scripts/lv_village.gd` | (scene smoke) | ✅ |
-| 16 | LVNotebookUI | `src/lexicon/scripts/lv_notebook_ui.gd` | (scene smoke) | ✅ |
-| 17 | LVTitle | `src/lexicon/scripts/lv_title.gd` | (scene smoke) | ✅ |
-| 18 | LVEnding | `src/lexicon/scripts/lv_ending.gd` | (scene smoke) | ✅ |
-| 10 | LVCascadeShimmer (MVP scaffold) | `src/lexicon/scripts/lv_cascade_shimmer.gd` | (SPIKE 1 deferred) | ✅ |
-| — | LVMain root | `src/lexicon/scripts/lv_main.gd` + `lv_main.tscn` | (scene smoke) | ✅ |
-
-**ALL 13 MVP SYSTEMS IMPLEMENTED**.
-
-Total lexicon tests: **114**. NM tests intact: 324. **Full suite: 438/438**. Web export OK (~10MB gzipped).
-
-**Entry point**: `res://lexicon/scenes/lv_main.tscn` (run via `godot --path src res://lexicon/scenes/lv_main.tscn`).
-
-**MVP play loop**: Title → Start → Village (baker + elder) → click baker → vignette plays → press N to open notebook → place 3 icons correctly → cascade shimmer → click elder → ending scene → restart.
-
-| # | System | ACs | Notes |
-|---|---|---|---|
-| 19 | Game session state | 23 | Bottleneck; complete prior session |
-| 2 | Input system | 18 | Click-primary; concept Mech #5 reconciled |
-| 1 | Boot & scene flow | 17 | "Arriving at the gate" fantasy |
-| 3 | Camera & viewport | 9 | 320×180 base, integer scale |
-| 9 | Symbol-binding | 15 | Bottleneck; gesture realizer |
-| 11 | Dialogue display | 14 | Bottleneck; shimmer-aware token rendering |
-| 6 | Village scene & layout | 10 | Single-screen; no player avatar |
-| 10 | Cascade shimmer | 16 | **HIGH RISK + CENTRAL FEEL**; SPIKE 1 gated |
-| 8 | Vignette state machine | 14 | Per-NPC 6-state machine |
-| 7 | NPC sprite & tableau | 10 | Baker MVP only |
-| 16 | Notebook UI | 14 | UX spec followup flagged |
-| 17 | Title screen | 10 | Quiet entry |
-| 13 | Vignette content (baker) | quick-spec | First authored content |
-
-**Concept doc cross-doc corrections applied**:
-- Mechanic #5: drag-primary → click-primary (post-#2)
-- #19 dependency table: #11 added as direct dependent (post-#11)
-
-**Registry updates**: `total_semantic_slots` referenced by 3 GDDs now.
-
-**Pending all-in-fresh-session reviews**: every MVP GDD's review log notes "single-session inline review; fresh-session independent review recommended before MVP code begins."
-
-## Files Created / Modified This Session (most recent first)
+## Files Touched This Session
 
 | File | Purpose |
 |---|---|
-| `design/gdd/systems-index.md` | 22-system enumeration, dependency map, design order, high-risk systems (just written) |
-| `design/gdd/lexicon-village-elder-question.md` | Keystone artifact (~280 lines) — chosen elder question + mini-lexicon + 7 NPC tableaux |
-| `design/gdd/game-concept-lexicon-village.md` | 6 edits — Mechanic #2 (counter UX), Mechanic #4 (binary climax), Session Loop, Hook, Pillar Priority, Scope Tiers, Open Questions |
-| `design/gdd/reviews/game-concept-lexicon-village-review-log.md` | Multiple appends — defer reverted, keystone, counter UX, binary climax, scope re-baseline, 3 small blockers |
-| `production/sprints/sprint-01.md` | Night Market launch sprint — **SHELVED** (user reverted to Lexicon Village focus) |
-| `production/sprint-status.yaml` | Night Market launch sprint state — SHELVED |
-| `production/qa/qa-plan-sprint-1-2026-05-28.md` | Night Market QA plan — SHELVED |
+| `src/lexicon/scripts/lv_dialogue_display.gd` | Refactored: single Label → HBoxContainer-of-Labels; new `get_token_labels()` + `get_lexicon_slot_labels()` API |
+| `src/lexicon/scripts/lv_cascade_shimmer.gd` | Replaced placeholder scaffold with real implementation (Formulas 1-4, ACs 1-16) |
+| `src/lexicon/scripts/lv_village.gd` | Removed legacy Label injection (dialogue display owns its own TokenBox now) |
+| `src/tests/unit/lexicon/test_lv_cascade_shimmer.gd` | NEW — 26 tests covering formulas, state machine, queue, cap, reduced-motion, defer |
+| (deleted) `prototypes/night-market-runner/*` | Staged deletion via `git rm` — 9 files |
+| (deleted) `src/src/`, `assets/` | Untracked empty dir orphans |
 
-## Key Decisions Made
+## SPIKE 1 Coverage
 
-- **Defer Lexicon Village reverted** (2026-05-29) — user rejected CD "defer until v1.0" rec; active focus is Lexicon Village
-- **Counter UX α** — "3/5 待解" includes unguessed + wrong-guessed; live update; notebook-only; distinct slot visuals; sudoku elimination accepted
-- **Binary climax** — 2 candidates (not 3-4), both emotionally valid, no "correct" answer
-- **Scope re-baseline** — 6-8 weekends part-time solo, procedural generator retained
-- **NPC revisit pattern** — all-NPC post-cascade comprehensible idle line ≤4 tokens
-- **Elder question** — `Ne sun-wo nai-an ka?` ("Will you come back to this place?")
+### Acceptance Criteria status
 
-## Systems Index Summary
+| AC | Coverage | Notes |
+|---|---|---|
+| AC-1 | ✅ test | `vignette_completed → state RIPPLE_ACTIVE` |
+| AC-2 | partial | Origin projection coded; visual verification deferred to playtest |
+| AC-3 | ✅ test | `t_arrive(near) < t_arrive(far)` |
+| AC-4 | ✅ test | Ease-out: `t(100) < t(500)*0.5` |
+| AC-5 | ⚠ manual | 3-phase tween coded; per-tick assertion deferred to playtest |
+| AC-6 | ✅ test | `is_on_screen()` filter; direct resolve path |
+| AC-7 | ✅ test | Second completion queues during active |
+| AC-8 | ✅ test | Three completions all accounted for (1 active + 2 queued) |
+| AC-9 | ✅ test | `split_animated_vs_direct()` caps at 80, picks nearest |
+| AC-10 | ✅ test | `is_instance_valid` guards in `_apply_modulate` |
+| AC-11 | ✅ test | `compute_pan()` Formula 4; chime asset stub (game muted-OK per design) |
+| AC-12 | ✅ test | `set_reduced_motion(true) → t_arrive == 0` |
+| AC-13 | implicit | Audio is no-op for MVP; visual path doesn't depend on audio |
+| AC-14 | n/a | Retroactive resolve owned by #11 (history reopen — unchanged) |
+| AC-15 | ⚠ playtest | Requires ≥3 first-time testers |
+| AC-16 | ✅ test | Notebook-open → defer; close → drain |
 
-- 22 total systems (13 MVP, 8 VS, 2 Alpha-FV, 1 Full Vision)
-- 5 Foundation + 6 Core + 6 Feature + 3 Presentation + 2 Polish
-- Bottlenecks: #9 Symbol-binding, #11 Dialogue display
-- High-risk: #10 Cascade shimmer, #5 Glyph font, #16 Notebook UI, #12 Procedural generator, #13 Vignette content
-- First 4 systems in design order: #19 → #2 → #1 → #3 (all Foundation, all S effort)
+### Known limitations (carry to playtest)
 
-## Open Questions Awaiting User Input
+- Audio chime: no asset bundled (per AC-13 design — game must work muted). Wire real chime in audio pipeline.
+- World→screen projection uses `Camera2D.global_position`; assumes default Camera2D; not battle-tested with custom transforms.
+- `_active_tokens` registry split (OQ-2): currently dialogue-only via `get_lexicon_slot_labels()`. Notebook tokens not in shimmer scope.
 
-- Whether to start `/design-system` on order 1 (#19 Game session state) now, or stop and resume later
-- Whether to run SPIKEs 1-3 (shimmer/drag/font) in parallel with design work or sequence after design
+## Cleanup Summary
+
+Removed/staged:
+- `src/src/` (empty untracked orphan)
+- `assets/` (empty untracked dir — NM/lexicon both draw procedurally, font is in `src/assets/fonts/`)
+- `prototypes/night-market-runner/` (superseded by NM in `src/`)
+
+Kept (intentional):
+- `dist/web/` — gitignored 41 MB web build (rebuild on demand)
+- `production/stories/archived-platformer/` — historical record
+- `CCGS Skill Testing Framework/` — referenced by `.claude/skills/skill-test/SKILL.md`
+- `production/sprints/sprint-01.md` — NM launch sprint (shelved, may revive)
+
+## Open Directions (next session)
+
+1. **MVP playtest** — verify v0.54.1 visuals + new shimmer end-to-end. Need human eyes (AC-15).
+2. **VS system pick** — 8 VS systems pending. High-leverage candidates:
+   - #12 Procedural generator (lexicon → seed glyphs runtime-generated)
+   - More NPC vignettes (smith, fisherman, weaver, child, traveler — currently baker only)
+   - #5 Glyph font (8×8 bitmap pixel font — currently using jf-openhuninn)
+3. **Night Market revival** — `sprint-01.md` shelved launch sprint. NT$10/NT$2/NT$5 stalls all live.
+4. **Audio chime asset** — finish AC-11 audibly (currently silent pan calc only).
 
 ## Solo Mode
 
 `production/review-mode.txt` = `solo`. Director gates (TD/PR/CD) all auto-skipped.
 
-## Carryover from Earlier Session
+## Test Suite Snapshot
 
-- Night Market launch sprint artifacts on disk (sprint-01.md, sprint-status.yaml, qa-plan-sprint-1-2026-05-28.md) — shelved per user; may repurpose as sprint-02 template later.
+- Total: 464/464
+- Lexicon unit: 140 (was 114; +26 cascade shimmer)
+- NM unit + integration: 324
+- Runtime: ~6s headless
