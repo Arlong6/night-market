@@ -296,3 +296,40 @@ func test_shimmer_plays_chime_on_ripple() -> void:
 	shimmer.on_vignette_completed(&"BAKER")
 	# Assert: chime player was created
 	assert_true(shimmer.did_play_chime())
+
+# Multi-harmonic — chime defines multiple partials, not pure sine
+func test_chime_has_multiple_harmonic_partials() -> void:
+	const LVChime = preload("res://lexicon/scripts/lv_chime.gd")
+	assert_gte(LVChime.HARMONICS.size(), 3,
+		"Multi-harmonic chime should stack at least fundamental + 5th + octave")
+
+# Fundamental is in warm range (A4 = 440Hz, not piercing A5 = 880Hz)
+func test_chime_fundamental_is_warm() -> void:
+	const LVChime = preload("res://lexicon/scripts/lv_chime.gd")
+	assert_almost_eq(LVChime.FUNDAMENTAL_HZ, 440.0, 1.0)
+
+# Generated stream has non-zero content in sustain region
+func test_chime_stream_has_audio_in_sustain() -> void:
+	const LVChime = preload("res://lexicon/scripts/lv_chime.gd")
+	var stream: AudioStreamWAV = LVChime.generate()
+	# Sample at ~0.5s mark (well into sustain after 0.15s attack)
+	var sample_idx: int = int(0.5 * LVChime.SAMPLE_RATE) * 2  # *2 for 16-bit byte pos
+	var lo: int = stream.data[sample_idx]
+	var hi: int = stream.data[sample_idx + 1]
+	var raw: int = (hi << 8) | lo
+	# Convert little-endian int16 → signed
+	if raw >= 32768:
+		raw -= 65536
+	# Sustain region should have non-trivial amplitude
+	assert_true(absi(raw) > 1000, "Mid-stream sample amplitude=%d, expected substantial signal" % raw)
+
+# Attack region starts near zero (slow attack — no percussive transient per design)
+func test_chime_starts_with_slow_attack() -> void:
+	const LVChime = preload("res://lexicon/scripts/lv_chime.gd")
+	var stream: AudioStreamWAV = LVChime.generate()
+	# Sample at 0s (first sample)
+	var sample_0: int = (stream.data[1] << 8) | stream.data[0]
+	if sample_0 >= 32768:
+		sample_0 -= 65536
+	# First sample should be near silence (slow attack)
+	assert_true(absi(sample_0) < 500, "First sample amplitude=%d, expected near zero (slow attack)" % sample_0)

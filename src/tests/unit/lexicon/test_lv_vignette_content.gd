@@ -207,3 +207,69 @@ func test_npc_world_positions_distinct() -> void:
 	# Spread across viewport (smith leftmost, baker middle, fisher rightmost)
 	assert_lt(p_smith.x, p_baker.x)
 	assert_lt(p_baker.x, p_fisher.x)
+
+# ─── Weaver / Child / Traveler / Storyteller (added VS-1.5) ────────────────────
+
+func test_weaver_content() -> void:
+	var content: Dictionary = LVVignetteContent.get_content(&"WEAVER")
+	assert_true(content.has(&"world_position"))
+	# Intro: "kove."
+	assert_eq(LVVignetteContent.render_tokens(content.intro_tokens[0], []), "kove.")
+	# Action 0: "talo lim." → "布 長."
+	assert_eq(LVVignetteContent.render_tokens(
+		content.action_tokens[0], [&"NOUN_CLOTH", &"ADJ_LONG"]), "布 長.")
+
+func test_child_content() -> void:
+	var content: Dictionary = LVVignetteContent.get_content(&"CHILD")
+	assert_true(content.has(&"world_position"))
+	# Intro: "vu."
+	assert_eq(LVVignetteContent.render_tokens(content.intro_tokens[0], []), "vu.")
+	# Action 0: "ela." → "跑."
+	assert_eq(LVVignetteContent.render_tokens(
+		content.action_tokens[0], [&"VERB_PLAY"]), "跑.")
+
+func test_traveler_content() -> void:
+	var content: Dictionary = LVVignetteContent.get_content(&"TRAVELER")
+	assert_true(content.has(&"world_position"))
+	# Intro: "gel."
+	assert_eq(LVVignetteContent.render_tokens(content.intro_tokens[0], []), "gel.")
+	# Action 0: "solar naima." → "路 遠."
+	assert_eq(LVVignetteContent.render_tokens(
+		content.action_tokens[0], [&"NOUN_PATH", &"ADJ_FAR"]), "路 遠.")
+
+func test_storyteller_content() -> void:
+	var content: Dictionary = LVVignetteContent.get_content(&"STORYTELLER")
+	assert_true(content.has(&"world_position"))
+	# Intro: "sun."
+	assert_eq(LVVignetteContent.render_tokens(content.intro_tokens[0], []), "sun.")
+	# Closing: "taro sun ka?" — echoes elder's question
+	assert_eq(LVVignetteContent.render_tokens(content.closing_tokens[0], []), "taro sun ka?")
+
+# All 7 vignettes in SLOTS_IN_VIGNETTE
+func test_seven_vignettes_registered() -> void:
+	for npc in [&"BAKER", &"SMITH", &"FISHER", &"WEAVER", &"CHILD", &"TRAVELER", &"STORYTELLER"]:
+		assert_true(LVVignetteContent.SLOTS_IN_VIGNETTE.has(npc),
+			"Missing vignette: %s" % npc)
+
+# All 7 NPC world positions inside viewport
+func test_all_npc_world_positions_in_viewport() -> void:
+	var positions: Array = [
+		LVVignetteContent.BAKER_WORLD_POSITION,
+		LVVignetteContent.SMITH_WORLD_POSITION,
+		LVVignetteContent.FISHER_WORLD_POSITION,
+		LVVignetteContent.WEAVER_WORLD_POSITION,
+		LVVignetteContent.CHILD_WORLD_POSITION,
+		LVVignetteContent.TRAVELER_WORLD_POSITION,
+		LVVignetteContent.STORYTELLER_WORLD_POSITION,
+	]
+	for p in positions:
+		assert_between(p.x, 0.0, 320.0)
+		assert_between(p.y, 0.0, 180.0)
+
+# CORRECT_TABLE covers all registered slots (no orphan slot)
+func test_correct_table_covers_all_slots() -> void:
+	for vig_id in LVVignetteContent.SLOTS_IN_VIGNETTE.keys():
+		var slots: Array = LVVignetteContent.SLOTS_IN_VIGNETTE[vig_id]
+		for slot_id in slots:
+			assert_true(LVVignetteContent.CORRECT_TABLE.has(slot_id),
+				"CORRECT_TABLE missing %s (in vignette %s)" % [slot_id, vig_id])

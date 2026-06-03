@@ -183,6 +183,69 @@ func get_runtime_glyphs() -> Dictionary:
 func set_runtime_glyphs(glyphs: Dictionary) -> void:
 	_runtime_glyphs = glyphs.duplicate(true)
 
+# ─── Save / Restore (Phase C) ─────────────────────────────────────────────────
+
+## Serialize current session to a Dictionary suitable for JSON save or
+## round-trip testing. Keys are plain Strings (JSON-safe).
+func serialize() -> Dictionary:
+	return {
+		"version": 1,
+		"seed": _language_seed,
+		"binding_map": _stringify_keys_and_values(_binding_map),
+		"confirmed_slots": _stringify_array(_confirmed_slots.keys()),
+		"vignette_cascaded": _stringify_array(_vignette_cascaded.keys()),
+		"game_phase": _game_phase,
+		"elapsed_ms": session_elapsed_ms(),
+	}
+
+## Restore from a serialized Dictionary. Returns true on success, false on
+## version mismatch or malformed input. NOTE: restoration replays state but
+## does NOT re-emit vignette_completed (those signals already happened in the
+## original session). UI must re-render on its own.
+func deserialize(d: Dictionary, correct_table_in: Dictionary, slots_in_vignette_in: Dictionary) -> bool:
+	if d.get("version", 0) != 1:
+		return false
+	if not d.has("seed"):
+		return false
+	# Re-init with the saved seed; this regenerates runtime_glyphs identically.
+	init_session(int(d.seed), correct_table_in, slots_in_vignette_in)
+	# Replay binding_map without firing cascade — set internal dict directly.
+	for key in d.get("binding_map", {}).keys():
+		var sn_key: StringName = StringName(String(key))
+		var v_val: Variant = d.binding_map[key]
+		_binding_map[sn_key] = StringName(String(v_val)) if v_val is String or v_val is StringName else v_val
+	for s in d.get("confirmed_slots", []):
+		_confirmed_slots[StringName(String(s))] = true
+	for v in d.get("vignette_cascaded", []):
+		_vignette_cascaded[StringName(String(v))] = true
+	# Phase restoration (best-effort)
+	if d.has("game_phase"):
+		_game_phase = int(d.game_phase)
+	return true
+
+## Serialize to JSON string.
+func to_save_json() -> String:
+	return JSON.stringify(serialize())
+
+## Restore from JSON. Returns false on parse failure or version mismatch.
+func from_save_json(json_str: String, correct_table_in: Dictionary, slots_in_vignette_in: Dictionary) -> bool:
+	var parsed: Variant = JSON.parse_string(json_str)
+	if not (parsed is Dictionary):
+		return false
+	return deserialize(parsed, correct_table_in, slots_in_vignette_in)
+
+func _stringify_keys_and_values(d: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	for k in d.keys():
+		out[String(k)] = String(d[k]) if d[k] is StringName else d[k]
+	return out
+
+func _stringify_array(arr: Array) -> Array:
+	var out: Array = []
+	for v in arr:
+		out.append(String(v))
+	return out
+
 ## Transition PLAYING → ENDING. Snapshots timer atomically BEFORE emitting signal
 ## (AC-10). Idempotent: a second call has no effect.
 func transition_to_ending() -> void:

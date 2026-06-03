@@ -20,6 +20,13 @@
 
 ---
 
+## 🎮 Games built with this framework
+
+> **🌃 夜市採購 (Night Market)** + **📜 字典村莊 (Lexicon Village)** — two small games shipped together.
+> Play in browser (link coming on v1.0 release). See [GAMES.md](GAMES.md) for details and play instructions.
+
+---
+
 ## Why This Exists
 
 Building a game solo with AI is powerful — but a single chat session has no structure. No one stops you from hardcoding magic numbers, skipping design docs, or writing spaghetti code. There's no QA pass, no design review, no one asking "does this actually fit the game's vision?"

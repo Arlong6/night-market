@@ -13,17 +13,38 @@ extends RefCounted
 # from icons (player-side palette tokens).
 
 const CORRECT_TABLE: Dictionary = {
-	&"NOUN_BREAD": &"icon_bread",
-	&"VERB_GIVE": &"icon_give",
-	&"ADJ_WARM": &"icon_warm",
+	&"NOUN_BREAD":    &"icon_bread",
+	&"VERB_GIVE":     &"icon_give",
+	&"ADJ_WARM":      &"icon_warm",
+	&"NOUN_IRON":     &"icon_iron",
+	&"NOUN_HAMMER":   &"icon_hammer",
+	&"VERB_MAKE":     &"icon_make",
+	&"NOUN_WATER":    &"icon_water",
+	&"NOUN_FISH":     &"icon_fish",
+	&"VERB_COME":     &"icon_come",
+	&"NOUN_CLOTH":    &"icon_cloth",
+	&"VERB_WEAVE":    &"icon_weave",
+	&"ADJ_LONG":      &"icon_long",
+	&"ADJ_SMALL":     &"icon_small",
+	&"VERB_PLAY":     &"icon_play",
+	&"NOUN_FRIEND":   &"icon_friend",
+	&"NOUN_PATH":     &"icon_path",
+	&"ADJ_FAR":       &"icon_far",
+	&"NOUN_STRANGER": &"icon_stranger",
+	&"VERB_REMEMBER": &"icon_remember",
+	&"NOUN_PLACE":    &"icon_place",
 }
 
 # ─── Per-vignette slot lists ──────────────────────────────────────────────────
 
 const SLOTS_IN_VIGNETTE: Dictionary = {
-	&"BAKER": [&"NOUN_BREAD", &"VERB_GIVE", &"ADJ_WARM"],
-	&"SMITH": [&"NOUN_IRON", &"NOUN_HAMMER", &"VERB_MAKE"],
-	&"FISHER": [&"NOUN_WATER", &"NOUN_FISH", &"VERB_COME"],
+	&"BAKER":       [&"NOUN_BREAD", &"VERB_GIVE", &"ADJ_WARM"],
+	&"SMITH":       [&"NOUN_IRON", &"NOUN_HAMMER", &"VERB_MAKE"],
+	&"FISHER":      [&"NOUN_WATER", &"NOUN_FISH", &"VERB_COME"],
+	&"WEAVER":      [&"NOUN_CLOTH", &"VERB_WEAVE", &"ADJ_LONG"],
+	&"CHILD":       [&"ADJ_SMALL", &"VERB_PLAY", &"NOUN_FRIEND"],
+	&"TRAVELER":    [&"NOUN_PATH", &"ADJ_FAR", &"NOUN_STRANGER"],
+	&"STORYTELLER": [&"VERB_REMEMBER", &"NOUN_PLACE"],
 }
 
 # ─── Baker vignette content (per vignette-content-baker.md) ───────────────────
@@ -166,6 +187,186 @@ const FISHER_IDLE_TOKENS: Array = [
 
 const FISHER_WORLD_POSITION: Vector2 = Vector2(250, 110)
 
+# ─── Weaver vignette content ──────────────────────────────────────────────────
+
+const WEAVER_INTRO_TOKENS: Array = [
+	# Line 1: "kove." (weave.)
+	[
+		{"type": "LEXICON_SLOT", "value": &"VERB_WEAVE"},
+		{"type": "PUNCTUATION", "value": "."},
+	]
+]
+
+const WEAVER_ACTION_TOKENS: Array = [
+	# Line 1: "talo lim." (cloth long.)
+	[
+		{"type": "LEXICON_SLOT", "value": &"NOUN_CLOTH"},
+		{"type": "LEXICON_SLOT", "value": &"ADJ_LONG"},
+		{"type": "PUNCTUATION", "value": "."},
+	],
+	# Line 2: "kove talo." (weave cloth.)
+	[
+		{"type": "LEXICON_SLOT", "value": &"VERB_WEAVE"},
+		{"type": "LEXICON_SLOT", "value": &"NOUN_CLOTH"},
+		{"type": "PUNCTUATION", "value": "."},
+	]
+]
+
+const WEAVER_CLOSING_TOKENS: Array = [
+	# Line 1: "kove talo ka?" (weave cloth? — invitational)
+	[
+		{"type": "LEXICON_SLOT", "value": &"VERB_WEAVE"},
+		{"type": "LEXICON_SLOT", "value": &"NOUN_CLOTH"},
+		{"type": "PART_Q", "value": &"ka"},
+		{"type": "PUNCTUATION", "value": "?"},
+	]
+]
+
+const WEAVER_IDLE_TOKENS: Array = [
+	[
+		{"type": "LEXICON_SLOT", "value": &"VERB_WEAVE"},
+		{"type": "LEXICON_SLOT", "value": &"NOUN_CLOTH"},
+		{"type": "PART_Q", "value": &"ka"},
+		{"type": "PUNCTUATION", "value": "?"},
+	]
+]
+
+const WEAVER_WORLD_POSITION: Vector2 = Vector2(180, 100)
+
+# ─── Child vignette content ───────────────────────────────────────────────────
+
+const CHILD_INTRO_TOKENS: Array = [
+	# Line 1: "vu." (friend.)
+	[
+		{"type": "LEXICON_SLOT", "value": &"NOUN_FRIEND"},
+		{"type": "PUNCTUATION", "value": "."},
+	]
+]
+
+const CHILD_ACTION_TOKENS: Array = [
+	# Line 1: "ela." (play/run.)
+	[
+		{"type": "LEXICON_SLOT", "value": &"VERB_PLAY"},
+		{"type": "PUNCTUATION", "value": "."},
+	],
+	# Line 2: "du vu." (small friend.)
+	[
+		{"type": "LEXICON_SLOT", "value": &"ADJ_SMALL"},
+		{"type": "LEXICON_SLOT", "value": &"NOUN_FRIEND"},
+		{"type": "PUNCTUATION", "value": "."},
+	]
+]
+
+const CHILD_CLOSING_TOKENS: Array = [
+	# Line 1: "ela ka?" (play? — invitational)
+	[
+		{"type": "LEXICON_SLOT", "value": &"VERB_PLAY"},
+		{"type": "PART_Q", "value": &"ka"},
+		{"type": "PUNCTUATION", "value": "?"},
+	]
+]
+
+const CHILD_IDLE_TOKENS: Array = [
+	[
+		{"type": "LEXICON_SLOT", "value": &"VERB_PLAY"},
+		{"type": "PART_Q", "value": &"ka"},
+		{"type": "PUNCTUATION", "value": "?"},
+	]
+]
+
+const CHILD_WORLD_POSITION: Vector2 = Vector2(95, 135)
+
+# ─── Traveler vignette content ────────────────────────────────────────────────
+
+const TRAVELER_INTRO_TOKENS: Array = [
+	# Line 1: "gel." (stranger.)
+	[
+		{"type": "LEXICON_SLOT", "value": &"NOUN_STRANGER"},
+		{"type": "PUNCTUATION", "value": "."},
+	]
+]
+
+const TRAVELER_ACTION_TOKENS: Array = [
+	# Line 1: "solar naima." (path far.)
+	[
+		{"type": "LEXICON_SLOT", "value": &"NOUN_PATH"},
+		{"type": "LEXICON_SLOT", "value": &"ADJ_FAR"},
+		{"type": "PUNCTUATION", "value": "."},
+	],
+	# Line 2: "gel solar." (stranger path.)
+	[
+		{"type": "LEXICON_SLOT", "value": &"NOUN_STRANGER"},
+		{"type": "LEXICON_SLOT", "value": &"NOUN_PATH"},
+		{"type": "PUNCTUATION", "value": "."},
+	]
+]
+
+const TRAVELER_CLOSING_TOKENS: Array = [
+	# Line 1: "solar naima ka?" (path far? — invitational)
+	[
+		{"type": "LEXICON_SLOT", "value": &"NOUN_PATH"},
+		{"type": "LEXICON_SLOT", "value": &"ADJ_FAR"},
+		{"type": "PART_Q", "value": &"ka"},
+		{"type": "PUNCTUATION", "value": "?"},
+	]
+]
+
+const TRAVELER_IDLE_TOKENS: Array = [
+	[
+		{"type": "LEXICON_SLOT", "value": &"NOUN_PATH"},
+		{"type": "LEXICON_SLOT", "value": &"ADJ_FAR"},
+		{"type": "PART_Q", "value": &"ka"},
+		{"type": "PUNCTUATION", "value": "?"},
+	]
+]
+
+const TRAVELER_WORLD_POSITION: Vector2 = Vector2(270, 70)
+
+# ─── Storyteller vignette content ─────────────────────────────────────────────
+
+const STORYTELLER_INTRO_TOKENS: Array = [
+	# Line 1: "sun." (place.)
+	[
+		{"type": "LEXICON_SLOT", "value": &"NOUN_PLACE"},
+		{"type": "PUNCTUATION", "value": "."},
+	]
+]
+
+const STORYTELLER_ACTION_TOKENS: Array = [
+	# Line 1: "taro." (remember.)
+	[
+		{"type": "LEXICON_SLOT", "value": &"VERB_REMEMBER"},
+		{"type": "PUNCTUATION", "value": "."},
+	],
+	# Line 2: "taro sun." (remember place.)
+	[
+		{"type": "LEXICON_SLOT", "value": &"VERB_REMEMBER"},
+		{"type": "LEXICON_SLOT", "value": &"NOUN_PLACE"},
+		{"type": "PUNCTUATION", "value": "."},
+	]
+]
+
+const STORYTELLER_CLOSING_TOKENS: Array = [
+	# Line 1: "taro sun ka?" (remember place? — invitational, echoes elder's question)
+	[
+		{"type": "LEXICON_SLOT", "value": &"VERB_REMEMBER"},
+		{"type": "LEXICON_SLOT", "value": &"NOUN_PLACE"},
+		{"type": "PART_Q", "value": &"ka"},
+		{"type": "PUNCTUATION", "value": "?"},
+	]
+]
+
+const STORYTELLER_IDLE_TOKENS: Array = [
+	[
+		{"type": "LEXICON_SLOT", "value": &"VERB_REMEMBER"},
+		{"type": "LEXICON_SLOT", "value": &"NOUN_PLACE"},
+		{"type": "PART_Q", "value": &"ka"},
+		{"type": "PUNCTUATION", "value": "?"},
+	]
+]
+
+const STORYTELLER_WORLD_POSITION: Vector2 = Vector2(40, 75)
+
 # ─── Lexicon → seed glyph strings ─────────────────────────────────────────────
 # Maps semantic slot → string the player sees while undecoded.
 # MVP hard-coded; VS+ procedural generator produces this per seed.
@@ -251,6 +452,38 @@ static func get_content(vignette_id: StringName) -> Dictionary:
 				&"closing_tokens": FISHER_CLOSING_TOKENS,
 				&"idle_tokens": FISHER_IDLE_TOKENS,
 				&"world_position": FISHER_WORLD_POSITION,
+			}
+		&"WEAVER":
+			return {
+				&"intro_tokens": WEAVER_INTRO_TOKENS,
+				&"action_tokens": WEAVER_ACTION_TOKENS,
+				&"closing_tokens": WEAVER_CLOSING_TOKENS,
+				&"idle_tokens": WEAVER_IDLE_TOKENS,
+				&"world_position": WEAVER_WORLD_POSITION,
+			}
+		&"CHILD":
+			return {
+				&"intro_tokens": CHILD_INTRO_TOKENS,
+				&"action_tokens": CHILD_ACTION_TOKENS,
+				&"closing_tokens": CHILD_CLOSING_TOKENS,
+				&"idle_tokens": CHILD_IDLE_TOKENS,
+				&"world_position": CHILD_WORLD_POSITION,
+			}
+		&"TRAVELER":
+			return {
+				&"intro_tokens": TRAVELER_INTRO_TOKENS,
+				&"action_tokens": TRAVELER_ACTION_TOKENS,
+				&"closing_tokens": TRAVELER_CLOSING_TOKENS,
+				&"idle_tokens": TRAVELER_IDLE_TOKENS,
+				&"world_position": TRAVELER_WORLD_POSITION,
+			}
+		&"STORYTELLER":
+			return {
+				&"intro_tokens": STORYTELLER_INTRO_TOKENS,
+				&"action_tokens": STORYTELLER_ACTION_TOKENS,
+				&"closing_tokens": STORYTELLER_CLOSING_TOKENS,
+				&"idle_tokens": STORYTELLER_IDLE_TOKENS,
+				&"world_position": STORYTELLER_WORLD_POSITION,
 			}
 		_:
 			return {}

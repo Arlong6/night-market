@@ -14,14 +14,22 @@ const LVVignetteContent = preload("res://lexicon/data/lv_vignette_content.gd")
 var _baker: LVNPC = null
 var _smith: LVNPC = null
 var _fisher: LVNPC = null
+var _weaver: LVNPC = null
+var _child: LVNPC = null
+var _traveler: LVNPC = null
+var _storyteller: LVNPC = null
 var _elder: LVNPC = null
 var _dialogue_display: LVDialogueDisplay = null
 
 ## Track which NPC vignettes have cascaded; elder ending unlocks once
-## ALL three (baker + smith + fisher) are done. (MVP shortcut: baker-only.)
+## any vignette is done (MVP shortcut keeps baker-only gate).
 var _baker_cascaded: bool = false
 var _smith_cascaded: bool = false
 var _fisher_cascaded: bool = false
+var _weaver_cascaded: bool = false
+var _child_cascaded: bool = false
+var _traveler_cascaded: bool = false
+var _storyteller_cascaded: bool = false
 
 func _ready() -> void:
 	_build_background()
@@ -94,6 +102,38 @@ func _build_npcs() -> void:
 	_fisher.held_item_text = "魚"
 	_fisher.position = LVVignetteContent.FISHER_WORLD_POSITION
 	add_child(_fisher)
+	# Weaver at (180, 100) — right of baker
+	_weaver = LVNPC.new()
+	_weaver.npc_id = &"WEAVER"
+	_weaver.body_color = Color(0.55, 0.4, 0.55, 1.0)  # muted violet
+	_weaver.skin_color = Color(0.93, 0.78, 0.65, 1.0)
+	_weaver.held_item_text = "布"
+	_weaver.position = LVVignetteContent.WEAVER_WORLD_POSITION
+	add_child(_weaver)
+	# Child at (95, 135) — bottom-left
+	_child = LVNPC.new()
+	_child.npc_id = &"CHILD"
+	_child.body_color = Color(0.75, 0.65, 0.4, 1.0)  # straw yellow
+	_child.skin_color = Color(0.95, 0.82, 0.7, 1.0)
+	_child.held_item_text = "朋友"
+	_child.position = LVVignetteContent.CHILD_WORLD_POSITION
+	add_child(_child)
+	# Traveler at (270, 70) — top-right
+	_traveler = LVNPC.new()
+	_traveler.npc_id = &"TRAVELER"
+	_traveler.body_color = Color(0.4, 0.3, 0.2, 1.0)  # dusty traveler-brown
+	_traveler.skin_color = Color(0.85, 0.7, 0.55, 1.0)
+	_traveler.held_item_text = "杖"
+	_traveler.position = LVVignetteContent.TRAVELER_WORLD_POSITION
+	add_child(_traveler)
+	# Storyteller at (40, 75) — top-left
+	_storyteller = LVNPC.new()
+	_storyteller.npc_id = &"STORYTELLER"
+	_storyteller.body_color = Color(0.55, 0.35, 0.3, 1.0)  # rust-red shawl
+	_storyteller.skin_color = Color(0.9, 0.75, 0.6, 1.0)
+	_storyteller.held_item_text = "書"
+	_storyteller.position = LVVignetteContent.STORYTELLER_WORLD_POSITION
+	add_child(_storyteller)
 	# Elder at village top-center (160, 60) — raised above horizon so distinct
 	_elder = LVNPC.new()
 	_elder.npc_id = &"ELDER"
@@ -161,7 +201,7 @@ func _on_cancel() -> void:
 ## Find the NPC whose state machine is currently engaged in dialogue.
 ## Returns null if none.
 func _active_npc() -> LVNPC:
-	for npc in [_baker, _smith, _fisher]:
+	for npc in [_baker, _smith, _fisher, _weaver, _child, _traveler, _storyteller]:
 		if npc == null:
 			continue
 		var sm = npc.get_state_machine()
@@ -183,6 +223,10 @@ func _on_vignette_completed(v: StringName) -> void:
 		&"BAKER": _baker_cascaded = true
 		&"SMITH": _smith_cascaded = true
 		&"FISHER": _fisher_cascaded = true
+		&"WEAVER": _weaver_cascaded = true
+		&"CHILD": _child_cascaded = true
+		&"TRAVELER": _traveler_cascaded = true
+		&"STORYTELLER": _storyteller_cascaded = true
 
 ## All three vignettes cascaded → elder click triggers ending.
 ## MVP fallback: baker-only suffices (so MVP play loop still works).
