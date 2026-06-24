@@ -72,11 +72,14 @@ signal line_shown(tokens: Array)
 signal line_completed  ## typewriter finished
 signal advance_pressed
 signal dialogue_hidden
+signal tap_received  ## player clicked anywhere on dialogue box → advance
 
 # ─── Construction ─────────────────────────────────────────────────────────────
 
 func _ready() -> void:
 	visible = false
+	mouse_filter = Control.MOUSE_FILTER_STOP  # catch player clicks to advance
+	gui_input.connect(_on_gui_input)
 	_setup_token_container()
 	_session_state = get_node_or_null("/root/LVSessionState")
 	_input = get_node_or_null("/root/LVInput")
@@ -84,6 +87,13 @@ func _ready() -> void:
 	if _session_state and _session_state.has_signal("vignette_completed"):
 		if not _session_state.vignette_completed.is_connected(_on_vignette_completed):
 			_session_state.vignette_completed.connect(_on_vignette_completed)
+
+func _on_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+			tap_received.emit()
+			accept_event()
 
 func _setup_token_container() -> void:
 	_token_box = get_node_or_null("TokenBox") as HBoxContainer

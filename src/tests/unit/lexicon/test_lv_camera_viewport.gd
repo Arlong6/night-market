@@ -2,16 +2,17 @@
 ## Camera & viewport has no script; it's pure project configuration.
 extends GutTest
 
-# AC-1 — Viewport configured correctly at boot
-func test_viewport_stretch_mode_is_viewport() -> void:
-	# Assert
+# AC-1 — Viewport configured correctly at boot.
+# Note: original design called for 'viewport' + 'integer' for pixel-art crispness.
+# Switched to 'canvas_items' + 'keep' for sharp CJK rendering on Web export (the
+# pixel-art aesthetic was incompatible with readable CJK at small font sizes).
+func test_viewport_stretch_mode_is_canvas_items() -> void:
 	var mode: String = ProjectSettings.get_setting("display/window/stretch/mode", "")
-	assert_eq(mode, "viewport", "stretch_mode must be 'viewport' per AC-1")
+	assert_eq(mode, "canvas_items", "stretch_mode must be 'canvas_items' for sharp CJK on Web")
 
-func test_viewport_scale_mode_is_integer() -> void:
-	# Assert
+func test_viewport_scale_mode_is_keep() -> void:
 	var scale_mode: String = ProjectSettings.get_setting("display/window/stretch/scale_mode", "")
-	assert_eq(scale_mode, "integer", "scale_mode must be 'integer' per AC-8 (preserves 8x8 font crispness)")
+	assert_eq(scale_mode, "keep", "scale_mode must be 'keep' to lock aspect under canvas_items")
 
 # AC-2 — Base resolution is 320x180
 func test_viewport_width_is_320() -> void:
