@@ -160,6 +160,15 @@ func _resolve(x: float) -> void:
 		_result_color = COLOR_GREEN
 	elif tier == 1:
 		_result_color = COLOR_YELLOW
+	# Audio on the core mechanic: bright chime for a green clutch, a soft tick for
+	# a yellow partial, a denial blip for a red miss. The bargain landing was
+	# silent before — half its dopamine was missing.
+	if tier == 2:
+		Sfx.play_chime()
+	elif tier == 1:
+		Sfx.play_choice()
+	else:
+		Sfx.play_denial()
 	resolved.emit(tier)
 
 

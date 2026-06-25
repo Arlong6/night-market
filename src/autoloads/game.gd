@@ -31,6 +31,10 @@ var last_run_perfect: bool = false
 ## the no-bargain achievement. Cleared by reset_run().
 var bargain_count: int = 0
 
+## True once the one-time "try bargaining" nudge has fired this run (shown at
+## the first stall that still has 殺價 available). Cleared by reset_run().
+var bargain_hint_shown: bool = false
+
 ## v0.14: true iff the most recent run finished without all required
 ## ingredients — kid came home anyway. Drives the "messy cooking" path in
 ## the kitchen and suppresses HiScore recording. Cleared by reset_run().
@@ -136,4 +140,5 @@ func reset_run() -> void:
 	last_run_perfect = false
 	last_run_incomplete = false
 	bargain_count = 0
+	bargain_hint_shown = false
 	last_run_new_dishes = PackedStringArray()

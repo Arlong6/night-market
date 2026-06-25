@@ -20,6 +20,13 @@ var _shimmer: LVCascadeShimmer = null
 func _ready() -> void:
 	# Apply CJK font BEFORE building any UI labels (must happen first)
 	LVThemeSetup.apply_default_cjk_font()
+	# The project ships in Night Market's pixel-art stretch (viewport/integer) as the
+	# boot default. Lexicon needs sharp CJK glyphs, so override the window to
+	# canvas_items + fractional scaling at runtime whenever the village scene loads.
+	var win := get_window()
+	if win:
+		win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+		win.content_scale_stretch = Window.CONTENT_SCALE_STRETCH_FRACTIONAL
 	_build_subscenes()
 	_wire_boot()
 	# Inhibit LVBoot's auto-scene-swap; we manage children manually

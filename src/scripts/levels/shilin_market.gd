@@ -189,15 +189,17 @@ const SHOPPER_DATA: Array[Dictionary] = [
 ]
 
 ## Item pickups scattered on the floor — free money / loose change.
+## v1: trimmed from 3 coins (25 NT$) to 2 (15 NT$). Guaranteed free money was
+## erasing the budget squeeze that makes 殺價 matter. [BALANCE: needs playtest]
 const ITEM_DATA: Array[Dictionary] = [
 	{"cell": Vector2i(11, 5), "value": 10, "line": "撿到 NT$10！"},
 	{"cell": Vector2i(4, 7), "value": 5,  "line": "撿到 NT$5。"},
-	{"cell": Vector2i(22, 11), "value": 10, "line": "撿到 NT$10！"},
 ]
 
 ## Bonus pickup tuning — spawned at a random walkable cell each run.
-const BONUS_VALUE: int = 15
-const BONUS_LINE: String = "★ 哎呀，地上有人掉的 NT$15！"
+## v1: 15 → 10 to keep the squeeze. [BALANCE: needs playtest]
+const BONUS_VALUE: int = 10
+const BONUS_LINE: String = "★ 哎呀，地上有人掉的 NT$10！"
 const BONUS_COLOR: Color = Color("#7AC940")  # green — distinct from gold
 
 # v0.21 — random street events. Each rolls independently per run.
@@ -214,8 +216,10 @@ const RAIN_DELAY_MAX: float = 14.0
 
 # v0.31 — weekend 紅包. Guaranteed (not chance) when the rotating-week day
 # is Sat or Sun. Bigger value than wallet so weekends feel like a payday.
-const RED_ENVELOPE_VALUE: int = 50
-const RED_ENVELOPE_LINE: String = "★ 週末紅包！NT$50"
+## v1: 50 → 35. Weekends still feel like a payday but don't erase the (larger
+## Sat/Sun shopping-list) squeeze. [BALANCE: needs playtest]
+const RED_ENVELOPE_VALUE: int = 35
+const RED_ENVELOPE_LINE: String = "★ 週末紅包！NT$35"
 const RED_ENVELOPE_COLOR: Color = Color("#C2241A")  # festive red
 
 # Palette

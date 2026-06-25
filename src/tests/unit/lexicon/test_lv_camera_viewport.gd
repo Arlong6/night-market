@@ -3,16 +3,19 @@
 extends GutTest
 
 # AC-1 — Viewport configured correctly at boot.
-# Note: original design called for 'viewport' + 'integer' for pixel-art crispness.
-# Switched to 'canvas_items' + 'keep' for sharp CJK rendering on Web export (the
-# pixel-art aesthetic was incompatible with readable CJK at small font sizes).
-func test_viewport_stretch_mode_is_canvas_items() -> void:
+# The project now SHIPS as Night Market (pixel-art), so the project default is
+# 'viewport' + 'integer' for crisp pixels — consistent with the nearest-filter +
+# pixel-snap rendering config. Lexicon Village needs sharp CJK instead, so it
+# overrides the window to canvas_items + fractional at RUNTIME in lv_main.gd
+# (_ready). Hence this test asserts the pixel-art project default, not Lexicon's
+# runtime override.
+func test_viewport_stretch_mode_is_viewport() -> void:
 	var mode: String = ProjectSettings.get_setting("display/window/stretch/mode", "")
-	assert_eq(mode, "canvas_items", "stretch_mode must be 'canvas_items' for sharp CJK on Web")
+	assert_eq(mode, "viewport", "project default stretch_mode must be 'viewport' for crisp pixel-art (Night Market)")
 
-func test_viewport_scale_mode_is_keep() -> void:
+func test_viewport_scale_mode_is_integer() -> void:
 	var scale_mode: String = ProjectSettings.get_setting("display/window/stretch/scale_mode", "")
-	assert_eq(scale_mode, "keep", "scale_mode must be 'keep' to lock aspect under canvas_items")
+	assert_eq(scale_mode, "integer", "project default scale_mode must be 'integer' for pixel-perfect scaling")
 
 # AC-2 — Base resolution is 320x180
 func test_viewport_width_is_320() -> void:

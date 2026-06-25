@@ -542,6 +542,14 @@ func _open_buy_choice() -> void:
 		options = ["是", "否"]
 	else:
 		options = ["是", "殺價", "否"]
+	# First stall that still offers 殺價: teach the green-zone timing once, then
+	# open the choice. No tutorial wall — a single contextual line. Suppressed in
+	# test mode so the buy-choice flow tests see ask_choice fire immediately.
+	if not _bargained and not Game.bargain_hint_shown and not Game.test_mode:
+		Game.bargain_hint_shown = true
+		Dialogue.show(["試試殺價! 抓準綠色區，按空白鍵停下"], func() -> void:
+			Dialogue.ask_choice(question, options, _on_choice))
+		return
 	Dialogue.ask_choice(question, options, _on_choice)
 
 

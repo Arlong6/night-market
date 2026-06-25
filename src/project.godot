@@ -10,8 +10,8 @@ config_version=5
 
 [application]
 
-config/name="字典村莊"
-run/main_scene="res://lexicon/scenes/lv_main.tscn"
+config/name="夜市採購大作戰"
+run/main_scene="res://scenes/menus/title.tscn"
 config/features=PackedStringArray("4.6", "GL Compatibility")
 
 [autoload]
@@ -32,8 +32,8 @@ window/size/viewport_width=320
 window/size/viewport_height=180
 window/size/window_width_override=1280
 window/size/window_height_override=720
-window/stretch/mode="canvas_items"
-window/stretch/scale_mode="keep"
+window/stretch/mode="viewport"
+window/stretch/scale_mode="integer"
 
 [editor_plugins]
 

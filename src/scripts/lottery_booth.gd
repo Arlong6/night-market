@@ -6,13 +6,15 @@
 ## lottery is dearer (NT$10) with bigger jackpots + chance of a free
 ## ingredient.
 ##
-## Roll buckets:
-##   * 35% NT$5  back  (net -5,    "銘謝惠顧")
-##   * 25% NT$10 back  (net  0,    "再接再厲")
-##   * 20% NT$20 back  (net +10,   "三等獎")
-##   * 10% NT$30 back  (net +20,   "二等獎")
-##   *  8% free random ingredient   ("特別獎")
-##   *  2% NT$50 back  (net +40,   "一等獎！")
+## Roll buckets (v1 retune — was a positive-EV money pump + 8% free required
+## ingredient, which erased the budget squeeze; now a genuine press-your-luck
+## gamble that loses on average). [BALANCE: needs playtest]
+##   * 50%  NT$5  back  (net -5,    "銘謝惠顧")
+##   * 22%  NT$10 back  (net  0,    "再接再厲")
+##   * 16%  NT$20 back  (net +10,   "三等獎")
+##   *  7%  NT$30 back  (net +20,   "二等獎")
+##   *  3.5% free random ingredient ("特別獎")
+##   *  1.5% NT$50 back (net +40,   "一等獎！")
 class_name LotteryBooth
 extends NPC
 
@@ -23,11 +25,11 @@ extends NPC
 const LOTTERY_PRICE: int = 10
 const MAX_DRAWS: int = 3
 
-const ROLL_LOSE: float = 0.35       ## refund 5
-const ROLL_BREAK_EVEN: float = 0.60 ## refund 10
-const ROLL_THIRD: float = 0.80      ## refund 20
-const ROLL_SECOND: float = 0.90     ## refund 30
-const ROLL_BONUS: float = 0.98      ## free ingredient
+const ROLL_LOSE: float = 0.50       ## refund 5  (was 0.35 — pressing luck now genuinely risky)
+const ROLL_BREAK_EVEN: float = 0.72 ## refund 10
+const ROLL_THIRD: float = 0.88      ## refund 20
+const ROLL_SECOND: float = 0.95     ## refund 30
+const ROLL_BONUS: float = 0.985     ## free ingredient (band shrunk 8% → 3.5%)
 # everything above ROLL_BONUS → first prize NT$50
 
 const REFUND_LOSE: int = 5
