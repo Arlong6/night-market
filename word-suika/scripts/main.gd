@@ -7,6 +7,8 @@ extends Node2D
 
 const Glyph = preload("res://scripts/glyph.gd")
 const TierData = preload("res://scripts/tier_data.gd")
+const WSAudio = preload("res://scripts/audio.gd")
+const WSHiScore = preload("res://scripts/hiscore.gd")
 
 ## Viewport dimensions (matching project.godot).
 const VIEWPORT_W: float = 540.0
@@ -53,6 +55,15 @@ var _next_tier: int = 0
 var _danger_timer: float = 0.0
 var _game_over: bool = false
 
+## Best score (persisted) + this-run progress
+var _best: int = 0
+var _highest_tier_run: int = -1
+var _first_merge_done: bool = false
+var _ui_best: Label = null
+var _ladder_cells: Array = []   # Label per tier, for the goal ladder
+var _hint_label: Label = null   # first-time "click to drop" nudge
+var _hint_tween: Tween = null
+
 ## Combo state
 var _combo_count: int = 0
 var _combo_timer: float = 0.0
@@ -98,6 +109,14 @@ func _ready() -> void:
 	_build_next_card()
 	_update_preview()
 	_refresh_mode_ui()
+	# Best score + goal ladder + first-time hint. Mode toggle is hidden until the
+	# first merge so a newcomer sees ONE simple action (drop) before any choice.
+	_best = WSHiScore.load_best()
+	_build_ladder()
+	_build_hint()
+	_refresh_score()
+	if _mode_button:
+		_mode_button.visible = false
 
 func _build_aim_renderer() -> void:
 	_aim_renderer = Node2D.new()
@@ -174,6 +193,15 @@ func _build_ui() -> void:
 	_ui_score.add_theme_font_size_override("font_size", 28)
 	_ui_score.add_theme_color_override("font_color", Color(0.95, 0.92, 0.78, 1.0))
 	ui.add_child(_ui_score)
+	# Best score (top-right, above the next-card) — the number you relaunch to beat.
+	_ui_best = Label.new()
+	_ui_best.name = "Best"
+	_ui_best.position = Vector2(VIEWPORT_W - 210, 26)
+	_ui_best.size = Vector2(180, 26)
+	_ui_best.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_ui_best.add_theme_font_size_override("font_size", 16)
+	_ui_best.add_theme_color_override("font_color", Color(0.78, 0.70, 0.50, 0.85))
+	ui.add_child(_ui_best)
 	# Title (top center)
 	var title := Label.new()
 	title.text = "一字一句"
@@ -453,6 +481,8 @@ func _try_drop() -> void:
 	g.position = Vector2(_spawn_x, SPAWN_Y)
 	g.collided_same_tier.connect(_on_glyph_collision.bind(g))
 	add_child(g)
+	WSAudio.drop_thock(self)
+	_dismiss_hint()
 	_advance_next_tier()
 	get_tree().create_timer(DROP_COOLDOWN).timeout.connect(func(): _can_drop = true)
 
@@ -477,6 +507,8 @@ func _fire_launch() -> void:
 	add_child(g)
 	# Apply velocity after add_child so physics is initialized
 	g.linear_velocity = dir * speed
+	WSAudio.drop_thock(self)
+	_dismiss_hint()
 	_advance_next_tier()
 	# Slight kickback shake to sell the launch
 	_add_shake(1.0 + _charge_amount * 2.5)
@@ -551,6 +583,9 @@ func _execute_merge(a: Glyph, b: Glyph) -> void:
 	# Remove old glyphs
 	a.queue_free()
 	b.queue_free()
+	# First merge unlocks the mode toggle (and clears any lingering hint).
+	_on_first_merge()
+	_note_tier_reached(mini(t + 1, TierData.TIER_COUNT - 1))
 	# Reaching max tier (詩) is a "watermelon" — bonus points + dramatic burst.
 	if TierData.is_max_tier(t):
 		var poem_bonus: int = TierData.score_for_merge(TierData.TIER_COUNT - 1) * 2 * combo_mult
@@ -559,12 +594,19 @@ func _execute_merge(a: Glyph, b: Glyph) -> void:
 		_spawn_floating_score(mid_pos + Vector2(0, -40), poem_bonus, 7)
 		_spawn_merge_particles(mid_pos, 7)  # extra burst
 		_add_shake(12.0)
+		WSAudio.poem_fanfare(self)
 	else:
+		var new_tier: int = t + 1
 		var new_g := Glyph.new()
-		new_g.tier = t + 1
+		new_g.tier = new_tier
 		new_g.position = mid_pos
 		new_g.collided_same_tier.connect(_on_glyph_collision.bind(new_g))
 		add_child(new_g)
+		# Pitch rises up the ladder; creating the first 詩 earns the fanfare.
+		if new_tier >= TierData.TIER_COUNT - 1:
+			WSAudio.poem_fanfare(self)
+		else:
+			WSAudio.merge_pop(self, new_tier)
 	# Clear pending merge entry
 	_pending_merges = _pending_merges.filter(func(p): return p[0] != a or p[1] != b)
 
@@ -619,16 +661,110 @@ func _spawn_floating_score(pos: Vector2, amount: int, tier: int) -> void:
 func _refresh_score() -> void:
 	if _ui_score:
 		_ui_score.text = "分數 %d" % _score
+	if _ui_best:
+		_ui_best.text = ("最佳 %d" % _best) if _best > 0 else ""
 
 func _trigger_game_over() -> void:
 	if _game_over:
 		return
 	_game_over = true
+	WSAudio.game_over(self)
+	# Persist the run; celebrate a new personal best.
+	var is_new_best: bool = WSHiScore.submit(_score, maxi(_highest_tier_run, 0))
+	if is_new_best:
+		_best = _score
+		_refresh_score()
 	if _ui_status:
-		_ui_status.text = "結束\n%d 分\n點擊重來" % _score
-		_ui_status.add_theme_font_size_override("font_size", 32)
+		var banner: String = "結束\n%d 分\n" % _score
+		banner += ("★ 新紀錄! ★\n" if is_new_best else "最佳 %d\n" % _best)
+		banner += "點擊重來"
+		_ui_status.text = banner
+		_ui_status.add_theme_font_size_override("font_size", 30)
+		if is_new_best:
+			_ui_status.add_theme_color_override("font_color", Color(1.0, 0.95, 0.5, 1.0))
 	if _preview:
 		_preview.visible = false
 
 func _restart() -> void:
 	get_tree().reload_current_scene()
+
+# ─── Onboarding, ladder & progress ────────────────────────────────────────────
+
+## Called the first time any merge happens: reveal the (until-now hidden) mode
+## toggle and clear the first-time hint. Keeps a newcomer's first screen to ONE
+## obvious action before introducing the LAUNCH option.
+func _on_first_merge() -> void:
+	if _first_merge_done:
+		return
+	_first_merge_done = true
+	_dismiss_hint()
+	if _mode_button:
+		_mode_button.visible = true
+
+## Record the highest tier produced this run and re-light the goal ladder.
+func _note_tier_reached(tier: int) -> void:
+	if tier > _highest_tier_run:
+		_highest_tier_run = tier
+		_refresh_ladder()
+
+## Build the always-visible goal ladder (雨→…→詩) along the bottom strip so a
+## newcomer can see where the climb is going without trial and error.
+func _build_ladder() -> void:
+	var ui: CanvasLayer = _ui_layer
+	if ui == null:
+		return
+	var count: int = TierData.TIER_COUNT
+	var margin: float = 16.0
+	var step: float = (VIEWPORT_W - margin * 2.0) / float(count)
+	var y: float = VIEWPORT_H - 48.0
+	_ladder_cells.clear()
+	for i in count:
+		var lbl := Label.new()
+		lbl.text = TierData.get_char(i)
+		lbl.position = Vector2(margin + step * float(i), y)
+		lbl.size = Vector2(step, 40)
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		ui.add_child(lbl)
+		_ladder_cells.append(lbl)
+	_refresh_ladder()
+
+## Light tiers up to the highest reached in their own colour; the frontier is
+## largest. Unreached tiers stay dim so progress reads at a glance.
+func _refresh_ladder() -> void:
+	for i in _ladder_cells.size():
+		var lbl: Label = _ladder_cells[i]
+		if i <= _highest_tier_run:
+			lbl.add_theme_color_override("font_color", TierData.get_color(i))
+			lbl.add_theme_font_size_override("font_size", 24 if i == _highest_tier_run else 18)
+		else:
+			lbl.add_theme_color_override("font_color", Color(0.55, 0.50, 0.44, 0.45))
+			lbl.add_theme_font_size_override("font_size", 18)
+
+## A single pulsing "click to drop" nudge under the spawn cursor — the only
+## instruction a Suika game needs. Removed on the first drop.
+func _build_hint() -> void:
+	var ui: CanvasLayer = _ui_layer
+	if ui == null:
+		return
+	_hint_label = Label.new()
+	_hint_label.text = "▼ 點擊放下"
+	_hint_label.size = Vector2(VIEWPORT_W, 30)
+	_hint_label.position = Vector2(0, SPAWN_Y + 40.0)
+	_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hint_label.add_theme_font_size_override("font_size", 22)
+	_hint_label.add_theme_color_override("font_color", Color(0.95, 0.88, 0.6, 0.95))
+	_hint_label.add_theme_color_override("font_outline_color", Color(0.2, 0.12, 0.0, 0.8))
+	_hint_label.add_theme_constant_override("outline_size", 4)
+	ui.add_child(_hint_label)
+	_hint_tween = create_tween().set_loops()
+	_hint_tween.tween_property(_hint_label, "modulate:a", 0.35, 0.6)
+	_hint_tween.tween_property(_hint_label, "modulate:a", 1.0, 0.6)
+
+func _dismiss_hint() -> void:
+	if _hint_tween:
+		_hint_tween.kill()
+		_hint_tween = null
+	if _hint_label and is_instance_valid(_hint_label):
+		_hint_label.queue_free()
+		_hint_label = null
