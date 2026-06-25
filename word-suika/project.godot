@@ -5,7 +5,7 @@ config_version=5
 
 config/name="一字一句"
 config/description="Chinese-character Suika-style merge game."
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/title.tscn"
 config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="res://icon.svg"
 
