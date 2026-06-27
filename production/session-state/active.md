@@ -1,51 +1,43 @@
 # Active Session State
 
-> **Last Updated**: 2026-06-26 (session: portfolio analysis → Night Market ship-prep + word-suika juice/title)
+> **Last Updated**: 2026-06-27 (session: pivoted to new game 橫衝直撞 / Road Rage)
 > **Purpose**: Living checkpoint. Read this first after compaction or new session.
 
-## Direction (user, 2026-06-26)
+## Current build: 橫衝直撞 (Road Rage) — top-down vehicle destruction sandbox
 
-"夜市完成 其他繼續做" — **finish Night Market (priority), keep advancing the others.**
+User's direction: "想做無腦破壞的遊戲 … 勁量去突破極限". Chose **vehicle rampage** (top-down GTA-flavored mindless destruction). New standalone project `road-rage/`.
 
-## Three games in flight
+- **Spec**: `docs/superpowers/specs/2026-06-27-road-rage-design.md`
+- **Plan**: `docs/superpowers/plans/2026-06-27-road-rage.md` (16 tasks, 6 phases, TDD)
 
-- **Night Market (夜市採購大作戰)** — now the BOOT game, ~ship-ready. Was 88%; this session did the ship-prep pass.
-- **word-suika / 一字一句** — Suika merge (雨→露→川→江→海→雲→月→詩). Juiced + has a title screen now.
-- **Lexicon Village (字典村莊)** — shelved; core loop triple-broken (notebook BAKER-lock, glyph mismatch from hard-coded seed 12345, green/red feedback deletes deduction). Renders correctly now via runtime stretch override in lv_main.gd. NEXT CYCLE: fix the 3 core blockers before content.
+### Progress (inline execution, verified on Godot 4.6.2)
 
-## What shipped this session (commits)
+| Phase | Tasks | Status |
+|---|---|---|
+| 0 Scaffold | 1–2 | ✅ project + GUT + CJK theme + RRTuning |
+| 1 Driving | 3–4 | ✅ RRPhysics (TDD) + drivable arcade car + camera + title |
+| 2 Destruction | 5–7 | ✅ FX debris/particles + RRAudio (TDD) + Destructible (impact→break→debris+audio+shake) |
+| 3 Combo/Score/HUD | 8–10 | ⏳ next |
+| 4 City | 11–12 | ⏳ |
+| 5 Wanted/Police | 13–14 | ⏳ |
+| 6 Juice | 15–16 | ⏳ |
 
-| Commit | Delivery |
-|---|---|
-| d823040 | lexicon WIP preserved (web-reliable click + SFX + CJK theme) |
-| c5f9cf7 | word-suika merge prototype committed |
-| 82f7cbe | word-suika juice: procedural audio (pitch rises ladder), high-score, goal ladder, onboarding (21/21 smoke) |
-| e554ab7 | **v0.59 Night Market = boot game + ship-prep**: main_scene flip + config/name; stretch back to viewport/integer (Lexicon overrides at runtime); bargain audio; first-stall nudge; economy balance |
-| f709a2f | word-suika title/start screen (one-tap = Web audio-unlock) |
-| 7674918 | uid housekeeping |
+**Tests: 8/8 green** (smoke, RRPhysics×4, RRAudio×3). Both scenes boot clean headless.
+**Playable now**: drive a heavy car, smash scattered props/cars/peds → debris + impact/explosion audio + screenshake. (combo/score/city/police/juice not yet wired.)
 
-Foundation verified on Godot 4.6.2 (`~/Downloads/godot-4.6.2/Godot.app`): **553 tests green** (496 unit + 57 integration); NM title + word-suika title boot clean headless.
+### How to playtest (feel needs a real run)
+```
+~/Downloads/godot-4.6.2/Godot.app/Contents/MacOS/Godot --path road-rage
+```
+WASD/arrows to drive. **Validate: does the car feel heavy/satisfying? does smashing feel good?** Tuning knobs in `road-rage/scripts/rr_tuning.gd` (ACCEL, TURN_RATE, FRICTION, MAX_SPEED, break thresholds).
 
-## Night Market — remaining to ship (mostly USER-dependent)
+### Next (resume here)
+Phase 3: ComboSystem (TDD) → ScoreSystem (TDD) → HUD wired into main.gd. Then city (CityGen TDD), wanted/police, juice pass. Follow the plan task-by-task; each pure-logic unit is TDD, each phase ends with a green suite + clean boot + commit.
 
-1. **PLAYTEST the economy balance** — I tuned free money down (guaranteed 40→25/run, lottery from money-pump to real gamble) by ANALYSIS, not playtest. Knobs marked `[BALANCE: needs playtest]` in shilin_market.gd, lottery_booth.gd. Confirm the squeeze feels right; tell me to adjust.
-2. **Web build** — src/ shipped a web build at v0.53 but has no committed export_presets.cfg now; needs export templates (4.6.2) + an HTML5 preset.
-3. **Screenshots/GIF** — bargain meter mid-swing, green-zone hit, plated dishes, cat following home → fill `production/release/itch-page-draft.md` + cover.
-4. **itch upload** — user account.
-
-## word-suika — next
-
-- Web export config (export_presets.cfg + HTML5 preset); GUT setup for real tests; daily-seed challenge mode.
-- Open question: theme is currently cosmetic — a real word-building mechanic raises the ceiling but is a redesign.
+## Other games (paused, intact)
+- **Night Market (夜市)** — boot game in `src/`, ship-prep done (v0.59), 553 tests green. Remaining: user playtest balance + web build + screenshots + itch.
+- **word-suika (一字一句)** — juiced + title screen. Standalone.
+- **Lexicon Village** — shelved; core loop needs rebuild next cycle.
 
 ## Solo Mode
-
 `production/review-mode.txt` = `solo`. Director gates auto-skipped.
-
-## How to run (interactive — audio/feel need a real run)
-
-```
-GODOT=~/Downloads/godot-4.6.2/Godot.app/Contents/MacOS/Godot
-"$GODOT" --path src           # Night Market (boots title)
-"$GODOT" --path word-suika    # 一字一句 (boots title)
-```
