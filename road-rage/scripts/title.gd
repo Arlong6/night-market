@@ -1,0 +1,28 @@
+## Title — start gate (Web audio-unlock gesture) for 橫衝直撞.
+extends Node2D
+
+func _ready() -> void:
+	var ui := CanvasLayer.new()
+	add_child(ui)
+	var title := Label.new()
+	title.text = "橫衝直撞"
+	title.position = Vector2(0, 170)
+	title.size = Vector2(960, 90)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 64)
+	title.add_theme_color_override("font_color", Color("#F2C14E"))
+	ui.add_child(title)
+	var start := Label.new()
+	start.text = "點擊開始　·　WASD / 方向鍵 駕駛"
+	start.position = Vector2(0, 320)
+	start.size = Vector2(960, 40)
+	start.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	start.add_theme_font_size_override("font_size", 24)
+	start.add_theme_color_override("font_color", Color("#E8E2D0"))
+	ui.add_child(start)
+
+func _input(event: InputEvent) -> void:
+	var go: bool = (event is InputEventMouseButton and event.pressed) \
+		or (event is InputEventKey and event.pressed and not event.echo)
+	if go:
+		get_tree().change_scene_to_file("res://scenes/main.tscn")
