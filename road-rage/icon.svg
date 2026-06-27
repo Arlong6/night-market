@@ -1,0 +1,5 @@
+<svg width="128" height="128" xmlns="http://www.w3.org/2000/svg">
+  <rect width="128" height="128" rx="20" fill="#1f1a23"/>
+  <circle cx="64" cy="64" r="44" fill="#f6d378"/>
+  <text x="64" y="80" font-family="serif" font-size="60" text-anchor="middle" fill="#1a0e08">詩</text>
+</svg>
