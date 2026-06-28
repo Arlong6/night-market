@@ -20,6 +20,18 @@ func _ready() -> void:
 	start.add_theme_font_size_override("font_size", 24)
 	start.add_theme_color_override("font_color", Color("#E8E2D0"))
 	ui.add_child(start)
+	# Best score to beat (if any).
+	const ScoreSystem = preload("res://scripts/score_system.gd")
+	var best: int = ScoreSystem.new().load_best()
+	if best > 0:
+		var b := Label.new()
+		b.text = "最佳 %d" % best
+		b.position = Vector2(0, 380)
+		b.size = Vector2(960, 30)
+		b.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		b.add_theme_font_size_override("font_size", 22)
+		b.add_theme_color_override("font_color", Color("#C8BC90"))
+		ui.add_child(b)
 
 func _input(event: InputEvent) -> void:
 	var go: bool = (event is InputEventMouseButton and event.pressed) \

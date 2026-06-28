@@ -95,14 +95,44 @@ func _add_prop(cell: Vector2i, kind: String) -> void:
 
 # ── Events ────────────────────────────────────────────────────────────────────
 
-func _on_destroyed(kind: String, value: int, heat: int, _pos: Vector2) -> void:
+func _on_destroyed(kind: String, value: int, heat: int, pos: Vector2) -> void:
 	var pts: int = _combo.register(value)
 	_score.add(pts, 1)
 	_wanted.add_heat(heat)
 	_cam.shake(0.25 if kind != "car" else 0.6)
+	_spawn_popup(pos, "+%d" % pts, Color("#FFE08A"))
 	if kind == "car":
 		_cam.punch(0.06)
+		_hit_stop(0.05)
+	# Milestone: max combo every 5 hits → brief slow-mo + a callout.
+	if _combo.multiplier() == RRTuning.COMBO_MAX_MULT and _combo.count() % 5 == 0:
+		_slowmo(0.35, 0.25)
+		_spawn_popup(pos + Vector2(0, -30), "失控!", Color("#FF6020"))
 	_refresh()
+
+func _spawn_popup(pos: Vector2, text: String, color: Color) -> void:
+	var l := Label.new()
+	l.text = text
+	l.position = pos
+	l.add_theme_font_size_override("font_size", 20)
+	l.add_theme_color_override("font_color", color)
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	l.add_theme_constant_override("outline_size", 3)
+	add_child(l)
+	var t := create_tween()
+	t.set_parallel(true)
+	t.tween_property(l, "position:y", pos.y - 40, 0.7)
+	t.tween_property(l, "modulate:a", 0.0, 0.7)
+	t.chain().tween_callback(func() -> void:
+		if is_instance_valid(l): l.queue_free())
+
+func _hit_stop(d: float) -> void:
+	Engine.time_scale = 0.0
+	get_tree().create_timer(d, true, false, true).timeout.connect(func() -> void: Engine.time_scale = 1.0)
+
+func _slowmo(scale: float, dur: float) -> void:
+	Engine.time_scale = scale
+	get_tree().create_timer(dur, true, false, true).timeout.connect(func() -> void: Engine.time_scale = 1.0)
 
 func _manage_police() -> void:
 	_police = _police.filter(func(p): return is_instance_valid(p))
