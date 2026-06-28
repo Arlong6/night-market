@@ -1,6 +1,5 @@
-## Main — game director. Phase 3: player + camera + scattered destructibles +
-## combo/score systems + HUD + impact shake. Later phases add city, wanted,
-## police, juice.
+## Main — game director. Phase 4: procedural city (road grid + buildings as walls
+## + smashable props) + combo/score + HUD + impact shake. Later: wanted, police, juice.
 extends Node2D
 
 const Vehicle = preload("res://scripts/vehicle.gd")
@@ -8,6 +7,7 @@ const CameraRig = preload("res://scripts/camera_rig.gd")
 const Destructible = preload("res://scripts/destructible.gd")
 const ComboSystem = preload("res://scripts/combo_system.gd")
 const ScoreSystem = preload("res://scripts/score_system.gd")
+const CityGen = preload("res://scripts/city_gen.gd")
 
 var _player: Vehicle = null
 var _cam: CameraRig = null
@@ -21,13 +21,14 @@ var _ui_best: Label = null
 
 func _ready() -> void:
 	_best = _score.load_best()
+	_build_city()
+	# Player starts on a central road intersection (cell 12,12 — both % 4 == 0).
 	_player = Vehicle.new()
-	_player.position = Vector2.ZERO
+	_player.position = Vector2(12, 12) * RRTuning.TILE + Vector2.ONE * (RRTuning.TILE * 0.5)
 	add_child(_player)
 	_cam = CameraRig.new()
 	add_child(_cam)
 	_cam.setup(_player)
-	_scatter_props()
 	_build_hud()
 	queue_redraw()
 
@@ -37,17 +38,41 @@ func _process(delta: float) -> void:
 		_ui_combo.visible = _combo.is_active() and _combo.multiplier() > 1
 		_ui_combo.text = "×%d 連擊!" % _combo.multiplier()
 
-func _scatter_props() -> void:
-	var kinds := ["prop", "prop", "prop", "car", "ped", "ped"]
-	for i in 80:
-		var d := Destructible.new()
-		d.kind = kinds[i % kinds.size()]
-		var p := Vector2(randf_range(-1100, 1100), randf_range(-800, 800))
-		if p.length() < 120.0:
-			p = p.normalized() * 160.0
-		d.position = p
-		d.destroyed.connect(_on_destroyed)
-		add_child(d)
+func _build_city() -> void:
+	var w: int = RRTuning.CITY_COLS * RRTuning.TILE
+	var h: int = RRTuning.CITY_ROWS * RRTuning.TILE
+	var bg := ColorRect.new()
+	bg.color = Color("#2A2A30")  # tarmac (roads are the gaps between buildings)
+	bg.size = Vector2(w, h)
+	bg.z_index = -100
+	add_child(bg)
+	var layout: Dictionary = CityGen.new().generate(randi())
+	for cell in layout["buildings"]:
+		_add_building(cell)
+	for p in layout["props"]:
+		_add_prop(p["cell"], p["kind"])
+
+func _add_building(cell: Vector2i) -> void:
+	var sb := StaticBody2D.new()
+	sb.position = Vector2(cell) * RRTuning.TILE + Vector2.ONE * (RRTuning.TILE * 0.5)
+	var col := CollisionShape2D.new()
+	var shape := RectangleShape2D.new()
+	shape.size = Vector2.ONE * (RRTuning.TILE * 0.9)
+	col.shape = shape
+	sb.add_child(col)
+	var hs: float = RRTuning.TILE * 0.45
+	var poly := Polygon2D.new()
+	poly.polygon = PackedVector2Array([Vector2(-hs, -hs), Vector2(hs, -hs), Vector2(hs, hs), Vector2(-hs, hs)])
+	poly.color = Color("#5A5560")
+	sb.add_child(poly)
+	add_child(sb)
+
+func _add_prop(cell: Vector2i, kind: String) -> void:
+	var d := Destructible.new()
+	d.kind = kind
+	d.position = Vector2(cell) * RRTuning.TILE + Vector2.ONE * (RRTuning.TILE * 0.5)
+	d.destroyed.connect(_on_destroyed)
+	add_child(d)
 
 func _on_destroyed(kind: String, value: int, _heat: int, _pos: Vector2) -> void:
 	var pts: int = _combo.register(value)
@@ -82,15 +107,13 @@ func _mk_label(ui: CanvasLayer, pos: Vector2, size: int, col: Color) -> Label:
 	return l
 
 func _draw() -> void:
-	# Faint asphalt grid so speed and drift read clearly.
-	var ext: float = 1600.0
-	var step: float = 64.0
-	var line_col := Color(1.0, 1.0, 1.0, 0.06)
-	var x: float = -ext
-	while x <= ext:
-		draw_line(Vector2(x, -ext), Vector2(x, ext), line_col, 1.0)
-		x += step
-	var y: float = -ext
-	while y <= ext:
-		draw_line(Vector2(-ext, y), Vector2(ext, y), line_col, 1.0)
-		y += step
+	# Faint lane lines along the road cells so streets read at speed.
+	var line_col := Color(1.0, 0.95, 0.7, 0.05)
+	var w: int = RRTuning.CITY_COLS * RRTuning.TILE
+	var h: int = RRTuning.CITY_ROWS * RRTuning.TILE
+	for cx in range(0, RRTuning.CITY_COLS + 1, 4):
+		var x: float = cx * RRTuning.TILE
+		draw_line(Vector2(x, 0), Vector2(x, h), line_col, 2.0)
+	for cy in range(0, RRTuning.CITY_ROWS + 1, 4):
+		var y: float = cy * RRTuning.TILE
+		draw_line(Vector2(0, y), Vector2(w, y), line_col, 2.0)
