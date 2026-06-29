@@ -156,8 +156,8 @@ func _break(car: FPCar) -> void:
 ## Comedic confetti poof — bright shirt-colored bits, no gore.
 func _spawn_poof() -> void:
 	var p := CPUParticles3D.new()
-	p.amount = 18
-	p.lifetime = 0.6
+	p.amount = 10
+	p.lifetime = 0.5
 	p.one_shot = true
 	p.explosiveness = 1.0
 	p.direction = Vector3(0.0, 1.0, 0.0)

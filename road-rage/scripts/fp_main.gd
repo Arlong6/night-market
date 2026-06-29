@@ -56,23 +56,23 @@ func _build_environment() -> void:
 	var we := WorldEnvironment.new()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("#8FB8E8")
+	env.background_color = Color("#A6CDEE")   # cool, fresh daytime blue
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("#C2CCDA")
-	env.ambient_light_energy = 1.0
+	env.ambient_light_color = Color("#C4D2E4")
+	env.ambient_light_energy = 0.95
 	env.fog_enabled = true
-	env.fog_light_color = Color("#BCD0E6")
+	env.fog_light_color = Color("#C6D8EC")
 	env.fog_light_energy = 1.0
-	env.fog_density = 0.0035   # light haze for depth, not murk
+	env.fog_density = 0.0032   # light cool haze for depth
 	env.fog_aerial_perspective = 0.35
 	env.fog_sky_affect = 0.15
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_exposure = 1.0
+	env.tonemap_exposure = 0.95
 	we.environment = env
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-58.0, -52.0, 0.0)  # high midday angle
-	sun.light_color = Color("#FFF4E2")
-	sun.light_energy = 1.5
+	sun.light_color = Color("#EAF2FB")  # cool daylight white
+	sun.light_energy = 1.35
 	# Shadows DISABLED: real-time directional shadows over this many meshes crash
 	# the GL-compatibility renderer on some GPUs (the "window closes" bug). Depth
 	# now comes from fog + daytime lighting instead.
@@ -199,12 +199,13 @@ func _add_streetlight(pos: Vector3) -> void:
 func _build_city() -> void:
 	var layout: Dictionary = CityGen.new().generate(_rng.randi())
 	for cell in layout["buildings"]:
+		if _rng.randf() < 0.4:
+			continue   # thin out buildings for the GL-compat render budget
 		_add_building(cell)
 	for p in layout["props"]:
 		_add_target(p["cell"], p["kind"], Vector3.ZERO)
-	_spawn_traffic(14)
-	_spawn_crowds(10)
-	_spawn_streetlights()
+	_spawn_traffic(8)
+	_spawn_crowds(5)
 
 func _add_building(cell: Vector2i) -> void:
 	var b := FPBuildings.make(TILE3D * 0.82, _rng)

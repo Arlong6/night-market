@@ -66,8 +66,8 @@ func _break(car: FPCar) -> void:
 func _spawn_debris() -> void:
 	var p := CPUParticles3D.new()
 	p.global_position = global_position + Vector3(0.0, size.y * 0.5, 0.0)
-	p.amount = 24
-	p.lifetime = 0.7
+	p.amount = 10
+	p.lifetime = 0.6
 	p.one_shot = true
 	p.explosiveness = 0.95
 	p.direction = Vector3(0.0, 1.0, 0.0)
