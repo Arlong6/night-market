@@ -11,9 +11,13 @@ const REVERSE_SPEED: float = 16.0
 const TURN_RATE: float = 2.3
 const FRICTION: float = 12.0
 const GRAVITY: float = 24.0
+const BASE_FOV: float = 76.0
+const MAX_FOV: float = 96.0    ## widens with speed for an acceleration rush
 
 var _cam: Camera3D = null
 var _cockpit: FPCockpit = null
+var _engine: AudioStreamPlayer = null
+var _engine_started: bool = false
 
 func _ready() -> void:
 	up_direction = Vector3.UP
@@ -44,13 +48,18 @@ func _ready() -> void:
 	add_child(hood)
 	# First-person camera at the driver's eye, looking forward (-Z).
 	_cam = Camera3D.new()
-	_cam.position = Vector3(0.0, 1.5, -0.2)
-	_cam.fov = 82.0
+	_cam.position = Vector3(0.0, 1.7, 0.1)   # a touch higher to see over the dash
+	_cam.fov = BASE_FOV
 	_cam.current = true
 	add_child(_cam)
 	# First-person car interior (dashboard, wheel, pillars, mirror).
 	_cockpit = FPCockpit.new()
 	add_child(_cockpit)
+	# Engine drone — pitch tracks speed; starts on first input (Web-safe gesture).
+	_engine = AudioStreamPlayer.new()
+	_engine.stream = RRAudio.make_engine_stream()
+	_engine.volume_db = -13.0
+	add_child(_engine)
 
 func speed() -> float:
 	return Vector3(velocity.x, 0.0, velocity.z).length()
@@ -88,6 +97,25 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.y -= GRAVITY * delta
 	move_and_slide()
+	# ── Speed feel ──────────────────────────────────────────────────────────
+	var frac: float = clampf(speed() / MAX_SPEED, 0.0, 1.0)
+	if _cam != null:
+		var tgt_fov: float = lerpf(BASE_FOV, MAX_FOV, frac)
+		if throttle > 0.0:
+			tgt_fov += 4.0   # extra punch while flooring it
+		_cam.fov = lerpf(_cam.fov, tgt_fov, 0.12)
+		var shake: float = maxf(0.0, frac - 0.55) * 0.10   # vibration only at high speed
+		_cam.h_offset = randf_range(-shake, shake)
+		_cam.v_offset = randf_range(-shake, shake)
+	if _engine != null:
+		if not _engine_started and (throttle != 0.0 or steer != 0.0):
+			_engine_started = true
+			_engine.play()
+		_engine.pitch_scale = 0.7 + 1.4 * frac
+	# Safety: a run never "ends" — if the car ever drops off the world, respawn.
+	if global_position.y < -8.0:
+		global_position = Vector3(144.0, 2.0, 144.0)
+		velocity = Vector3.ZERO
 
 func bleed_speed(factor: float) -> void:
 	velocity.x *= factor

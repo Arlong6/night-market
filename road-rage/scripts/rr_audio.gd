@@ -71,6 +71,28 @@ static func _make_siren() -> AudioStreamWAV:
 		_w(data, i, sin(t * TAU * freq) * 0.4)
 	return _wrap(data)
 
+# Loopable engine drone — low harmonic buzz. Caller loops it and shifts
+# pitch_scale with speed for an acceleration sense. base 72Hz × 0.25s = 18
+# whole cycles (and all partials are integer multiples) so the loop seam is clean.
+static func make_engine_stream() -> AudioStreamWAV:
+	var dur := 0.25
+	var n := int(SAMPLE_RATE * dur)
+	var data := PackedByteArray()
+	data.resize(n * 2)
+	var base := 72.0
+	for i in n:
+		var t: float = float(i) / SAMPLE_RATE
+		var s: float = sin(t * TAU * base) * 0.5
+		s += sin(t * TAU * base * 2.0) * 0.24
+		s += sin(t * TAU * base * 3.0) * 0.12
+		s += sin(t * TAU * base * 0.5) * 0.16   # sub-octave growl
+		_w(data, i, s * 0.5)
+	var st := _wrap(data)
+	st.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	st.loop_begin = 0
+	st.loop_end = n
+	return st
+
 static func _w(data: PackedByteArray, idx: int, s: float) -> void:
 	var v: int = int(clampf(s, -1.0, 1.0) * 32767.0)
 	if v < 0: v += 65536

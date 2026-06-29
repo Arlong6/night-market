@@ -32,6 +32,7 @@ func _ready() -> void:
 	_best = _score.load_best()
 	_build_environment()
 	_build_ground()
+	_build_bounds()
 	_build_city()
 	_spawn_car()
 	_build_hud()
@@ -50,40 +51,31 @@ func _world_pos(cell: Vector2i) -> Vector3:
 # ── Atmosphere & depth ────────────────────────────────────────────────────────
 
 func _build_environment() -> void:
-	# Dusk / early-night mood: deep blue sky, low warm ambient so emissive
-	# windows + streetlights pop, fog for depth fade, glow, filmic tonemap, and a
-	# low warm key light casting long shadows (the main depth cue).
+	# Bright DAYTIME: clear blue sky, strong neutral ambient, light distance haze
+	# for depth, and a high sun casting crisp shadows (the main depth cue).
 	var we := WorldEnvironment.new()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("#1A1D33")
+	env.background_color = Color("#8FB8E8")
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("#454C66")
-	env.ambient_light_energy = 0.5
+	env.ambient_light_color = Color("#C2CCDA")
+	env.ambient_light_energy = 1.0
 	env.fog_enabled = true
-	env.fog_light_color = Color("#2A2F4D")
-	env.fog_light_energy = 0.8
-	env.fog_density = 0.010
-	env.fog_aerial_perspective = 0.5
-	env.fog_sky_affect = 0.4
-	env.glow_enabled = true
-	env.glow_intensity = 0.7
-	env.glow_strength = 1.0
-	env.glow_bloom = 0.15
-	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
-	env.glow_hdr_threshold = 0.95
+	env.fog_light_color = Color("#BCD0E6")
+	env.fog_light_energy = 1.0
+	env.fog_density = 0.0035   # light haze for depth, not murk
+	env.fog_aerial_perspective = 0.35
+	env.fog_sky_affect = 0.15
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_exposure = 1.0
-	env.tonemap_white = 1.1
 	we.environment = env
-	add_child(we)
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-18.0, -125.0, 0.0)  # low + raking → long shadows
-	sun.light_color = Color("#FFB266")
-	sun.light_energy = 1.3
+	sun.rotation_degrees = Vector3(-58.0, -52.0, 0.0)  # high midday angle
+	sun.light_color = Color("#FFF4E2")
+	sun.light_energy = 1.5
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 220.0
-	sun.shadow_bias = 0.05
+	sun.directional_shadow_max_distance = 180.0
+	sun.shadow_bias = 0.04
 	add_child(sun)
 
 func _build_ground() -> void:
@@ -135,6 +127,37 @@ func _build_ground() -> void:
 		x_strip.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
 		add_child(x_strip)
 		c += 4
+
+func _build_bounds() -> void:
+	# Tall perimeter walls so the car can NEVER drive off the world (which read as
+	# "the game ended"). Slightly inset blue-grey barriers around the district.
+	var span: float = RRTuning.CITY_COLS * TILE3D
+	var h: float = 40.0
+	var th: float = 4.0
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color("#39414F")
+	mat.roughness = 0.9
+	var c: float = span * 0.5
+	_wall(Vector3(c, h * 0.5, -th * 0.5), Vector3(span + th * 2.0, h, th), mat)
+	_wall(Vector3(c, h * 0.5, span + th * 0.5), Vector3(span + th * 2.0, h, th), mat)
+	_wall(Vector3(-th * 0.5, h * 0.5, c), Vector3(th, h, span + th * 2.0), mat)
+	_wall(Vector3(span + th * 0.5, h * 0.5, c), Vector3(th, h, span + th * 2.0), mat)
+
+func _wall(pos: Vector3, size: Vector3, mat: StandardMaterial3D) -> void:
+	var sb := StaticBody3D.new()
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = size
+	col.shape = shape
+	sb.add_child(col)
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = size
+	bm.material = mat
+	mi.mesh = bm
+	sb.add_child(mi)
+	sb.position = pos
+	add_child(sb)
 
 func _add_streetlight(pos: Vector3) -> void:
 	var pole_height: float = 7.0

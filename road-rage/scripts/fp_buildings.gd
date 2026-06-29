@@ -152,10 +152,8 @@ static func _add_windows(root: StaticBody3D, w: float, h: float, y_base: float, 
 				var lit: bool = rng.randf() < WINDOW_LIT_CHANCE
 				var slot: float = (float(c) - float(cols - 1) * 0.5) * (w / float(cols))
 				var mi := MeshInstance3D.new()
-				var qm := QuadMesh.new()
-				qm.size = Vector2(win_w, win_h)
-				qm.material = _window_mat(lit, rng)
-				mi.mesh = qm
+				mi.mesh = _shared_quad()
+				mi.material_override = (_lit_mat(rng) if lit else _dark_mat())
 				if on_z:
 					mi.position = Vector3(slot, cy, sign * (half + margin))
 					mi.rotation_degrees = Vector3(0.0, 0.0 if sign > 0.0 else 180.0, 0.0)
@@ -211,6 +209,38 @@ static func _add_roof(root: StaticBody3D, w: float, y_top: float, body_color: Co
 
 
 # ── Materials ─────────────────────────────────────────────────────────────────
+
+## Shared window resources — one quad + a few materials reused across ALL
+## buildings (was one mesh+material per window → thousands of allocations).
+static var _quad: QuadMesh = null
+static var _lit_cache: Array[StandardMaterial3D] = []
+static var _dark_cache: StandardMaterial3D = null
+
+static func _shared_quad() -> QuadMesh:
+	if _quad == null:
+		_quad = QuadMesh.new()
+		_quad.size = Vector2(0.9, 1.4)
+	return _quad
+
+static func _lit_mat(rng: RandomNumberGenerator) -> StandardMaterial3D:
+	if _lit_cache.is_empty():
+		for g in GLOW_WARM:
+			var m := StandardMaterial3D.new()
+			m.albedo_color = g
+			m.emission_enabled = true
+			m.emission = g
+			m.emission_energy_multiplier = 2.0
+			m.roughness = 0.3
+			_lit_cache.append(m)
+	return _lit_cache[rng.randi() % _lit_cache.size()]
+
+static func _dark_mat() -> StandardMaterial3D:
+	if _dark_cache == null:
+		_dark_cache = StandardMaterial3D.new()
+		_dark_cache.albedo_color = GLOW_DARK
+		_dark_cache.roughness = 0.2
+		_dark_cache.metallic = 0.35
+	return _dark_cache
 
 static func _solid_mat(c: Color, rough: float, metal: float) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
