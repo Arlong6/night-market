@@ -1,11 +1,14 @@
-## FPMain — first-person 3D destruction-driving spike for 橫衝直撞.
-## Reuses the engine-agnostic logic units (CityGen, ComboSystem, ScoreSystem) in
-## a 3D world built from primitive meshes (no art assets). Endless rampage — no
-## death — so a run lasts as long as you want (addresses "crash ends the game").
+## FPMain — first-person 3D destruction-driving for 橫衝直撞.
+## Dusk city built from primitive meshes (no art assets): designed buildings with
+## glowing windows, wandering pedestrian crowds, drifting traffic, streetlights,
+## shadows + fog for depth. Reuses CityGen / ComboSystem / ScoreSystem. Endless
+## rampage — no death.
 extends Node3D
 
 const FPCar = preload("res://scripts/fp_car.gd")
 const FPTarget = preload("res://scripts/fp_target.gd")
+const FPBuildings = preload("res://scripts/fp_buildings.gd")
+const FPPed = preload("res://scripts/fp_ped.gd")
 const CityGen = preload("res://scripts/city_gen.gd")
 const ComboSystem = preload("res://scripts/combo_system.gd")
 const ScoreSystem = preload("res://scripts/score_system.gd")
@@ -41,27 +44,46 @@ func _process(delta: float) -> void:
 	if _ui_speed and is_instance_valid(_car):
 		_ui_speed.text = "%d km/h" % int(_car.speed() * 3.6)
 
-# ── World ─────────────────────────────────────────────────────────────────────
-
 func _world_pos(cell: Vector2i) -> Vector3:
 	return Vector3(cell.x * TILE3D, 0.0, cell.y * TILE3D)
 
+# ── Atmosphere & depth ────────────────────────────────────────────────────────
+
 func _build_environment() -> void:
+	# Dusk / early-night mood: deep blue sky, low warm ambient so emissive
+	# windows + streetlights pop, fog for depth fade, glow, filmic tonemap, and a
+	# low warm key light casting long shadows (the main depth cue).
 	var we := WorldEnvironment.new()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("#171720")
+	env.background_color = Color("#1A1D33")
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("#9AA0B4")
-	env.ambient_light_energy = 0.65
+	env.ambient_light_color = Color("#454C66")
+	env.ambient_light_energy = 0.5
 	env.fog_enabled = true
-	env.fog_light_color = Color("#171720")
-	env.fog_density = 0.012
+	env.fog_light_color = Color("#2A2F4D")
+	env.fog_light_energy = 0.8
+	env.fog_density = 0.010
+	env.fog_aerial_perspective = 0.5
+	env.fog_sky_affect = 0.4
+	env.glow_enabled = true
+	env.glow_intensity = 0.7
+	env.glow_strength = 1.0
+	env.glow_bloom = 0.15
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
+	env.glow_hdr_threshold = 0.95
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.tonemap_exposure = 1.0
+	env.tonemap_white = 1.1
 	we.environment = env
 	add_child(we)
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-52.0, -38.0, 0.0)
-	sun.light_energy = 1.15
+	sun.rotation_degrees = Vector3(-18.0, -125.0, 0.0)  # low + raking → long shadows
+	sun.light_color = Color("#FFB266")
+	sun.light_energy = 1.3
+	sun.shadow_enabled = true
+	sun.directional_shadow_max_distance = 220.0
+	sun.shadow_bias = 0.05
 	add_child(sun)
 
 func _build_ground() -> void:
@@ -76,12 +98,79 @@ func _build_ground() -> void:
 	var bm := BoxMesh.new()
 	bm.size = shape.size
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color("#26262C")
+	mat.albedo_color = Color("#1C1C22")
+	mat.roughness = 0.95
+	mat.metallic = 0.05
 	bm.material = mat
 	mi.mesh = bm
 	body.add_child(mi)
 	body.position = Vector3(span * 0.5, -1.0, span * 0.5)  # top at y=0
 	add_child(body)
+	# Cheap road-lane depth cues: slightly-emissive strips along arterial cells.
+	var lane_mat := StandardMaterial3D.new()
+	lane_mat.albedo_color = Color("#3A3A44")
+	lane_mat.emission_enabled = true
+	lane_mat.emission = Color("#5A5E78")
+	lane_mat.emission_energy_multiplier = 0.6
+	lane_mat.roughness = 1.0
+	var lane_y: float = 0.02
+	var strip_w: float = 0.6
+	var c: int = 0
+	while c <= RRTuning.CITY_COLS:
+		var center: float = c * TILE3D
+		var z_strip := MeshInstance3D.new()
+		var zq := QuadMesh.new()
+		zq.size = Vector2(strip_w, span)
+		zq.material = lane_mat
+		z_strip.mesh = zq
+		z_strip.position = Vector3(center, lane_y, span * 0.5)
+		z_strip.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
+		add_child(z_strip)
+		var x_strip := MeshInstance3D.new()
+		var xq := QuadMesh.new()
+		xq.size = Vector2(span, strip_w)
+		xq.material = lane_mat
+		x_strip.mesh = xq
+		x_strip.position = Vector3(span * 0.5, lane_y, center)
+		x_strip.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
+		add_child(x_strip)
+		c += 4
+
+func _add_streetlight(pos: Vector3) -> void:
+	var pole_height: float = 7.0
+	var pole := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.35, pole_height, 0.35)
+	var pmat := StandardMaterial3D.new()
+	pmat.albedo_color = Color("#2A2A30")
+	pmat.metallic = 0.4
+	pmat.roughness = 0.7
+	bm.material = pmat
+	pole.mesh = bm
+	pole.position = pos + Vector3(0.0, pole_height * 0.5, 0.0)
+	add_child(pole)
+	var head := MeshInstance3D.new()
+	var hm := SphereMesh.new()
+	hm.radius = 0.45
+	hm.height = 0.9
+	var hmat := StandardMaterial3D.new()
+	hmat.albedo_color = Color("#FFD9A0")
+	hmat.emission_enabled = true
+	hmat.emission = Color("#FFC062")
+	hmat.emission_energy_multiplier = 4.0
+	hm.material = hmat
+	head.mesh = hm
+	head.position = pos + Vector3(0.0, pole_height, 0.0)
+	add_child(head)
+	var light := OmniLight3D.new()
+	light.light_color = Color("#FFC062")
+	light.light_energy = 2.0
+	light.omni_range = 18.0
+	light.omni_attenuation = 1.5
+	light.position = pos + Vector3(0.0, pole_height - 0.4, 0.0)
+	add_child(light)
+
+# ── City ──────────────────────────────────────────────────────────────────────
 
 func _build_city() -> void:
 	var layout: Dictionary = CityGen.new().generate(_rng.randi())
@@ -90,26 +179,13 @@ func _build_city() -> void:
 	for p in layout["props"]:
 		_add_target(p["cell"], p["kind"], Vector3.ZERO)
 	_spawn_traffic(14)
+	_spawn_crowds(10)
+	_spawn_streetlights()
 
 func _add_building(cell: Vector2i) -> void:
-	var height: float = _rng.randf_range(8.0, 28.0)
-	var sb := StaticBody3D.new()
-	var col := CollisionShape3D.new()
-	var shape := BoxShape3D.new()
-	shape.size = Vector3(TILE3D * 0.82, height, TILE3D * 0.82)
-	col.shape = shape
-	sb.add_child(col)
-	var mi := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = shape.size
-	var mat := StandardMaterial3D.new()
-	var shade: float = _rng.randf_range(0.30, 0.46)
-	mat.albedo_color = Color(shade, shade, shade + 0.05)
-	bm.material = mat
-	mi.mesh = bm
-	sb.add_child(mi)
-	sb.position = _world_pos(cell) + Vector3(0.0, height * 0.5, 0.0)
-	add_child(sb)
+	var b := FPBuildings.make(TILE3D * 0.82, _rng)
+	add_child(b)
+	b.global_position = _world_pos(cell)
 
 func _add_target(cell: Vector2i, kind: String, drift: Vector3) -> void:
 	var t := FPTarget.new()
@@ -129,7 +205,6 @@ func _add_target(cell: Vector2i, kind: String, drift: Vector3) -> void:
 	t.global_position = _world_pos(cell)
 
 func _spawn_traffic(count: int) -> void:
-	# Cars that cruise along road lanes (cells where x or y % 4 == 0), ping-ponging.
 	for i in count:
 		var on_x: bool = (i % 2 == 0)
 		var lane: int = (_rng.randi_range(0, RRTuning.CITY_COLS / 4)) * 4
@@ -138,27 +213,39 @@ func _spawn_traffic(count: int) -> void:
 		var dir := Vector3(0, 0, _rng.randf_range(8.0, 16.0)) if on_x else Vector3(_rng.randf_range(8.0, 16.0), 0, 0)
 		_add_target(cell, "car", dir)
 
+func _spawn_crowds(clusters: int) -> void:
+	for i in clusters:
+		var cell := Vector2i(_rng.randi_range(1, RRTuning.CITY_COLS - 2), _rng.randi_range(1, RRTuning.CITY_ROWS - 2))
+		var peds: Array = FPPed.crowd(self, _world_pos(cell), _rng.randi_range(3, 6), _rng)
+		for ped in peds:
+			ped.smashed.connect(_on_smashed)
+
+func _spawn_streetlights() -> void:
+	var c: int = 0
+	while c < RRTuning.CITY_COLS:
+		var r: int = 0
+		while r < RRTuning.CITY_ROWS:
+			if _rng.randf() < 0.55:
+				_add_streetlight(_world_pos(Vector2i(c, r)) + Vector3(TILE3D * 0.4, 0.0, TILE3D * 0.4))
+			r += 4
+		c += 4
+
 func _spawn_car() -> void:
 	_car = FPCar.new()
-	# Central road intersection (cell 12,12 — both % 4 == 0).
 	_car.position = _world_pos(Vector2i(12, 12)) + Vector3(0.0, 1.2, 0.0)
 	add_child(_car)
 
-# ── Events ────────────────────────────────────────────────────────────────────
+# ── Events / HUD ──────────────────────────────────────────────────────────────
 
 func _on_smashed(value: int, _heat: int, pos: Vector3) -> void:
 	var pts: int = _combo.register(value)
 	_score.add(pts, 1)
 	_smashed += 1
-	_maybe_new_best()
-	_popup(pos, "+%d" % pts)
-	_refresh()
-
-func _maybe_new_best() -> void:
-	# Live best tracking (endless run — no game over to submit at).
 	if _score.score > _best:
 		_best = _score.score
 		_score.submit()
+	_popup(pos, "+%d" % pts)
+	_refresh()
 
 func _popup(pos: Vector3, text: String) -> void:
 	var l := Label3D.new()
@@ -175,8 +262,6 @@ func _popup(pos: Vector3, text: String) -> void:
 	t.tween_property(l, "modulate:a", 0.0, 0.7)
 	t.chain().tween_callback(func() -> void:
 		if is_instance_valid(l): l.queue_free())
-
-# ── HUD ───────────────────────────────────────────────────────────────────────
 
 func _refresh() -> void:
 	if _ui_score:

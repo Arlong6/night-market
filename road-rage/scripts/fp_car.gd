@@ -3,14 +3,17 @@
 class_name FPCar
 extends CharacterBody3D
 
+const FPCockpit = preload("res://scripts/fp_cockpit.gd")
+
 const ACCEL: float = 22.0
 const MAX_SPEED: float = 42.0
-const REVERSE_SPEED: float = 12.0
+const REVERSE_SPEED: float = 16.0
 const TURN_RATE: float = 2.3
 const FRICTION: float = 12.0
 const GRAVITY: float = 24.0
 
 var _cam: Camera3D = null
+var _cockpit: FPCockpit = null
 
 func _ready() -> void:
 	up_direction = Vector3.UP
@@ -45,6 +48,9 @@ func _ready() -> void:
 	_cam.fov = 82.0
 	_cam.current = true
 	add_child(_cam)
+	# First-person car interior (dashboard, wheel, pillars, mirror).
+	_cockpit = FPCockpit.new()
+	add_child(_cockpit)
 
 func speed() -> float:
 	return Vector3(velocity.x, 0.0, velocity.z).length()
@@ -52,22 +58,27 @@ func speed() -> float:
 func _physics_process(delta: float) -> void:
 	var throttle: float = Input.get_axis("brake", "accel")
 	var steer: float = Input.get_axis("left", "right")
+	if _cockpit != null:
+		_cockpit.set_steer(steer)
 	var sp: float = speed()
 	# Steer only while moving; scale with speed for an arcade feel.
 	if sp > 0.5:
 		rotate_y(-steer * TURN_RATE * delta * clampf(sp / MAX_SPEED, 0.25, 1.0))
 	var forward: Vector3 = -global_transform.basis.z
-	if throttle > 0.0:
-		velocity += forward * ACCEL * delta
-	elif throttle < 0.0:
-		velocity -= forward * REVERSE_SPEED * delta
-	# Horizontal friction.
 	var h := Vector3(velocity.x, 0.0, velocity.z)
-	var fr: float = FRICTION * delta
-	if h.length() <= fr:
-		h = Vector3.ZERO
+	if throttle > 0.0:
+		h += forward * ACCEL * delta
+	elif throttle < 0.0:
+		# Reverse / brake. Friction is skipped while throttling so the car
+		# actually builds reverse speed (friction used to cancel it out).
+		h += -forward * REVERSE_SPEED * delta
 	else:
-		h -= h.normalized() * fr
+		# Coasting: passive friction only when not accelerating.
+		var fr: float = FRICTION * delta
+		if h.length() <= fr:
+			h = Vector3.ZERO
+		else:
+			h -= h.normalized() * fr
 	h = h.limit_length(MAX_SPEED)
 	velocity.x = h.x
 	velocity.z = h.z
