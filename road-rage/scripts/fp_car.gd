@@ -5,11 +5,12 @@ extends CharacterBody3D
 
 const FPCockpit = preload("res://scripts/fp_cockpit.gd")
 
-const ACCEL: float = 22.0
-const MAX_SPEED: float = 42.0
-const REVERSE_SPEED: float = 16.0
+const ACCEL: float = 18.0
+const MAX_SPEED: float = 30.0      ## slower / more controllable per feedback
+const REVERSE_SPEED: float = 12.0
 const TURN_RATE: float = 2.3
 const FRICTION: float = 12.0
+const BRAKE_DECEL: float = 55.0    ## handbrake (SPACE) — strong deceleration
 const GRAVITY: float = 24.0
 const BASE_FOV: float = 76.0
 const MAX_FOV: float = 96.0    ## widens with speed for an acceleration rush
@@ -75,11 +76,14 @@ func _physics_process(delta: float) -> void:
 		rotate_y(-steer * TURN_RATE * delta * clampf(sp / MAX_SPEED, 0.25, 1.0))
 	var forward: Vector3 = -global_transform.basis.z
 	var h := Vector3(velocity.x, 0.0, velocity.z)
-	if throttle > 0.0:
+	if Input.is_action_pressed("handbrake"):
+		# Handbrake (SPACE): strong deceleration to a stop.
+		h = h.move_toward(Vector3.ZERO, BRAKE_DECEL * delta)
+	elif throttle > 0.0:
 		h += forward * ACCEL * delta
 	elif throttle < 0.0:
-		# Reverse / brake. Friction is skipped while throttling so the car
-		# actually builds reverse speed (friction used to cancel it out).
+		# Reverse. Friction is skipped while throttling so the car actually
+		# builds reverse speed (friction used to cancel it out).
 		h += -forward * REVERSE_SPEED * delta
 	else:
 		# Coasting: passive friction only when not accelerating.

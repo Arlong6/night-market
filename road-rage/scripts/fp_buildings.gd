@@ -19,8 +19,8 @@ const MAX_STOREYS: int = 6
 const SETBACK_CHANCE: float = 0.40   ## Probability a building tiers inward as it rises.
 const SETBACK_FACTOR: float = 0.74   ## Each setback tier shrinks footprint to this fraction.
 const WINDOW_LIT_CHANCE: float = 0.62 ## Fraction of windows that glow warm at night.
-const MAX_WINDOW_COLS: int = 4        ## Cap window grid density (node-count budget).
-const MAX_WINDOW_ROWS_PER_TIER: int = 4
+const MAX_WINDOW_COLS: int = 3        ## Cap window grid density (node-count budget).
+const MAX_WINDOW_ROWS_PER_TIER: int = 2
 
 ## Body palette — concrete greys, brick reds, teal, tan.
 const PALETTE: Array[Color] = [

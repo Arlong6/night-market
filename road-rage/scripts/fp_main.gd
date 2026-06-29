@@ -73,9 +73,10 @@ func _build_environment() -> void:
 	sun.rotation_degrees = Vector3(-58.0, -52.0, 0.0)  # high midday angle
 	sun.light_color = Color("#FFF4E2")
 	sun.light_energy = 1.5
-	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 180.0
-	sun.shadow_bias = 0.04
+	# Shadows DISABLED: real-time directional shadows over this many meshes crash
+	# the GL-compatibility renderer on some GPUs (the "window closes" bug). Depth
+	# now comes from fog + daytime lighting instead.
+	sun.shadow_enabled = false
 	add_child(sun)
 
 func _build_ground() -> void:
@@ -248,7 +249,7 @@ func _spawn_streetlights() -> void:
 	while c < RRTuning.CITY_COLS:
 		var r: int = 0
 		while r < RRTuning.CITY_ROWS:
-			if _rng.randf() < 0.55:
+			if _rng.randf() < 0.12:   # daytime: just a few poles; many omnis stress GL-compat
 				_add_streetlight(_world_pos(Vector2i(c, r)) + Vector3(TILE3D * 0.4, 0.0, TILE3D * 0.4))
 			r += 4
 		c += 4
