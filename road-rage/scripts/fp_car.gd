@@ -8,6 +8,7 @@ const MAX_SPEED: float = 30.0      ## slower / more controllable per feedback
 const REVERSE_SPEED: float = 12.0
 const TURN_RATE: float = 2.3
 const FRICTION: float = 12.0
+const GRIP: float = 5.0             ## how hard velocity steers toward facing in turns
 const BRAKE_DECEL: float = 55.0    ## handbrake (SPACE)
 const GRAVITY: float = 24.0
 const BASE_FOV: float = 72.0
@@ -130,6 +131,10 @@ func _physics_process(delta: float) -> void:
 			h = Vector3.ZERO
 		else:
 			h -= h.normalized() * fr
+	# Grip: steer the velocity toward the car's facing so corners feel planted
+	# instead of sliding (the "handling feels off / drifty" feedback).
+	if h.length() > 1.0 and not Input.is_action_pressed("handbrake"):
+		h = h.lerp(forward * h.length(), clampf(GRIP * delta, 0.0, 1.0))
 	h = h.limit_length(MAX_SPEED)
 	velocity.x = h.x
 	velocity.z = h.z

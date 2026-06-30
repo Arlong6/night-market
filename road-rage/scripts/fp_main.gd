@@ -13,7 +13,7 @@ const CityGen = preload("res://scripts/city_gen.gd")
 const ComboSystem = preload("res://scripts/combo_system.gd")
 const ScoreSystem = preload("res://scripts/score_system.gd")
 
-const TILE3D: float = 12.0
+const TILE3D: float = 14.0   ## bigger blocks + wider roads (cornering room)
 
 var _car: FPCar = null
 var _combo := ComboSystem.new()
@@ -204,6 +204,8 @@ func _build_city() -> void:
 		_add_target(p["cell"], p["kind"], Vector3.ZERO)
 	_spawn_traffic(12)
 	_spawn_crowds(8)
+	_spawn_trees(34)
+	_build_test_track()
 
 func _add_building(cell: Vector2i) -> void:
 	var b := FPBuildings.make(TILE3D * 0.82, _rng)
@@ -252,6 +254,71 @@ func _spawn_streetlights() -> void:
 				_add_streetlight(_world_pos(Vector2i(c, r)) + Vector3(TILE3D * 0.4, 0.0, TILE3D * 0.4))
 			r += 4
 		c += 4
+
+func _add_tree(pos: Vector3) -> void:
+	var trunk := MeshInstance3D.new()
+	var tm := CylinderMesh.new()
+	tm.top_radius = 0.3
+	tm.bottom_radius = 0.42
+	tm.height = 3.0
+	var trunk_mat := StandardMaterial3D.new()
+	trunk_mat.albedo_color = Color("#5A3A22")
+	trunk_mat.roughness = 0.95
+	tm.material = trunk_mat
+	trunk.mesh = tm
+	trunk.position = pos + Vector3(0.0, 1.5, 0.0)
+	add_child(trunk)
+	var canopy := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 1.9
+	sm.height = 3.6
+	var leaf := StandardMaterial3D.new()
+	leaf.albedo_color = Color("#3E7D3A")
+	leaf.roughness = 0.9
+	sm.material = leaf
+	canopy.mesh = sm
+	canopy.position = pos + Vector3(0.0, 4.0, 0.0)
+	add_child(canopy)
+
+func _spawn_trees(count: int) -> void:
+	# Greenery along the sidewalks (edges of road cells) for a bit of life.
+	var span: float = RRTuning.CITY_COLS * TILE3D
+	for i in count:
+		var lane: int = (_rng.randi_range(1, RRTuning.CITY_COLS / 4)) * 4
+		var along: float = _rng.randf_range(1.0, RRTuning.CITY_ROWS - 1) * TILE3D
+		var edge: float = TILE3D * 0.42 * (1.0 if (i % 2 == 0) else -1.0)
+		var p: Vector3
+		if i % 2 == 0:
+			p = Vector3(lane * TILE3D + edge, 0.0, along)
+		else:
+			p = Vector3(along, 0.0, lane * TILE3D + edge)
+		p.x = clampf(p.x, 6.0, span - 6.0)
+		p.z = clampf(p.z, 6.0, span - 6.0)
+		_add_tree(p)
+
+func _build_test_track() -> void:
+	# A ring of cones near the spawn — a simple cornering course to test handling.
+	var center: Vector3 = _world_pos(Vector2i(12, 12))
+	var rx: float = 56.0
+	var rz: float = 36.0
+	var cone_mat := StandardMaterial3D.new()
+	cone_mat.albedo_color = Color("#FF6A1A")
+	cone_mat.emission_enabled = true
+	cone_mat.emission = Color("#FF5400")
+	cone_mat.emission_energy_multiplier = 0.7
+	var n: int = 26
+	for i in n:
+		var a: float = TAU * float(i) / float(n)
+		var pos: Vector3 = center + Vector3(cos(a) * rx, 0.0, sin(a) * rz)
+		var cone := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = 0.04
+		cm.bottom_radius = 0.45
+		cm.height = 1.1
+		cm.material = cone_mat
+		cone.mesh = cm
+		cone.position = pos + Vector3(0.0, 0.55, 0.0)
+		add_child(cone)
 
 func _spawn_car() -> void:
 	_car = FPCar.new()
