@@ -65,7 +65,6 @@ func _break(car: FPCar) -> void:
 
 func _spawn_debris() -> void:
 	var p := CPUParticles3D.new()
-	p.global_position = global_position + Vector3(0.0, size.y * 0.5, 0.0)
 	p.amount = 10
 	p.lifetime = 0.6
 	p.one_shot = true
@@ -82,7 +81,8 @@ func _spawn_debris() -> void:
 	mat.albedo_color = box_color.lightened(0.15)
 	debris_mesh.material = mat
 	p.mesh = debris_mesh
-	p.emitting = true
 	get_parent().add_child(p)
+	p.global_position = global_position + Vector3(0.0, size.y * 0.5, 0.0)
+	p.emitting = true
 	get_tree().create_timer(1.1).timeout.connect(func() -> void:
 		if is_instance_valid(p): p.queue_free())

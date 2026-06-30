@@ -56,7 +56,7 @@ func _build_environment() -> void:
 	var we := WorldEnvironment.new()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("#A6CDEE")   # cool, fresh daytime blue
+	env.background_color = Color("#9EC8EE")   # cooler, fresher daytime blue
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color("#C4D2E4")
 	env.ambient_light_energy = 0.95
@@ -73,10 +73,10 @@ func _build_environment() -> void:
 	sun.rotation_degrees = Vector3(-58.0, -52.0, 0.0)  # high midday angle
 	sun.light_color = Color("#EAF2FB")  # cool daylight white
 	sun.light_energy = 1.35
-	# Shadows DISABLED: real-time directional shadows over this many meshes crash
-	# the GL-compatibility renderer on some GPUs (the "window closes" bug). Depth
-	# now comes from fog + daytime lighting instead.
-	sun.shadow_enabled = false
+	# Forward+ on Apple Silicon handles real-time shadows fine — re-enabled for depth.
+	sun.shadow_enabled = true
+	sun.directional_shadow_max_distance = 180.0
+	sun.shadow_bias = 0.04
 	add_child(sun)
 
 func _build_ground() -> void:
@@ -199,13 +199,11 @@ func _add_streetlight(pos: Vector3) -> void:
 func _build_city() -> void:
 	var layout: Dictionary = CityGen.new().generate(_rng.randi())
 	for cell in layout["buildings"]:
-		if _rng.randf() < 0.4:
-			continue   # thin out buildings for the GL-compat render budget
 		_add_building(cell)
 	for p in layout["props"]:
 		_add_target(p["cell"], p["kind"], Vector3.ZERO)
-	_spawn_traffic(8)
-	_spawn_crowds(5)
+	_spawn_traffic(12)
+	_spawn_crowds(8)
 
 func _add_building(cell: Vector2i) -> void:
 	var b := FPBuildings.make(TILE3D * 0.82, _rng)

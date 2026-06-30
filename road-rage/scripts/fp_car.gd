@@ -21,16 +21,16 @@ func _ready() -> void:
 	up_direction = Vector3.UP
 	var col := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(2.4, 1.4, 5.0)
+	box.size = Vector3(3.2, 1.7, 6.6)
 	col.shape = box
-	col.position = Vector3(0.0, 0.7, 0.0)
+	col.position = Vector3(0.0, 0.85, 0.0)
 	add_child(col)
 	_build_car_visual()
 	# Third-person chase camera: behind (+Z, since the car faces -Z) and above,
 	# pulled back, with a slight downward tilt. Rigidly parented so it follows turns.
 	_cam = Camera3D.new()
-	_cam.position = Vector3(0.0, 5.6, 11.0)
-	_cam.rotation_degrees = Vector3(-17.0, 0.0, 0.0)
+	_cam.position = Vector3(0.0, 8.0, 16.5)   # pulled further back + higher
+	_cam.rotation_degrees = Vector3(-18.0, 0.0, 0.0)
 	_cam.fov = BASE_FOV
 	_cam.current = true
 	add_child(_cam)
@@ -47,34 +47,34 @@ func _build_car_visual() -> void:
 	body_mat.roughness = 0.45
 	var chassis := MeshInstance3D.new()
 	var cm := BoxMesh.new()
-	cm.size = Vector3(2.4, 0.9, 5.0)
+	cm.size = Vector3(3.2, 1.0, 6.6)
 	cm.material = body_mat
 	chassis.mesh = cm
-	chassis.position = Vector3(0.0, 0.6, 0.0)
+	chassis.position = Vector3(0.0, 0.68, 0.0)
 	add_child(chassis)
 	# Cabin
 	var cabin := MeshInstance3D.new()
 	var cab := BoxMesh.new()
-	cab.size = Vector3(2.0, 0.8, 2.4)
+	cab.size = Vector3(2.7, 1.0, 3.0)
 	var cab_mat := StandardMaterial3D.new()
 	cab_mat.albedo_color = Color("#BE3C20")
 	cab_mat.metallic = 0.35
 	cab_mat.roughness = 0.45
 	cab.material = cab_mat
 	cabin.mesh = cab
-	cabin.position = Vector3(0.0, 1.25, 0.2)
+	cabin.position = Vector3(0.0, 1.7, 0.45)
 	add_child(cabin)
 	# Windshield (front = -Z)
 	var glass := MeshInstance3D.new()
 	var gm := BoxMesh.new()
-	gm.size = Vector3(1.85, 0.7, 0.18)
+	gm.size = Vector3(2.5, 0.85, 0.2)
 	var gmat := StandardMaterial3D.new()
 	gmat.albedo_color = Color("#243040")
 	gmat.metallic = 0.7
 	gmat.roughness = 0.1
 	gm.material = gmat
 	glass.mesh = gm
-	glass.position = Vector3(0.0, 1.25, -1.0)
+	glass.position = Vector3(0.0, 1.7, -1.1)
 	add_child(glass)
 	# Headlights (front), emissive
 	var hl_mat := StandardMaterial3D.new()
@@ -82,29 +82,29 @@ func _build_car_visual() -> void:
 	hl_mat.emission_enabled = true
 	hl_mat.emission = Color("#FFE890")
 	hl_mat.emission_energy_multiplier = 2.0
-	for sx in [-0.8, 0.8]:
+	for sx in [-1.05, 1.05]:
 		var hl := MeshInstance3D.new()
 		var hm := BoxMesh.new()
-		hm.size = Vector3(0.5, 0.3, 0.18)
+		hm.size = Vector3(0.6, 0.35, 0.2)
 		hm.material = hl_mat
 		hl.mesh = hm
-		hl.position = Vector3(sx, 0.6, -2.5)
+		hl.position = Vector3(sx, 0.7, -3.35)
 		add_child(hl)
 	# Wheels (cylinders laid on their side — axis along X)
 	var wheel_mat := StandardMaterial3D.new()
 	wheel_mat.albedo_color = Color("#18181C")
 	wheel_mat.roughness = 0.9
-	for wx in [-1.25, 1.25]:
-		for wz in [-1.6, 1.6]:
+	for wx in [-1.7, 1.7]:
+		for wz in [-2.2, 2.2]:
 			var w := MeshInstance3D.new()
 			var wm := CylinderMesh.new()
-			wm.top_radius = 0.55
-			wm.bottom_radius = 0.55
-			wm.height = 0.4
+			wm.top_radius = 0.72
+			wm.bottom_radius = 0.72
+			wm.height = 0.5
 			wm.material = wheel_mat
 			w.mesh = wm
 			w.rotation_degrees = Vector3(0.0, 0.0, 90.0)
-			w.position = Vector3(wx, 0.45, wz)
+			w.position = Vector3(wx, 0.6, wz)
 			add_child(w)
 
 func speed() -> float:

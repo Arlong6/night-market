@@ -87,9 +87,7 @@ static func make(footprint: float, rng: RandomNumberGenerator) -> StaticBody3D:
 		var tier_h: float = float(tier_storeys) * STOREY_H
 
 		_add_tier_block(root, cur_w, tier_h, y_base, body_mat)
-		# Windows temporarily OFF: thousands of window meshes were the prime
-		# suspect for the GL-compat render crash. Re-add via MultiMesh once stable.
-		# _add_windows(root, cur_w, tier_h, y_base, rng)
+		_add_windows(root, cur_w, tier_h, y_base, rng)
 		_add_trim_band(root, cur_w, y_base + tier_h, trim_mat)
 
 		top_tier_w = cur_w
