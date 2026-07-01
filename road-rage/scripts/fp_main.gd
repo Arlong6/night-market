@@ -78,6 +78,8 @@ func _build_environment() -> void:
 	env.ssao_enabled = true
 	env.ssao_radius = 2.0
 	env.ssao_intensity = 2.2
+	env.ssr_enabled = true          # screen-space reflections on the polished road
+	env.ssr_max_steps = 32
 	env.glow_enabled = true
 	env.glow_intensity = 0.5
 	env.glow_bloom = 0.1
@@ -107,9 +109,9 @@ func _build_ground() -> void:
 	var bm := BoxMesh.new()
 	bm.size = shape.size
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color("#1C1C22")
-	mat.roughness = 0.95
-	mat.metallic = 0.05
+	mat.albedo_color = Color("#22222A")
+	mat.roughness = 0.5     # polished asphalt — catches SSR reflections
+	mat.metallic = 0.12
 	bm.material = mat
 	mi.mesh = bm
 	body.add_child(mi)

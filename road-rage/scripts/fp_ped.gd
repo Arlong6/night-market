@@ -183,8 +183,8 @@ func _spawn_flying_ped(car: FPCar) -> void:
 		dir = -car.global_transform.basis.z
 	dir = dir.normalized()
 	var force: float = maxf(car.speed(), 8.0)
-	r.linear_velocity = dir * force * 1.4 + Vector3.UP * (6.0 + force * 0.3)
-	r.angular_velocity = Vector3(randf_range(-12.0, 12.0), randf_range(-12.0, 12.0), randf_range(-12.0, 12.0))
+	r.linear_velocity = dir * force * 0.8 + Vector3.UP * (3.2 + force * 0.16)
+	r.angular_velocity = Vector3(randf_range(-8.0, 8.0), randf_range(-8.0, 8.0), randf_range(-8.0, 8.0))
 	var t := r.create_tween()
 	t.tween_interval(2.2)
 	t.tween_property(r, "scale", Vector3.ZERO, 0.5)

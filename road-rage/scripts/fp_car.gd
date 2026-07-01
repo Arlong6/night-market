@@ -5,7 +5,7 @@ extends CharacterBody3D
 
 const ACCEL: float = 18.0
 const MAX_SPEED: float = 30.0      ## slower / more controllable per feedback
-const REVERSE_SPEED: float = 12.0
+const REVERSE_SPEED: float = 20.0   ## faster reverse per feedback
 const TURN_RATE: float = 2.3
 const FRICTION: float = 12.0
 const GRIP: float = 5.0             ## how hard velocity steers toward facing in turns
@@ -115,8 +115,10 @@ func _physics_process(delta: float) -> void:
 	var throttle: float = Input.get_axis("brake", "accel")
 	var steer: float = Input.get_axis("left", "right")
 	var sp: float = speed()
+	# Invert steering while reversing so it feels natural (like backing up looking over your shoulder).
+	var steer_input: float = (-steer if throttle < 0.0 else steer)
 	if sp > 0.5:
-		rotate_y(-steer * TURN_RATE * delta * clampf(sp / MAX_SPEED, 0.25, 1.0))
+		rotate_y(-steer_input * TURN_RATE * delta * clampf(sp / MAX_SPEED, 0.25, 1.0))
 	var forward: Vector3 = -global_transform.basis.z
 	var h := Vector3(velocity.x, 0.0, velocity.z)
 	if Input.is_action_pressed("handbrake"):
@@ -134,7 +136,10 @@ func _physics_process(delta: float) -> void:
 	# Grip: steer the velocity toward the car's facing so corners feel planted
 	# instead of sliding (the "handling feels off / drifty" feedback).
 	if h.length() > 1.0 and not Input.is_action_pressed("handbrake"):
-		h = h.lerp(forward * h.length(), clampf(GRIP * delta, 0.0, 1.0))
+		# Grip toward the car's travel axis — forward OR backward, whichever it's
+		# actually moving — so it stays planted without fighting reverse.
+		var travel_sign: float = (1.0 if h.dot(forward) >= 0.0 else -1.0)
+		h = h.lerp(forward * travel_sign * h.length(), clampf(GRIP * delta, 0.0, 1.0))
 	h = h.limit_length(MAX_SPEED)
 	velocity.x = h.x
 	velocity.z = h.z
