@@ -9,6 +9,8 @@ const FPCar = preload("res://scripts/fp_car.gd")
 const FPTarget = preload("res://scripts/fp_target.gd")
 const FPBuildings = preload("res://scripts/fp_buildings.gd")
 const FPPed = preload("res://scripts/fp_ped.gd")
+const FPPolice = preload("res://scripts/fp_police.gd")
+const FPDecor = preload("res://scripts/fp_decor.gd")
 const CityGen = preload("res://scripts/city_gen.gd")
 const ComboSystem = preload("res://scripts/combo_system.gd")
 const ScoreSystem = preload("res://scripts/score_system.gd")
@@ -22,10 +24,20 @@ var _best: int = 0
 var _smashed: int = 0
 var _rng := RandomNumberGenerator.new()
 
+var _env: Environment = null
+var _sun: DirectionalLight3D = null
+var _tod: int = 0                 # 0 day, 1 dusk, 2 night
+const _TOD_NAMES: Array[String] = ["day", "dusk", "night"]
+
+var _wanted_heat: float = 0.0
+var _police: Array = []
+var _pol_timer: float = 0.0
+
 var _ui_score: Label = null
 var _ui_combo: Label = null
 var _ui_best: Label = null
 var _ui_speed: Label = null
+var _ui_wanted: Label = null
 
 func _ready() -> void:
 	_rng.randomize()
@@ -44,6 +56,37 @@ func _process(delta: float) -> void:
 		_ui_combo.text = "×%d 連擊!" % _combo.multiplier()
 	if _ui_speed and is_instance_valid(_car):
 		_ui_speed.text = "%d km/h" % int(_car.speed() * 3.6)
+	# Wanted heat decays; police escalate with the star level.
+	_wanted_heat = maxf(0.0, _wanted_heat - 6.0 * delta)
+	_pol_timer -= delta
+	if _pol_timer <= 0.0:
+		_pol_timer = 3.0
+		_manage_police()
+	if _ui_wanted:
+		var stars: int = _wanted_stars()
+		_ui_wanted.text = "通緝 " + "★".repeat(stars) + "☆".repeat(5 - stars)
+	# Cycle day / dusk / night with T.
+	if Input.is_action_just_pressed("toggle_time"):
+		_cycle_time()
+
+func _wanted_stars() -> int:
+	var s: int = 0
+	for i in RRTuning.STAR_THRESHOLDS.size():
+		if _wanted_heat >= float(RRTuning.STAR_THRESHOLDS[i]):
+			s = i
+	return s
+
+func _manage_police() -> void:
+	_police = _police.filter(func(p): return is_instance_valid(p))
+	var want: int = _wanted_stars() * 2
+	while _police.size() < want and is_instance_valid(_car):
+		var p := FPPolice.spawn(self, _car, _car.global_position, 90.0)
+		_police.append(p)
+
+func _cycle_time() -> void:
+	_tod = (_tod + 1) % _TOD_NAMES.size()
+	if _env != null and _sun != null:
+		FPDecor.apply_time_of_day(_env, _sun, _TOD_NAMES[_tod])
 
 func _world_pos(cell: Vector2i) -> Vector3:
 	return Vector3(cell.x * TILE3D, 0.0, cell.y * TILE3D)
@@ -96,6 +139,8 @@ func _build_environment() -> void:
 	sun.directional_shadow_max_distance = 180.0
 	sun.shadow_bias = 0.04
 	add_child(sun)
+	_env = env
+	_sun = sun
 
 func _build_ground() -> void:
 	var span: float = RRTuning.CITY_COLS * TILE3D
@@ -223,6 +268,8 @@ func _build_city() -> void:
 	_spawn_traffic(12)
 	_spawn_crowds(8)
 	_spawn_trees(34)
+	FPDecor.add_curbs(self, RRTuning.CITY_COLS, RRTuning.CITY_ROWS, TILE3D)
+	_spawn_neon(16)
 	_build_test_track()
 
 func _add_building(cell: Vector2i) -> void:
@@ -246,6 +293,8 @@ func _add_target(cell: Vector2i, kind: String, drift: Vector3) -> void:
 	t.smashed.connect(_on_smashed)
 	add_child(t)
 	t.global_position = _world_pos(cell)
+	if kind == "car":
+		FPDecor.make_car_body(t, t.size, t.box_color)
 
 func _spawn_traffic(count: int) -> void:
 	for i in count:
@@ -314,6 +363,21 @@ func _spawn_trees(count: int) -> void:
 		p.z = clampf(p.z, 6.0, span - 6.0)
 		_add_tree(p)
 
+func _spawn_neon(count: int) -> void:
+	var colors: Array[Color] = [Color("#FF3AA0"), Color("#22E0FF"), Color("#FFE23A"), Color("#8A5CFF"), Color("#FF6A2A"), Color("#3AFF8A")]
+	for i in count:
+		var lane: int = (_rng.randi_range(1, RRTuning.CITY_COLS / 4)) * 4
+		var along: float = _rng.randf_range(2.0, RRTuning.CITY_ROWS - 2) * TILE3D
+		var pos: Vector3
+		var facing: float
+		if i % 2 == 0:
+			pos = Vector3(lane * TILE3D + TILE3D * 0.42, 0.0, along)
+			facing = 90.0
+		else:
+			pos = Vector3(along, 0.0, lane * TILE3D + TILE3D * 0.42)
+			facing = 0.0
+		FPDecor.neon_sign(self, pos, facing, colors[_rng.randi() % colors.size()])
+
 func _build_test_track() -> void:
 	# A ring of cones near the spawn — a simple cornering course to test handling.
 	var center: Vector3 = _world_pos(Vector2i(12, 12))
@@ -345,10 +409,11 @@ func _spawn_car() -> void:
 
 # ── Events / HUD ──────────────────────────────────────────────────────────────
 
-func _on_smashed(value: int, _heat: int, pos: Vector3) -> void:
+func _on_smashed(value: int, heat: int, pos: Vector3) -> void:
 	var pts: int = _combo.register(value)
 	_score.add(pts, 1)
 	_smashed += 1
+	_wanted_heat += float(heat)
 	if _score.score > _best:
 		_best = _score.score
 		_score.submit()
@@ -384,7 +449,10 @@ func _build_hud() -> void:
 	_ui_best = _mk_label(ui, Vector2(740, 18), 18, Color("#C8BC90"))
 	_ui_combo = _mk_label(ui, Vector2(20, 50), 24, Color("#FFB020"))
 	_ui_combo.visible = false
+	_ui_wanted = _mk_label(ui, Vector2(20, 84), 22, Color("#FF6060"))
 	_ui_speed = _mk_label(ui, Vector2(740, 500), 22, Color("#A0D0FF"))
+	var hint := _mk_label(ui, Vector2(20, 508), 15, Color("#B8C0CC"))
+	hint.text = "Shift 氮氣 · 空白 手煞車 · S 倒車 · T 日夜切換"
 	_refresh()
 
 func _mk_label(ui: CanvasLayer, pos: Vector2, size: int, col: Color) -> Label:

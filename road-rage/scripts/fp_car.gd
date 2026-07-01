@@ -4,7 +4,7 @@ class_name FPCar
 extends CharacterBody3D
 
 const ACCEL: float = 18.0
-const MAX_SPEED: float = 30.0      ## slower / more controllable per feedback
+const MAX_SPEED: float = 33.0      ## base top speed (nitro boosts above this)
 const REVERSE_SPEED: float = 20.0   ## faster reverse per feedback
 const TURN_RATE: float = 2.3
 const FRICTION: float = 12.0
@@ -121,10 +121,11 @@ func _physics_process(delta: float) -> void:
 		rotate_y(-steer_input * TURN_RATE * delta * clampf(sp / MAX_SPEED, 0.25, 1.0))
 	var forward: Vector3 = -global_transform.basis.z
 	var h := Vector3(velocity.x, 0.0, velocity.z)
+	var boosting: bool = Input.is_action_pressed("nitro") and throttle > 0.0
 	if Input.is_action_pressed("handbrake"):
 		h = h.move_toward(Vector3.ZERO, BRAKE_DECEL * delta)
 	elif throttle > 0.0:
-		h += forward * ACCEL * delta
+		h += forward * ACCEL * (2.0 if boosting else 1.0) * delta
 	elif throttle < 0.0:
 		h += -forward * REVERSE_SPEED * delta
 	else:
@@ -140,7 +141,7 @@ func _physics_process(delta: float) -> void:
 		# actually moving — so it stays planted without fighting reverse.
 		var travel_sign: float = (1.0 if h.dot(forward) >= 0.0 else -1.0)
 		h = h.lerp(forward * travel_sign * h.length(), clampf(GRIP * delta, 0.0, 1.0))
-	h = h.limit_length(MAX_SPEED)
+	h = h.limit_length(MAX_SPEED * (1.55 if boosting else 1.0))
 	velocity.x = h.x
 	velocity.z = h.z
 	if is_on_floor():
@@ -154,6 +155,8 @@ func _physics_process(delta: float) -> void:
 		var tgt_fov: float = lerpf(BASE_FOV, MAX_FOV, frac)
 		if throttle > 0.0:
 			tgt_fov += 3.0
+		if boosting:
+			tgt_fov += 9.0   # nitro rush
 		_cam.fov = lerpf(_cam.fov, tgt_fov, 0.10)
 		var shake: float = maxf(0.0, frac - 0.6) * 0.08
 		_cam.h_offset = randf_range(-shake, shake)
@@ -162,7 +165,7 @@ func _physics_process(delta: float) -> void:
 		if not _engine_started and (throttle != 0.0 or steer != 0.0):
 			_engine_started = true
 			_engine.play()
-		_engine.pitch_scale = 0.7 + 1.4 * frac
+		_engine.pitch_scale = 0.7 + 1.4 * frac + (0.4 if boosting else 0.0)
 	# Safety: a run never "ends" — respawn if the car drops off the world.
 	if global_position.y < -8.0:
 		global_position = Vector3(144.0, 2.0, 144.0)
