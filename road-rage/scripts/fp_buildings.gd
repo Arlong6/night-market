@@ -56,7 +56,7 @@ static func make(footprint: float, rng: RandomNumberGenerator) -> StaticBody3D:
 	var trim_color: Color = TRIM_PALETTE[rng.randi_range(0, TRIM_PALETTE.size() - 1)]
 	var tiered: bool = storeys >= 3 and rng.randf() < SETBACK_CHANCE
 
-	var root := StaticBody3D.new()
+	var root := FPBuildingBody.new()   # collapsible on hard impact
 
 	# Single collider covering the main (ground-level, widest) mass.
 	var col := CollisionShape3D.new()

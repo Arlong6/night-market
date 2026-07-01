@@ -149,6 +149,12 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.y -= GRAVITY * delta
 	move_and_slide()
+	# Smash through buildings when ramming them fast enough.
+	if speed() > 18.0:
+		for i in get_slide_collision_count():
+			var other := get_slide_collision(i).get_collider()
+			if other != null and other.has_method("collapse"):
+				other.collapse()
 	# ── Speed feel ──
 	var frac: float = clampf(speed() / MAX_SPEED, 0.0, 1.0)
 	if _cam != null:

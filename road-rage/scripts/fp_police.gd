@@ -106,9 +106,10 @@ func _physics_process(delta: float) -> void:
 			velocity.y -= GRAVITY * delta
 		move_and_slide()
 		return
-	if _siren_t <= 0.0:
-		_siren_t = SIREN_INTERVAL
-		RRAudio.siren(self)
+	# Siren disabled per feedback (too noisy with several cruisers).
+	# if _siren_t <= 0.0:
+	# 	_siren_t = SIREN_INTERVAL
+	# 	RRAudio.siren(self)
 	var flat: Vector3 = Vector3(target.global_position.x, global_position.y, target.global_position.z)
 	var to: Vector3 = flat - global_position
 	if to.length() > 4.0:

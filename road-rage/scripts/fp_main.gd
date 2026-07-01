@@ -276,6 +276,18 @@ func _add_building(cell: Vector2i) -> void:
 	var b := FPBuildings.make(TILE3D * 0.82, _rng)
 	add_child(b)
 	b.global_position = _world_pos(cell)
+	b.connect("collapsed", _on_building_collapsed)
+
+func _on_building_collapsed(pos: Vector3) -> void:
+	var pts: int = _combo.register(150)
+	_score.add(pts, 1)
+	_smashed += 1
+	_wanted_heat += 40.0   # leveling a building brings serious heat
+	if _score.score > _best:
+		_best = _score.score
+		_score.submit()
+	_popup(pos + Vector3(0.0, 5.0, 0.0), "轟! +%d" % pts)
+	_refresh()
 
 func _add_target(cell: Vector2i, kind: String, drift: Vector3) -> void:
 	var t := FPTarget.new()
