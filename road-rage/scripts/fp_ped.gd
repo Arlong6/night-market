@@ -149,9 +149,47 @@ func _on_body_entered(body: Node) -> void:
 func _break(car: FPCar) -> void:
 	_broke = true
 	_spawn_poof()
+	_spawn_flying_ped(car)
 	car.bleed_speed(0.92)  # pedestrians barely slow the car
 	smashed.emit(value, heat, global_position)
 	queue_free()
+
+## Comically launch the pedestrian as a physics body — flung, tumbling, lands.
+func _spawn_flying_ped(car: FPCar) -> void:
+	var host: Node = get_parent()
+	if host == null:
+		return
+	var r := RigidBody3D.new()
+	var col := CollisionShape3D.new()
+	var shape := CapsuleShape3D.new()
+	shape.radius = 0.3
+	shape.height = body_height
+	col.shape = shape
+	r.add_child(col)
+	var mi := MeshInstance3D.new()
+	var cm := CapsuleMesh.new()
+	cm.radius = 0.3
+	cm.height = body_height
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = _shirt_color
+	cm.material = mat
+	mi.mesh = cm
+	r.add_child(mi)
+	host.add_child(r)
+	r.global_position = global_position + Vector3(0.0, body_height * 0.5, 0.0)
+	var dir: Vector3 = global_position - car.global_position
+	dir.y = 0.0
+	if dir.length() < 0.1:
+		dir = -car.global_transform.basis.z
+	dir = dir.normalized()
+	var force: float = maxf(car.speed(), 8.0)
+	r.linear_velocity = dir * force * 1.4 + Vector3.UP * (6.0 + force * 0.3)
+	r.angular_velocity = Vector3(randf_range(-12.0, 12.0), randf_range(-12.0, 12.0), randf_range(-12.0, 12.0))
+	var t := r.create_tween()
+	t.tween_interval(2.2)
+	t.tween_property(r, "scale", Vector3.ZERO, 0.5)
+	t.tween_callback(func() -> void:
+		if is_instance_valid(r): r.queue_free())
 
 ## Comedic confetti poof — bright shirt-colored bits, no gore.
 func _spawn_poof() -> void:

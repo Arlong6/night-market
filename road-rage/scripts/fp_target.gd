@@ -59,9 +59,46 @@ func _on_body_entered(body: Node) -> void:
 func _break(car: FPCar) -> void:
 	_broke = true
 	_spawn_debris()
+	_spawn_flying_chunk(car)
 	car.bleed_speed(0.86)
 	smashed.emit(value, heat, global_position)
 	queue_free()
+
+## Launch the smashed object as a physics chunk that flies off in the car's
+## travel direction, tumbles, lands, then fades — a real "knocked away" reaction.
+func _spawn_flying_chunk(car: FPCar) -> void:
+	var host: Node = get_parent()
+	if host == null:
+		return
+	var r := RigidBody3D.new()
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = size
+	col.shape = shape
+	r.add_child(col)
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = size
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = box_color
+	bm.material = mat
+	mi.mesh = bm
+	r.add_child(mi)
+	host.add_child(r)
+	r.global_position = global_position + Vector3(0.0, size.y * 0.5, 0.0)
+	var dir: Vector3 = global_position - car.global_position
+	dir.y = 0.0
+	if dir.length() < 0.1:
+		dir = -car.global_transform.basis.z
+	dir = dir.normalized()
+	var force: float = maxf(car.speed(), 8.0)
+	r.linear_velocity = dir * force * 1.3 + Vector3.UP * (5.0 + force * 0.25)
+	r.angular_velocity = Vector3(randf_range(-9.0, 9.0), randf_range(-9.0, 9.0), randf_range(-9.0, 9.0))
+	var t := r.create_tween()
+	t.tween_interval(2.2)
+	t.tween_property(r, "scale", Vector3.ZERO, 0.5)
+	t.tween_callback(func() -> void:
+		if is_instance_valid(r): r.queue_free())
 
 func _spawn_debris() -> void:
 	var p := CPUParticles3D.new()

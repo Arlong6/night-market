@@ -55,19 +55,35 @@ func _build_environment() -> void:
 	# for depth, and a high sun casting crisp shadows (the main depth cue).
 	var we := WorldEnvironment.new()
 	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("#9EC8EE")   # cooler, fresher daytime blue
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("#C4D2E4")
-	env.ambient_light_energy = 0.95
+	# Grand procedural sky — a gradient dome with a sun disk (follows the sun light).
+	var sky := Sky.new()
+	var sky_mat := ProceduralSkyMaterial.new()
+	sky_mat.sky_top_color = Color("#2E5FA8")
+	sky_mat.sky_horizon_color = Color("#C4D9EC")
+	sky_mat.ground_bottom_color = Color("#3E434E")
+	sky_mat.ground_horizon_color = Color("#9EACBC")
+	sky_mat.sun_angle_max = 12.0
+	sky.sky_material = sky_mat
+	env.background_mode = Environment.BG_SKY
+	env.sky = sky
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	env.ambient_light_energy = 1.0
+	# Atmospheric depth.
 	env.fog_enabled = true
 	env.fog_light_color = Color("#C6D8EC")
-	env.fog_light_energy = 1.0
-	env.fog_density = 0.0032   # light cool haze for depth
-	env.fog_aerial_perspective = 0.35
-	env.fog_sky_affect = 0.15
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_exposure = 0.95
+	env.fog_density = 0.0026
+	env.fog_aerial_perspective = 0.5
+	env.fog_sky_affect = 0.3
+	# Grandeur: ambient occlusion + bloom + cinematic tonemap (Forward+ features).
+	env.ssao_enabled = true
+	env.ssao_radius = 2.0
+	env.ssao_intensity = 2.2
+	env.glow_enabled = true
+	env.glow_intensity = 0.5
+	env.glow_bloom = 0.1
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
+	env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	env.tonemap_exposure = 1.0
 	we.environment = env
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-58.0, -52.0, 0.0)  # high midday angle
