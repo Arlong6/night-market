@@ -74,6 +74,9 @@ func _process(delta: float) -> void:
 	# Get in / out of the car with E.
 	if Input.is_action_just_pressed("enter_exit"):
 		_toggle_vehicle()
+	# Shoot on foot with J (or left mouse via _unhandled_input).
+	if _mode == "foot" and is_instance_valid(_walker) and Input.is_action_just_pressed("fire"):
+		_walker.fire()
 
 func _wanted_stars() -> int:
 	var s: int = 0
@@ -310,7 +313,7 @@ func _build_city() -> void:
 	for p in layout["props"]:
 		_add_target(p["cell"], p["kind"], Vector3.ZERO)
 	_spawn_traffic(12)
-	_spawn_crowds(8)
+	_spawn_crowds(16)   # more pedestrians on the streets
 	_spawn_trees(34)
 	FPDecor.add_curbs(self, RRTuning.CITY_COLS, RRTuning.CITY_ROWS, TILE3D)
 	_spawn_neon(16)
@@ -508,7 +511,7 @@ func _build_hud() -> void:
 	_ui_wanted = _mk_label(ui, Vector2(20, 84), 22, Color("#FF6060"))
 	_ui_speed = _mk_label(ui, Vector2(740, 500), 22, Color("#A0D0FF"))
 	var hint := _mk_label(ui, Vector2(20, 508), 15, Color("#B8C0CC"))
-	hint.text = "Shift 氮氣 · 空白 手煞車 · E 上下車 · 下車點擊射擊 · T 日夜"
+	hint.text = "Shift 氮氣 · 空白 手煞車 · E 上下車 · 下車 J/左鍵 射擊 · T 日夜"
 	_refresh()
 
 func _mk_label(ui: CanvasLayer, pos: Vector2, size: int, col: Color) -> Label:
