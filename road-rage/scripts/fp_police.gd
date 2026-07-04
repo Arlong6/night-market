@@ -8,10 +8,56 @@ const GRAVITY: float = 24.0
 const SIREN_INTERVAL: float = 2.6
 
 var target: FPCar = null
+var hp: int = 3
+var _wrecked: bool = false
 var _siren_t: float = 0.0
 var _blink: float = 0.0
 var _red: MeshInstance3D = null
 var _blue: MeshInstance3D = null
+
+## Shot on foot — a few bullets wreck a cruiser.
+func shoot_hit() -> void:
+	hp -= 1
+	if hp <= 0:
+		_wreck()
+
+## Rammed by the car at speed — instant wreck.
+func ram_wreck() -> void:
+	_wreck()
+
+func _wreck() -> void:
+	if _wrecked:
+		return
+	_wrecked = true
+	RRAudio.explosion(self)
+	var host := get_parent()
+	if host != null:
+		var p := CPUParticles3D.new()
+		p.amount = 26
+		p.lifetime = 0.8
+		p.one_shot = true
+		p.explosiveness = 0.95
+		p.direction = Vector3(0.0, 1.0, 0.0)
+		p.spread = 90.0
+		p.initial_velocity_min = 4.0
+		p.initial_velocity_max = 13.0
+		p.gravity = Vector3(0.0, -14.0, 0.0)
+		p.scale_amount_min = 0.5
+		p.scale_amount_max = 1.6
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color("#FF7A2A")
+		mat.emission_enabled = true
+		mat.emission = Color("#FF5010")
+		mat.emission_energy_multiplier = 2.0
+		var bm := BoxMesh.new()
+		bm.material = mat
+		p.mesh = bm
+		host.add_child(p)
+		p.global_position = global_position + Vector3(0.0, 1.0, 0.0)
+		p.emitting = true
+		get_tree().create_timer(1.2).timeout.connect(func() -> void:
+			if is_instance_valid(p): p.queue_free())
+	queue_free()
 
 func _ready() -> void:
 	up_direction = Vector3.UP

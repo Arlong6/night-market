@@ -74,9 +74,6 @@ func _process(delta: float) -> void:
 	# Get in / out of the car with E.
 	if Input.is_action_just_pressed("enter_exit"):
 		_toggle_vehicle()
-	# Shoot on foot with J (or left mouse via _unhandled_input).
-	if _mode == "foot" and is_instance_valid(_walker) and Input.is_action_just_pressed("fire"):
-		_walker.fire()
 
 func _wanted_stars() -> int:
 	var s: int = 0

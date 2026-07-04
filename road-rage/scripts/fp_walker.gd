@@ -6,6 +6,10 @@ extends CharacterBody3D
 const SPEED: float = 8.0
 const GRAVITY: float = 24.0
 const FIRE_RANGE: float = 60.0
+const FIRE_RATE: float = 0.13   ## seconds between shots when the fire key is held
+const BASE_FOV: float = 70.0
+
+var _fire_cd: float = 0.0
 
 var _cam: Camera3D = null
 var _visual: Node3D = null
@@ -89,6 +93,13 @@ func _process(delta: float) -> void:
 		_muzzle_t -= delta
 		if _muzzle_t <= 0.0 and _muzzle:
 			_muzzle.visible = false
+	# Auto-fire while the fire key (J) is held.
+	_fire_cd = maxf(0.0, _fire_cd - delta)
+	if _fire_cd <= 0.0 and Input.is_action_pressed("fire"):
+		fire()
+	# Ease the recoil FOV kick back to normal.
+	if _cam:
+		_cam.fov = lerpf(_cam.fov, BASE_FOV, 0.25)
 
 func _physics_process(delta: float) -> void:
 	var move := Vector3(Input.get_axis("left", "right"), 0.0, -Input.get_axis("brake", "accel"))
@@ -113,14 +124,19 @@ func _physics_process(delta: float) -> void:
 ## Fire the gun: immediate muzzle flash + shot; the hitscan runs on the physics
 ## frame (space-state queries are only safe there).
 func fire() -> void:
+	if _fire_cd > 0.0:
+		return
+	_fire_cd = FIRE_RATE
 	if _muzzle:
 		_muzzle.visible = true
-	_muzzle_t = 0.06
+	_muzzle_t = 0.05
 	RRAudio.gunshot(self)
+	if _cam:
+		_cam.fov = BASE_FOV + 3.0   # recoil kick, eased back in _process
 	_fire_queued = true
 
 func _do_fire() -> void:
-	var from: Vector3 = global_position + Vector3(0.0, 1.1, 0.0)
+	var from: Vector3 = global_position + Vector3(0.0, 1.4, 0.0)
 	var to: Vector3 = from + _face * FIRE_RANGE
 	var space := get_world_3d().direct_space_state
 	var q := PhysicsRayQueryParameters3D.create(from, to)
@@ -128,7 +144,64 @@ func _do_fire() -> void:
 	q.collide_with_bodies = true
 	q.exclude = [get_rid()]
 	var hit := space.intersect_ray(q)
+	var endp: Vector3 = to
 	if hit.has("collider"):
+		endp = hit["position"]
 		var c = hit["collider"]
 		if c != null and c.has_method("shoot_hit"):
 			c.shoot_hit()
+		_hit_spark(endp)
+	_tracer(from + _face * 0.8, endp)
+
+func _tracer(a: Vector3, b: Vector3) -> void:
+	var host: Node = get_parent()
+	if host == null:
+		return
+	var dist: float = a.distance_to(b)
+	if dist < 0.2:
+		return
+	var beam := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.05, 0.05, dist)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color("#FFF0A0")
+	mat.emission_enabled = true
+	mat.emission = Color("#FFD84A")
+	mat.emission_energy_multiplier = 5.0
+	bm.material = mat
+	beam.mesh = bm
+	host.add_child(beam)
+	beam.global_position = (a + b) * 0.5
+	if absf((b - a).normalized().dot(Vector3.UP)) < 0.98:
+		beam.look_at(b, Vector3.UP)
+	get_tree().create_timer(0.05).timeout.connect(func() -> void:
+		if is_instance_valid(beam): beam.queue_free())
+
+func _hit_spark(pos: Vector3) -> void:
+	var host: Node = get_parent()
+	if host == null:
+		return
+	var p := CPUParticles3D.new()
+	p.amount = 8
+	p.lifetime = 0.3
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.spread = 180.0
+	p.initial_velocity_min = 2.0
+	p.initial_velocity_max = 6.0
+	p.gravity = Vector3.ZERO
+	p.scale_amount_min = 0.2
+	p.scale_amount_max = 0.5
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color("#FFE080")
+	mat.emission_enabled = true
+	mat.emission = Color("#FFC040")
+	mat.emission_energy_multiplier = 3.0
+	var bm := BoxMesh.new()
+	bm.material = mat
+	p.mesh = bm
+	host.add_child(p)
+	p.global_position = pos
+	p.emitting = true
+	get_tree().create_timer(0.5).timeout.connect(func() -> void:
+		if is_instance_valid(p): p.queue_free())

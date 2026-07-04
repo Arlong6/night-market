@@ -158,8 +158,11 @@ func _physics_process(delta: float) -> void:
 	if speed() > 18.0:
 		for i in get_slide_collision_count():
 			var other := get_slide_collision(i).get_collider()
-			if other != null and other.has_method("collapse"):
-				other.collapse()
+			if other != null:
+				if other.has_method("collapse"):
+					other.collapse()
+				elif other.has_method("ram_wreck"):
+					other.ram_wreck()
 	# ── Speed feel ──
 	var frac: float = clampf(speed() / MAX_SPEED, 0.0, 1.0)
 	if _cam != null:
