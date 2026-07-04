@@ -192,6 +192,15 @@ func _spawn_flying_ped(car: FPCar) -> void:
 		if is_instance_valid(r): r.queue_free())
 
 ## Comedic confetti poof — bright shirt-colored bits, no gore.
+## Destroyed by a gunshot (on foot).
+func shoot_hit() -> void:
+	if _broke:
+		return
+	_broke = true
+	_spawn_poof()
+	smashed.emit(value, heat, global_position)
+	queue_free()
+
 func _spawn_poof() -> void:
 	var p := CPUParticles3D.new()
 	p.amount = 10

@@ -100,6 +100,15 @@ func _spawn_flying_chunk(car: FPCar) -> void:
 	t.tween_callback(func() -> void:
 		if is_instance_valid(r): r.queue_free())
 
+## Destroyed by a gunshot (on foot) — pop without the car knock-away.
+func shoot_hit() -> void:
+	if _broke:
+		return
+	_broke = true
+	_spawn_debris()
+	smashed.emit(value, heat, global_position)
+	queue_free()
+
 func _spawn_debris() -> void:
 	var p := CPUParticles3D.new()
 	p.amount = 10

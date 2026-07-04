@@ -11,6 +11,7 @@ const FPBuildings = preload("res://scripts/fp_buildings.gd")
 const FPPed = preload("res://scripts/fp_ped.gd")
 const FPPolice = preload("res://scripts/fp_police.gd")
 const FPDecor = preload("res://scripts/fp_decor.gd")
+const FPWalker = preload("res://scripts/fp_walker.gd")
 const CityGen = preload("res://scripts/city_gen.gd")
 const ComboSystem = preload("res://scripts/combo_system.gd")
 const ScoreSystem = preload("res://scripts/score_system.gd")
@@ -18,6 +19,8 @@ const ScoreSystem = preload("res://scripts/score_system.gd")
 const TILE3D: float = 14.0   ## bigger blocks + wider roads (cornering room)
 
 var _car: FPCar = null
+var _walker: FPWalker = null
+var _mode: String = "car"    # "car" or "foot"
 var _combo := ComboSystem.new()
 var _score := ScoreSystem.new()
 var _best: int = 0
@@ -68,6 +71,9 @@ func _process(delta: float) -> void:
 	# Cycle day / dusk / night with T.
 	if Input.is_action_just_pressed("toggle_time"):
 		_cycle_time()
+	# Get in / out of the car with E.
+	if Input.is_action_just_pressed("enter_exit"):
+		_toggle_vehicle()
 
 func _wanted_stars() -> int:
 	var s: int = 0
@@ -87,6 +93,44 @@ func _cycle_time() -> void:
 	_tod = (_tod + 1) % _TOD_NAMES.size()
 	if _env != null and _sun != null:
 		FPDecor.apply_time_of_day(_env, _sun, _TOD_NAMES[_tod])
+
+# ── On foot: get in/out of the car + shooting ────────────────────────────────
+
+func _unhandled_input(event: InputEvent) -> void:
+	if _mode == "foot" and is_instance_valid(_walker):
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			_walker.fire()
+
+func _toggle_vehicle() -> void:
+	if _mode == "car":
+		_exit_car()
+	else:
+		_enter_car()
+
+func _exit_car() -> void:
+	if not is_instance_valid(_car):
+		return
+	_mode = "foot"
+	_car.active = false
+	_car.velocity = Vector3.ZERO   # park it
+	if not is_instance_valid(_walker):
+		_walker = FPWalker.new()
+		add_child(_walker)
+	var side: Vector3 = _car.global_transform.basis.x.normalized()
+	_walker.rotation = Vector3.ZERO
+	_walker.global_position = _car.global_position + side * 3.8 + Vector3(0.0, 0.3, 0.0)
+	_walker.make_current()
+
+func _enter_car() -> void:
+	if not is_instance_valid(_car) or not is_instance_valid(_walker):
+		return
+	if _walker.global_position.distance_to(_car.global_position) > 7.5:
+		return   # must be near the car to get in
+	_mode = "car"
+	_car.active = true
+	_car.focus_camera()
+	_walker.queue_free()
+	_walker = null
 
 func _world_pos(cell: Vector2i) -> Vector3:
 	return Vector3(cell.x * TILE3D, 0.0, cell.y * TILE3D)
@@ -464,7 +508,7 @@ func _build_hud() -> void:
 	_ui_wanted = _mk_label(ui, Vector2(20, 84), 22, Color("#FF6060"))
 	_ui_speed = _mk_label(ui, Vector2(740, 500), 22, Color("#A0D0FF"))
 	var hint := _mk_label(ui, Vector2(20, 508), 15, Color("#B8C0CC"))
-	hint.text = "Shift 氮氣 · 空白 手煞車 · S 倒車 · T 日夜切換"
+	hint.text = "Shift 氮氣 · 空白 手煞車 · E 上下車 · 下車點擊射擊 · T 日夜"
 	_refresh()
 
 func _mk_label(ui: CanvasLayer, pos: Vector2, size: int, col: Color) -> Label:

@@ -17,6 +17,7 @@ const MAX_FOV: float = 86.0        ## widens with speed for an acceleration rush
 var _cam: Camera3D = null
 var _engine: AudioStreamPlayer = null
 var _engine_started: bool = false
+var active: bool = true   ## false when the player has stepped out (car parks)
 
 func _ready() -> void:
 	up_direction = Vector3.UP
@@ -38,7 +39,7 @@ func _ready() -> void:
 	# Engine drone — pitch tracks speed; starts on first input (Web-safe gesture).
 	_engine = AudioStreamPlayer.new()
 	_engine.stream = RRAudio.make_engine_stream()
-	_engine.volume_db = -13.0
+	_engine.volume_db = -24.0   ## much quieter — engine drone was too loud
 	add_child(_engine)
 
 func _build_car_visual() -> void:
@@ -108,12 +109,16 @@ func _build_car_visual() -> void:
 			w.position = Vector3(wx, 0.6, wz)
 			add_child(w)
 
+func focus_camera() -> void:
+	if _cam:
+		_cam.current = true
+
 func speed() -> float:
 	return Vector3(velocity.x, 0.0, velocity.z).length()
 
 func _physics_process(delta: float) -> void:
-	var throttle: float = Input.get_axis("brake", "accel")
-	var steer: float = Input.get_axis("left", "right")
+	var throttle: float = (Input.get_axis("brake", "accel") if active else 0.0)
+	var steer: float = (Input.get_axis("left", "right") if active else 0.0)
 	var sp: float = speed()
 	# Invert steering while reversing so it feels natural (like backing up looking over your shoulder).
 	var steer_input: float = (-steer if throttle < 0.0 else steer)
@@ -167,11 +172,8 @@ func _physics_process(delta: float) -> void:
 		var shake: float = maxf(0.0, frac - 0.6) * 0.08
 		_cam.h_offset = randf_range(-shake, shake)
 		_cam.v_offset = randf_range(-shake, shake)
-	if _engine != null:
-		if not _engine_started and (throttle != 0.0 or steer != 0.0):
-			_engine_started = true
-			_engine.play()
-		_engine.pitch_scale = 0.7 + 1.4 * frac + (0.4 if boosting else 0.0)
+	# Engine sound disabled per feedback (looping drone / pitch-zipper "click" was
+	# annoying). Re-add with a cleaner one-shot rev sample later if wanted.
 	# Safety: a run never "ends" — respawn if the car drops off the world.
 	if global_position.y < -8.0:
 		global_position = Vector3(144.0, 2.0, 144.0)

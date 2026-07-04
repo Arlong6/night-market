@@ -7,6 +7,7 @@ const SAMPLE_RATE: int = 22050
 static var _impact: AudioStreamWAV = null
 static var _explosion: AudioStreamWAV = null
 static var _siren: AudioStreamWAV = null
+static var _gunshot: AudioStreamWAV = null
 
 static func impact(parent: Node, force: float) -> void:
 	if _impact == null: _impact = _make_impact()
@@ -20,6 +21,10 @@ static func explosion(parent: Node) -> void:
 static func siren(parent: Node) -> void:
 	if _siren == null: _siren = _make_siren()
 	_play(parent, _siren, -10.0)
+
+static func gunshot(parent: Node) -> void:
+	if _gunshot == null: _gunshot = _make_gunshot()
+	_play(parent, _gunshot, -7.0)
 
 static func _play(parent: Node, stream: AudioStream, db: float) -> void:
 	if parent == null or stream == null or not is_instance_valid(parent): return
@@ -92,6 +97,22 @@ static func make_engine_stream() -> AudioStreamWAV:
 	st.loop_begin = 0
 	st.loop_end = n
 	return st
+
+# Short sharp gunshot crack.
+static func _make_gunshot() -> AudioStreamWAV:
+	var dur := 0.12
+	var n := int(SAMPLE_RATE * dur)
+	var data := PackedByteArray()
+	data.resize(n * 2)
+	var seed_v := 4242
+	for i in n:
+		var t: float = float(i) / SAMPLE_RATE
+		var env: float = pow(1.0 - t / dur, 2.5)
+		seed_v = (seed_v * 1103515245 + 12345) & 0x7fffffff
+		var noise: float = (float(seed_v) / 1073741823.0) - 1.0
+		var crack: float = sin(t * TAU * lerpf(420.0, 120.0, t / dur))
+		_w(data, i, (noise * 0.7 + crack * 0.3) * env * 0.8)
+	return _wrap(data)
 
 static func _w(data: PackedByteArray, idx: int, s: float) -> void:
 	var v: int = int(clampf(s, -1.0, 1.0) * 32767.0)
