@@ -4,6 +4,8 @@ class_name FPWalker
 extends CharacterBody3D
 
 const SPEED: float = 8.0
+const SPRINT_MULT: float = 1.7   ## hold Shift to sprint
+const JUMP_VEL: float = 9.5      ## Space to jump
 const GRAVITY: float = 24.0
 const FIRE_RANGE: float = 60.0
 const FIRE_RATE: float = 0.13   ## seconds between shots when the fire key is held
@@ -102,18 +104,22 @@ func _process(delta: float) -> void:
 		_cam.fov = lerpf(_cam.fov, BASE_FOV, 0.25)
 
 func _physics_process(delta: float) -> void:
+	var spd: float = SPEED * (SPRINT_MULT if Input.is_action_pressed("nitro") else 1.0)
 	var move := Vector3(Input.get_axis("left", "right"), 0.0, -Input.get_axis("brake", "accel"))
 	if move.length() > 0.1:
 		move = move.normalized()
 		_face = move
 		_visual.look_at(global_position + move, Vector3.UP)
-		velocity.x = move.x * SPEED
-		velocity.z = move.z * SPEED
+		velocity.x = move.x * spd
+		velocity.z = move.z * spd
 	else:
 		velocity.x = 0.0
 		velocity.z = 0.0
 	if is_on_floor():
-		velocity.y = 0.0
+		if Input.is_action_just_pressed("handbrake"):
+			velocity.y = JUMP_VEL   # jump (Space)
+		elif velocity.y < 0.0:
+			velocity.y = 0.0
 	else:
 		velocity.y -= GRAVITY * delta
 	move_and_slide()

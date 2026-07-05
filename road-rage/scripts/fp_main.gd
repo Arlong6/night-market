@@ -12,6 +12,7 @@ const FPPed = preload("res://scripts/fp_ped.gd")
 const FPPolice = preload("res://scripts/fp_police.gd")
 const FPDecor = preload("res://scripts/fp_decor.gd")
 const FPWalker = preload("res://scripts/fp_walker.gd")
+const FPFootCop = preload("res://scripts/fp_footcop.gd")
 const CityGen = preload("res://scripts/city_gen.gd")
 const ComboSystem = preload("res://scripts/combo_system.gd")
 const ScoreSystem = preload("res://scripts/score_system.gd")
@@ -34,7 +35,14 @@ const _TOD_NAMES: Array[String] = ["day", "dusk", "night"]
 
 var _wanted_heat: float = 0.0
 var _police: Array = []
+var _footcops: Array = []
 var _pol_timer: float = 0.0
+
+var _max_hp: float = 100.0
+var _hp: float = 100.0
+var _regen_delay: float = 0.0
+var _ui_hp_bg: ColorRect = null
+var _ui_hp_fill: ColorRect = null
 
 var _ui_score: Label = null
 var _ui_combo: Label = null
@@ -68,6 +76,7 @@ func _process(delta: float) -> void:
 	if _ui_wanted:
 		var stars: int = _wanted_stars()
 		_ui_wanted.text = "通緝 " + "★".repeat(stars) + "☆".repeat(5 - stars)
+	_update_health(delta)
 	# Cycle day / dusk / night with T.
 	if Input.is_action_just_pressed("toggle_time"):
 		_cycle_time()
@@ -84,10 +93,51 @@ func _wanted_stars() -> int:
 
 func _manage_police() -> void:
 	_police = _police.filter(func(p): return is_instance_valid(p))
-	var want: int = _wanted_stars() * 2
-	while _police.size() < want and is_instance_valid(_car):
-		var p := FPPolice.spawn(self, _car, _car.global_position, 90.0)
-		_police.append(p)
+	_footcops = _footcops.filter(func(c): return is_instance_valid(c))
+	var stars: int = _wanted_stars()
+	var pp: Vector3 = _player_pos()
+	while _police.size() < stars * 2 and is_instance_valid(_car):
+		_police.append(FPPolice.spawn(self, _car, pp, 90.0))
+	while _footcops.size() < stars * 2:
+		_footcops.append(FPFootCop.spawn(self, self, pp, 55.0))
+
+func _player_pos() -> Vector3:
+	if _mode == "foot" and is_instance_valid(_walker):
+		return _walker.global_position
+	if is_instance_valid(_car):
+		return _car.global_position
+	return Vector3.ZERO
+
+func _damage(amt: float) -> void:
+	_hp = maxf(0.0, _hp - amt)
+	_regen_delay = 2.5
+	if _hp <= 0.0:
+		_respawn()
+
+func _respawn() -> void:
+	_hp = _max_hp
+	_wanted_heat *= 0.4
+	var safe: Vector3 = _world_pos(Vector2i(12, 12)) + Vector3(0.0, 1.2, 0.0)
+	if _mode == "foot" and is_instance_valid(_walker):
+		_walker.global_position = safe
+		_walker.velocity = Vector3.ZERO
+	elif is_instance_valid(_car):
+		_car.global_position = safe
+		_car.velocity = Vector3.ZERO
+
+func _update_health(delta: float) -> void:
+	var pp: Vector3 = _player_pos()
+	for p in _police:
+		if is_instance_valid(p) and p.global_position.distance_to(pp) < 5.0:
+			_damage(18.0 * delta)
+	if _regen_delay > 0.0:
+		_regen_delay -= delta
+	elif _hp < _max_hp:
+		_hp = minf(_max_hp, _hp + 12.0 * delta)
+	if _ui_hp_fill and _ui_hp_bg:
+		var frac: float = clampf(_hp / _max_hp, 0.0, 1.0)
+		_ui_hp_fill.size.x = _ui_hp_bg.size.x * frac
+		_ui_hp_fill.color = Color("#4ADE6A").lerp(Color("#E04040"), 1.0 - frac)
 
 func _cycle_time() -> void:
 	_tod = (_tod + 1) % _TOD_NAMES.size()
@@ -506,9 +556,21 @@ func _build_hud() -> void:
 	_ui_combo = _mk_label(ui, Vector2(20, 50), 24, Color("#FFB020"))
 	_ui_combo.visible = false
 	_ui_wanted = _mk_label(ui, Vector2(20, 84), 22, Color("#FF6060"))
+	var hp_lbl := _mk_label(ui, Vector2(20, 114), 16, Color("#C8D0DC"))
+	hp_lbl.text = "體力"
+	_ui_hp_bg = ColorRect.new()
+	_ui_hp_bg.position = Vector2(70, 118)
+	_ui_hp_bg.size = Vector2(200, 16)
+	_ui_hp_bg.color = Color(0.1, 0.1, 0.12, 0.85)
+	ui.add_child(_ui_hp_bg)
+	_ui_hp_fill = ColorRect.new()
+	_ui_hp_fill.position = Vector2(70, 118)
+	_ui_hp_fill.size = Vector2(200, 16)
+	_ui_hp_fill.color = Color("#4ADE6A")
+	ui.add_child(_ui_hp_fill)
 	_ui_speed = _mk_label(ui, Vector2(740, 500), 22, Color("#A0D0FF"))
 	var hint := _mk_label(ui, Vector2(20, 508), 15, Color("#B8C0CC"))
-	hint.text = "Shift 氮氣 · 空白 手煞車 · E 上下車 · 下車 J/左鍵 射擊 · T 日夜"
+	hint.text = "車:Shift 氮氣 空白 手煞 · E 上下車 · 步行:WASD J 射擊 Shift 衝刺 空白 跳 · T 日夜"
 	_refresh()
 
 func _mk_label(ui: CanvasLayer, pos: Vector2, size: int, col: Color) -> Label:
