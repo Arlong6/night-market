@@ -118,12 +118,13 @@ func _respawn() -> void:
 	_hp = _max_hp
 	_wanted_heat *= 0.4
 	var safe: Vector3 = _world_pos(Vector2i(12, 12)) + Vector3(0.0, 1.2, 0.0)
-	if _mode == "foot" and is_instance_valid(_walker):
-		_walker.global_position = safe
-		_walker.velocity = Vector3.ZERO
-	elif is_instance_valid(_car):
+	# Always bring the car to the respawn point so it is never lost ("車不見").
+	if is_instance_valid(_car):
 		_car.global_position = safe
 		_car.velocity = Vector3.ZERO
+	if _mode == "foot" and is_instance_valid(_walker):
+		_walker.global_position = safe + Vector3(4.5, 0.0, 0.0)   # beside the car
+		_walker.velocity = Vector3.ZERO
 
 func _update_health(delta: float) -> void:
 	var pp: Vector3 = _player_pos()
@@ -172,14 +173,35 @@ func _exit_car() -> void:
 	_walker.make_current()
 
 func _enter_car() -> void:
-	if not is_instance_valid(_car) or not is_instance_valid(_walker):
+	if not is_instance_valid(_walker) or not is_instance_valid(_car):
 		return
-	if _walker.global_position.distance_to(_car.global_position) > 7.5:
-		return   # must be near the car to get in
+	var wp: Vector3 = _walker.global_position
+	var own_d: float = _car.global_position.distance_to(wp)
+	# Find the nearest traffic vehicle so you can hijack any car nearby.
+	var nearest = null
+	var nd: float = 1000000.0
+	for v in get_tree().get_nodes_in_group("vehicle"):
+		if is_instance_valid(v):
+			var d: float = v.global_position.distance_to(wp)
+			if d < nd:
+				nd = d
+				nearest = v
+	if own_d <= 8.0 and own_d <= nd:
+		_board_car()
+	elif nearest != null and nd <= 8.0:
+		# Hijack: move our car onto that car's spot and remove it.
+		var pos: Vector3 = nearest.global_position
+		nearest.queue_free()
+		_car.global_position = pos + Vector3(0.0, 0.6, 0.0)
+		_car.velocity = Vector3.ZERO
+		_board_car()
+
+func _board_car() -> void:
 	_mode = "car"
 	_car.active = true
 	_car.focus_camera()
-	_walker.queue_free()
+	if is_instance_valid(_walker):
+		_walker.queue_free()
 	_walker = null
 
 func _world_pos(cell: Vector2i) -> Vector3:
@@ -401,6 +423,7 @@ func _add_target(cell: Vector2i, kind: String, drift: Vector3) -> void:
 	t.global_position = _world_pos(cell)
 	if kind == "car":
 		FPDecor.make_car_body(t, t.size, t.box_color)
+		t.add_to_group("vehicle")
 
 func _spawn_traffic(count: int) -> void:
 	for i in count:

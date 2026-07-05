@@ -19,6 +19,7 @@ var _muzzle: MeshInstance3D = null
 var _face: Vector3 = Vector3.FORWARD
 var _muzzle_t: float = 0.0
 var _fire_queued: bool = false
+var _cam_yaw: float = 0.0   ## camera orbit yaw (, / . rotate the view)
 
 func _ready() -> void:
 	up_direction = Vector3.UP
@@ -102,14 +103,26 @@ func _process(delta: float) -> void:
 	# Ease the recoil FOV kick back to normal.
 	if _cam:
 		_cam.fov = lerpf(_cam.fov, BASE_FOV, 0.25)
+	# Rotate the view with , / .
+	_cam_yaw += Input.get_axis("cam_left", "cam_right") * 2.6 * delta
+	_update_camera()
+
+func _update_camera() -> void:
+	if _cam == null:
+		return
+	_cam.position = Vector3(sin(_cam_yaw) * 7.0, 3.6, cos(_cam_yaw) * 7.0)
+	_cam.look_at(global_position + Vector3(0.0, 1.2, 0.0), Vector3.UP)
 
 func _physics_process(delta: float) -> void:
 	var spd: float = SPEED * (SPRINT_MULT if Input.is_action_pressed("nitro") else 1.0)
-	var move := Vector3(Input.get_axis("left", "right"), 0.0, -Input.get_axis("brake", "accel"))
+	# Movement + aim are relative to the camera yaw (proper 3rd-person shooter feel).
+	var fwd := Vector3(-sin(_cam_yaw), 0.0, -cos(_cam_yaw))
+	var right := fwd.cross(Vector3.UP)
+	_face = fwd
+	_visual.look_at(global_position + fwd, Vector3.UP)
+	var move := fwd * Input.get_axis("brake", "accel") + right * Input.get_axis("left", "right")
 	if move.length() > 0.1:
 		move = move.normalized()
-		_face = move
-		_visual.look_at(global_position + move, Vector3.UP)
 		velocity.x = move.x * spd
 		velocity.z = move.z * spd
 	else:

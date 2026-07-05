@@ -18,6 +18,7 @@ var _cam: Camera3D = null
 var _engine: AudioStreamPlayer = null
 var _engine_started: bool = false
 var active: bool = true   ## false when the player has stepped out (car parks)
+var _look_yaw: float = 0.0   ## camera look-around (, / .), recenters when released
 
 func _ready() -> void:
 	up_direction = Vector3.UP
@@ -175,6 +176,15 @@ func _physics_process(delta: float) -> void:
 		var shake: float = maxf(0.0, frac - 0.6) * 0.08
 		_cam.h_offset = randf_range(-shake, shake)
 		_cam.v_offset = randf_range(-shake, shake)
+		# Look around with , / . (recenters when released).
+		var look_in: float = (Input.get_axis("cam_left", "cam_right") if active else 0.0)
+		if absf(look_in) > 0.01:
+			_look_yaw = clampf(_look_yaw + look_in * 2.0 * delta, -PI, PI)
+		else:
+			_look_yaw = lerpf(_look_yaw, 0.0, 0.12)
+		var base := Vector2(0.0, 16.5).rotated(_look_yaw)
+		_cam.position = Vector3(base.x, 8.0, base.y)
+		_cam.look_at(global_position + Vector3(0.0, 1.5, 0.0), Vector3.UP)
 	# Engine sound disabled per feedback (looping drone / pitch-zipper "click" was
 	# annoying). Re-add with a cleaner one-shot rev sample later if wanted.
 	# Safety: a run never "ends" — respawn if the car drops off the world.
