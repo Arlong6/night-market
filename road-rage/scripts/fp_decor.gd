@@ -114,6 +114,33 @@ static func add_curbs(parent: Node3D, cols: int, rows: int, tile: float) -> void
 			parent.add_child(b2)
 		r += 4
 
+## Zebra crosswalks at a sampling of intersections — reads as real streets.
+static func add_crosswalks(parent: Node3D, cols: int, rows: int, tile: float) -> void:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color("#D8DCE0")
+	mat.emission_enabled = true
+	mat.emission = Color("#9AA0AA")
+	mat.emission_energy_multiplier = 0.3
+	mat.roughness = 1.0
+	var c: int = 8
+	while c < cols:
+		var r: int = 8
+		while r < rows:
+			_crosswalk(parent, Vector3(c * tile, 0.03, r * tile), tile, mat)
+			r += 8
+		c += 8
+
+static func _crosswalk(parent: Node3D, pos: Vector3, tile: float, mat: StandardMaterial3D) -> void:
+	for i in 6:
+		var bar := MeshInstance3D.new()
+		var qm := QuadMesh.new()
+		qm.size = Vector2(0.55, tile * 0.55)
+		qm.material = mat
+		bar.mesh = qm
+		bar.position = pos + Vector3((float(i) - 2.5) * 0.95, 0.0, 0.0)
+		bar.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
+		parent.add_child(bar)
+
 ## Reconfigure an existing Environment + sun for "day" / "dusk" / "night".
 ## Keeps glow/ssao/ssr as they are; only changes sky/ambient/fog/sun.
 static func apply_time_of_day(env: Environment, sun: DirectionalLight3D, mode: String) -> void:

@@ -15,6 +15,7 @@ const FPWalker = preload("res://scripts/fp_walker.gd")
 const FPFootCop = preload("res://scripts/fp_footcop.gd")
 const FPExplosive = preload("res://scripts/fp_explosive.gd")
 const FPMinimap = preload("res://scripts/fp_minimap.gd")
+const FPPickup = preload("res://scripts/fp_pickup.gd")
 const CityGen = preload("res://scripts/city_gen.gd")
 const ComboSystem = preload("res://scripts/combo_system.gd")
 const ScoreSystem = preload("res://scripts/score_system.gd")
@@ -398,6 +399,11 @@ func _build_city() -> void:
 	var barrels: Array = FPExplosive.scatter(self, 40, RRTuning.CITY_COLS * TILE3D, _rng)
 	for b in barrels:
 		b.connect("exploded", _on_explosion)
+	FPDecor.add_crosswalks(self, RRTuning.CITY_COLS, RRTuning.CITY_ROWS, TILE3D)
+	_spawn_landmarks()
+	var packs: Array = FPPickup.scatter(self, 16, RRTuning.CITY_COLS * TILE3D, _rng)
+	for p in packs:
+		p.connect("collected", _on_pickup)
 
 func _add_building(cell: Vector2i) -> void:
 	var b := FPBuildings.make(TILE3D * 0.82, _rng)
@@ -406,6 +412,7 @@ func _add_building(cell: Vector2i) -> void:
 	b.connect("collapsed", _on_building_collapsed)
 
 func _on_building_collapsed(pos: Vector3) -> void:
+	_hit_stop(0.05)
 	var pts: int = _combo.register(150)
 	_score.add(pts, 1)
 	_smashed += 1
@@ -418,6 +425,7 @@ func _on_building_collapsed(pos: Vector3) -> void:
 
 func _on_explosion(pos: Vector3) -> void:
 	_flash = 0.55
+	_hit_stop(0.04)
 	if _player_pos().distance_to(pos) < 15.0:
 		_damage(26.0)
 	var pts: int = _combo.register(60)
@@ -426,6 +434,67 @@ func _on_explosion(pos: Vector3) -> void:
 	_wanted_heat += 22.0
 	_popup(pos + Vector3(0.0, 3.0, 0.0), "轟!")
 	_refresh()
+
+func _on_pickup(amount: float, pos: Vector3) -> void:
+	_hp = minf(_max_hp, _hp + amount)
+	_popup(pos + Vector3(0.0, 2.0, 0.0), "+體力")
+
+func _hit_stop(dur: float) -> void:
+	if Engine.time_scale < 1.0:
+		return   # a freeze is already active — don't stack
+	Engine.time_scale = 0.0
+	get_tree().create_timer(dur, true, false, true).timeout.connect(func() -> void:
+		Engine.time_scale = 1.0)
+
+func _spawn_landmarks() -> void:
+	var cells: Array[Vector2i] = [Vector2i(6, 6), Vector2i(6, 22), Vector2i(22, 6), Vector2i(22, 22), Vector2i(14, 18)]
+	var colors: Array[Color] = [Color("#3A5A8A"), Color("#5A4A6A"), Color("#4A6A5A")]
+	for i in cells.size():
+		var h: float = _rng.randf_range(46.0, 74.0)
+		var sb := FPBuildingBody.new()
+		var col := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = Vector3(TILE3D * 0.7, h, TILE3D * 0.7)
+		col.shape = shape
+		col.position = Vector3(0.0, h * 0.5, 0.0)
+		sb.add_child(col)
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = shape.size
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = colors[i % colors.size()]
+		mat.metallic = 0.4
+		mat.roughness = 0.35
+		bm.material = mat
+		mi.mesh = bm
+		mi.position = Vector3(0.0, h * 0.5, 0.0)
+		sb.add_child(mi)
+		var top := MeshInstance3D.new()
+		var tbm := BoxMesh.new()
+		tbm.size = Vector3(TILE3D * 0.76, 1.6, TILE3D * 0.76)
+		var tmat := StandardMaterial3D.new()
+		tmat.albedo_color = Color("#FFC060")
+		tmat.emission_enabled = true
+		tmat.emission = Color("#FFC060")
+		tmat.emission_energy_multiplier = 2.2
+		tbm.material = tmat
+		top.mesh = tbm
+		top.position = Vector3(0.0, h, 0.0)
+		sb.add_child(top)
+		var spire := MeshInstance3D.new()
+		var scm := CylinderMesh.new()
+		scm.top_radius = 0.1
+		scm.bottom_radius = 0.5
+		scm.height = 8.0
+		var smat := StandardMaterial3D.new()
+		smat.albedo_color = Color("#AAB0BA")
+		scm.material = smat
+		spire.mesh = scm
+		spire.position = Vector3(0.0, h + 4.0, 0.0)
+		sb.add_child(spire)
+		add_child(sb)
+		sb.global_position = _world_pos(cells[i])
+		sb.connect("collapsed", _on_building_collapsed)
 
 func _add_target(cell: Vector2i, kind: String, drift: Vector3) -> void:
 	var t := FPTarget.new()
