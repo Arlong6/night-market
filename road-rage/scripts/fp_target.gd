@@ -36,6 +36,7 @@ func _ready() -> void:
 	_mesh.position = Vector3(0.0, size.y * 0.5, 0.0)  # sit on the ground
 	add_child(_mesh)
 	_origin = global_position
+	add_to_group("blastable")
 	body_entered.connect(_on_body_entered)
 
 func _process(delta: float) -> void:

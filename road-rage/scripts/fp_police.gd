@@ -61,6 +61,7 @@ func _wreck() -> void:
 
 func _ready() -> void:
 	up_direction = Vector3.UP
+	add_to_group("blastable")
 	var col := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = Vector3(2.6, 1.6, 6.2)

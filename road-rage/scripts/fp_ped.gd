@@ -61,6 +61,7 @@ func _ready() -> void:
 	_build_figure()
 
 	_origin = global_position
+	add_to_group("blastable")
 	body_entered.connect(_on_body_entered)
 
 ## Assemble the little person from primitives. Heights are fractions of body_height.

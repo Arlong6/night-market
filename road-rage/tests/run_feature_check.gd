@@ -52,5 +52,15 @@ func _process(_delta: float) -> bool:
 		cam_ok = _m._walker._cam != null and _m._walker._cam.position.x != 0.0
 	out.append("camera_rotate=%s" % cam_ok)
 
+	# 4) Barrel explosion fires + emits its signal (drives the flash/damage/score).
+	var FPExplosive = load("res://scripts/fp_explosive.gd")
+	var b = FPExplosive.new()
+	_m.add_child(b)
+	b.global_position = Vector3(300.0, 0.0, 300.0)
+	var got: Array = [false]
+	b.exploded.connect(func(_p): got[0] = true)
+	b.explode()
+	out.append("explosion_fires=%s" % (got[0] and b._broke))
+
 	print("FEATURE_CHECK " + " ".join(out))
 	return true

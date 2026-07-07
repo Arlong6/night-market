@@ -13,6 +13,8 @@ const FPPolice = preload("res://scripts/fp_police.gd")
 const FPDecor = preload("res://scripts/fp_decor.gd")
 const FPWalker = preload("res://scripts/fp_walker.gd")
 const FPFootCop = preload("res://scripts/fp_footcop.gd")
+const FPExplosive = preload("res://scripts/fp_explosive.gd")
+const FPMinimap = preload("res://scripts/fp_minimap.gd")
 const CityGen = preload("res://scripts/city_gen.gd")
 const ComboSystem = preload("res://scripts/combo_system.gd")
 const ScoreSystem = preload("res://scripts/score_system.gd")
@@ -43,6 +45,8 @@ var _hp: float = 100.0
 var _regen_delay: float = 0.0
 var _ui_hp_bg: ColorRect = null
 var _ui_hp_fill: ColorRect = null
+var _ui_flash: ColorRect = null
+var _flash: float = 0.0
 
 var _ui_score: Label = null
 var _ui_combo: Label = null
@@ -77,6 +81,10 @@ func _process(delta: float) -> void:
 		var stars: int = _wanted_stars()
 		_ui_wanted.text = "通緝 " + "★".repeat(stars) + "☆".repeat(5 - stars)
 	_update_health(delta)
+	if _flash > 0.0:
+		_flash = maxf(0.0, _flash - delta * 1.6)
+	if _ui_flash:
+		_ui_flash.color.a = _flash * 0.5
 	# Cycle day / dusk / night with T.
 	if Input.is_action_just_pressed("toggle_time"):
 		_cycle_time()
@@ -387,6 +395,9 @@ func _build_city() -> void:
 	FPDecor.add_curbs(self, RRTuning.CITY_COLS, RRTuning.CITY_ROWS, TILE3D)
 	_spawn_neon(16)
 	_build_test_track()
+	var barrels: Array = FPExplosive.scatter(self, 40, RRTuning.CITY_COLS * TILE3D, _rng)
+	for b in barrels:
+		b.connect("exploded", _on_explosion)
 
 func _add_building(cell: Vector2i) -> void:
 	var b := FPBuildings.make(TILE3D * 0.82, _rng)
@@ -403,6 +414,17 @@ func _on_building_collapsed(pos: Vector3) -> void:
 		_best = _score.score
 		_score.submit()
 	_popup(pos + Vector3(0.0, 5.0, 0.0), "轟! +%d" % pts)
+	_refresh()
+
+func _on_explosion(pos: Vector3) -> void:
+	_flash = 0.55
+	if _player_pos().distance_to(pos) < 15.0:
+		_damage(26.0)
+	var pts: int = _combo.register(60)
+	_score.add(pts, 1)
+	_smashed += 1
+	_wanted_heat += 22.0
+	_popup(pos + Vector3(0.0, 3.0, 0.0), "轟!")
 	_refresh()
 
 func _add_target(cell: Vector2i, kind: String, drift: Vector3) -> void:
@@ -574,6 +596,11 @@ func _refresh() -> void:
 func _build_hud() -> void:
 	var ui := CanvasLayer.new()
 	add_child(ui)
+	_ui_flash = ColorRect.new()
+	_ui_flash.color = Color(1.0, 0.6, 0.25, 0.0)
+	_ui_flash.size = Vector2(960, 540)
+	_ui_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.add_child(_ui_flash)
 	_ui_score = _mk_label(ui, Vector2(20, 16), 26, Color("#F2E4B0"))
 	_ui_best = _mk_label(ui, Vector2(740, 18), 18, Color("#C8BC90"))
 	_ui_combo = _mk_label(ui, Vector2(20, 50), 24, Color("#FFB020"))
@@ -593,7 +620,11 @@ func _build_hud() -> void:
 	ui.add_child(_ui_hp_fill)
 	_ui_speed = _mk_label(ui, Vector2(740, 500), 22, Color("#A0D0FF"))
 	var hint := _mk_label(ui, Vector2(20, 508), 15, Color("#B8C0CC"))
-	hint.text = "車:Shift 氮氣 空白 手煞 · E 上下車 · 步行:WASD J 射擊 Shift 衝刺 空白 跳 · T 日夜"
+	hint.text = "車:Shift 氮氣 空白 手煞 · E 上下車 · 步行:WASD J 射擊 Shift 衝刺 空白 跳 · , . 轉視角 · T 日夜"
+	var mm := FPMinimap.new()
+	mm.game = self
+	mm.position = Vector2(794.0, 60.0)
+	ui.add_child(mm)
 	_refresh()
 
 func _mk_label(ui: CanvasLayer, pos: Vector2, size: int, col: Color) -> Label:

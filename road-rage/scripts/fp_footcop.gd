@@ -18,6 +18,7 @@ var _muzzle_t: float = 0.0
 
 func _ready() -> void:
 	up_direction = Vector3.UP
+	add_to_group("blastable")
 	var col := CollisionShape3D.new()
 	var cap := CapsuleShape3D.new()
 	cap.radius = 0.4
