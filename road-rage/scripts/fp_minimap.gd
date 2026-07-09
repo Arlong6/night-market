@@ -26,6 +26,12 @@ func _draw() -> void:
 	draw_circle(c, 4.0, Color("#4ADE6A"))
 	_draw_blips(c, pp, game._police, Color("#4A78FF"))
 	_draw_blips(c, pp, game._footcops, Color("#FF5454"))
+	_draw_blips(c, pp, game.get_tree().get_nodes_in_group("pickup"), Color("#3ADE5A"))
+	if is_instance_valid(game._heli):
+		var hr: Vector3 = game._heli.global_position - pp
+		var hp: Vector2 = c + Vector2(hr.x, hr.z) * WORLD_SCALE
+		if Rect2(2.0, 2.0, SIZE - 4.0, SIZE - 4.0).has_point(hp):
+			draw_circle(hp, 4.5, Color("#FFD23A"))
 
 func _draw_blips(c: Vector2, pp: Vector3, arr: Array, col: Color) -> void:
 	var bounds := Rect2(2.0, 2.0, SIZE - 4.0, SIZE - 4.0)

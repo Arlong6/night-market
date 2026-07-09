@@ -16,6 +16,7 @@ const FPFootCop = preload("res://scripts/fp_footcop.gd")
 const FPExplosive = preload("res://scripts/fp_explosive.gd")
 const FPMinimap = preload("res://scripts/fp_minimap.gd")
 const FPPickup = preload("res://scripts/fp_pickup.gd")
+const FPHeli = preload("res://scripts/fp_heli.gd")
 const CityGen = preload("res://scripts/city_gen.gd")
 const ComboSystem = preload("res://scripts/combo_system.gd")
 const ScoreSystem = preload("res://scripts/score_system.gd")
@@ -39,7 +40,11 @@ const _TOD_NAMES: Array[String] = ["day", "dusk", "night"]
 var _wanted_heat: float = 0.0
 var _police: Array = []
 var _footcops: Array = []
+var _heli = null
 var _pol_timer: float = 0.0
+var _ui_callout: Label = null
+var _callout_t: float = 0.0
+var _last_callout_mult: int = 0
 
 var _max_hp: float = 100.0
 var _hp: float = 100.0
@@ -86,6 +91,15 @@ func _process(delta: float) -> void:
 		_flash = maxf(0.0, _flash - delta * 1.6)
 	if _ui_flash:
 		_ui_flash.color.a = _flash * 0.5
+	if not _combo.is_active():
+		_last_callout_mult = 0
+	if _callout_t > 0.0:
+		_callout_t -= delta * 1.4
+		if _ui_callout:
+			_ui_callout.visible = _callout_t > 0.0
+			_ui_callout.modulate.a = clampf(_callout_t, 0.0, 1.0)
+	elif _ui_callout and _ui_callout.visible:
+		_ui_callout.visible = false
 	# Cycle day / dusk / night with T.
 	if Input.is_action_just_pressed("toggle_time"):
 		_cycle_time()
@@ -109,6 +123,15 @@ func _manage_police() -> void:
 		_police.append(FPPolice.spawn(self, _car, pp, 90.0))
 	while _footcops.size() < stars * 2:
 		_footcops.append(FPFootCop.spawn(self, self, pp, 55.0))
+	# Police helicopter at high wanted; leaves when the heat drops.
+	if stars >= 5 and not is_instance_valid(_heli):
+		_heli = FPHeli.new()
+		_heli.game = self
+		add_child(_heli)
+		_heli.global_position = pp + Vector3(0.0, FPHeli.HEIGHT, 30.0)
+	elif stars < 4 and is_instance_valid(_heli):
+		_heli.queue_free()
+		_heli = null
 
 func _player_pos() -> Vector3:
 	if _mode == "foot" and is_instance_valid(_walker):
@@ -638,7 +661,24 @@ func _on_smashed(value: int, heat: int, pos: Vector3) -> void:
 		_best = _score.score
 		_score.submit()
 	_popup(pos, "+%d" % pts)
+	_maybe_callout()
 	_refresh()
+
+func _maybe_callout() -> void:
+	var m: int = _combo.multiplier()
+	if m == _last_callout_mult:
+		return
+	_last_callout_mult = m
+	var text: String = ""
+	if m >= 10:
+		text = "大屠殺!"
+	elif m >= 8:
+		text = "瘋狂!"
+	elif m >= 5:
+		text = "失控!"
+	if text != "" and _ui_callout:
+		_ui_callout.text = text
+		_callout_t = 1.1
 
 func _popup(pos: Vector3, text: String) -> void:
 	var l := Label3D.new()
@@ -690,6 +730,12 @@ func _build_hud() -> void:
 	_ui_speed = _mk_label(ui, Vector2(740, 500), 22, Color("#A0D0FF"))
 	var hint := _mk_label(ui, Vector2(20, 508), 15, Color("#B8C0CC"))
 	hint.text = "車:Shift 氮氣 空白 手煞 · E 上下車 · 步行:WASD J 射擊 Shift 衝刺 空白 跳 · , . 轉視角 · T 日夜"
+	_ui_callout = _mk_label(ui, Vector2(0.0, 188.0), 46, Color("#FF9020"))
+	_ui_callout.size = Vector2(960.0, 64.0)
+	_ui_callout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_ui_callout.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.7))
+	_ui_callout.add_theme_constant_override("outline_size", 6)
+	_ui_callout.visible = false
 	var mm := FPMinimap.new()
 	mm.game = self
 	mm.position = Vector2(794.0, 60.0)

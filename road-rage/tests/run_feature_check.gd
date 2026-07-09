@@ -62,5 +62,10 @@ func _process(_delta: float) -> bool:
 	b.explode()
 	out.append("explosion_fires=%s" % (got[0] and b._broke))
 
+	# 5) Helicopter deploys at high wanted.
+	_m._wanted_heat = 5000.0
+	_m._manage_police()
+	out.append("heli_high_wanted=%s" % is_instance_valid(_m._heli))
+
 	print("FEATURE_CHECK " + " ".join(out))
 	return true

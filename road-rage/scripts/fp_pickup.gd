@@ -43,6 +43,7 @@ func _ready() -> void:
 		cross.mesh = cbm
 		cross.position = Vector3(0.51, 0.0, 0.0)
 		_visual.add_child(cross)
+	add_to_group("pickup")
 	body_entered.connect(_on_body_entered)
 
 func _process(delta: float) -> void:
