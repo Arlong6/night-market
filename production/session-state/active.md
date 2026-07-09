@@ -1,46 +1,62 @@
 # Active Session State
 
-> **Last Updated**: 2026-07-01 (Road Rage — first-person 3D branch, iterated to a good state)
-> **Purpose**: Living checkpoint. Read this first after compaction or new session.
+> Last Updated: 2026-07-09 (Road Rage FP 3D — GTA-like, heavily expanded)
+> Purpose: Living checkpoint. Read this first after compaction or new session.
 
-## Current build: 橫衝直撞 (Road Rage) — mindless vehicle-destruction game (Godot 4.6)
+## Active build: 橫衝直撞 (Road Rage) — standalone `road-rage/`, Godot 4.6
 
-Standalone project `road-rage/`. Spec/plan in `docs/superpowers/`.
+Boot scene = `scenes/fp_main.tscn` (`fp_main.gd`). A third-person 3D GTA-like sandbox
+built entirely from primitive meshes (no art assets). The 2D top-down build
+(`scenes/main.tscn`) still exists but is not the boot scene.
 
-### Two branches exist in the same project
-- **2D top-down** (`scenes/main.tscn` / `main.gd`): the original v1 vertical slice — city, combo, score, wanted/police, game-over, juice. Complete, 23 unit tests. NOT the boot scene now.
-- **First-person / third-person 3D** (`scenes/fp_main.tscn` / `fp_main.gd`) — **the active build + boot scene**. This is where all recent work went.
+Spec/plan: `docs/superpowers/specs/2026-06-27-road-rage-design.md`, `docs/superpowers/plans/2026-06-27-road-rage.md`.
 
-### FP 3D — current state (what the user plays)
-- **Third-person chase camera** (pulled back/high), big detailed muscle car (chassis/cabin/windshield/spoiler/stripe/headlights/wheels), engine drone (pitch tracks speed), FOV widens with speed, handbrake (SPACE).
-- **Handling**: grip model (velocity steers toward the car's travel axis) so corners are planted; reverse inverts steering (natural); REVERSE_SPEED 20; MAX_SPEED 30.
-- **World**: procedural city (CityGen, grid now 30, TILE3D 14 = wider roads/bigger world), designed buildings (tiers/windows/trim/roofs), pedestrians (FPPed, wander + crowds), traffic (drifting FPTargets), street trees, a cone ring near spawn as a cornering test-track, perimeter walls + fall-respawn (never "ends").
-- **Destruction**: smashed props/cars/peds spawn a physics RigidBody3D **knocked away** (flung in travel dir + up, tumbles, lands, fades) + particle burst + score/combo. Endless (no death).
-- **Grand environment**: procedural gradient sky + sun, SSAO, glow/bloom, SSR reflections on polished asphalt, ACES tonemap, atmospheric fog, real-time shadows.
+### CRITICAL: renderer
+`rendering_method = forward_plus` (NOT gl_compatibility). The window-closing crash
+the user hit was GL-compat on Apple M3 (OpenGL-over-Metal) choking on load — headless
+never caught it because it is GPU-side. Forward+ = native Metal = stable. Consequence:
+no HTML5/web export in this mode; a GL-compat-lite variant would be needed for web.
 
-### ⚠️ CRITICAL LEARNING — the crash saga (root cause found)
-The FP build repeatedly "closed the whole window" on the user's machine. Headless checks were ALWAYS clean because **the crash is GPU-side**. Root cause (from the launch log): device is **Apple M3** and the project ran **GL Compatibility (OpenGL-over-Metal)** — chosen originally for web export — which is **unstable on Apple Silicon under load**. FIX: `rendering/renderer/rendering_method="forward_plus"` (native Metal, stable). Confirmed: launch banner now "Metal 4.0 - Forward+", clean exits, no crash.
-- **Consequence**: Forward+ means **no HTML5/web export** for now. If web is wanted later, need a GL-compat-friendly variant (lighter scene, no SSR/SSAO/volumetrics).
+### Features implemented (all verified: scan/boot/23 unit tests + headless checks)
+- Driving: third-person chase cam, big detailed car, nitro (Shift), handbrake (Space),
+  reverse with inverted steering, grip handling, FOV-with-speed, MAX_SPEED 33.
+- On foot: FPWalker — E to enter/exit car, WASD move + aim relative to a rotatable
+  camera (, / .), J or left-click auto-fire hitscan (tracers + sparks + recoil),
+  Space jump, Shift sprint. Carjack ANY nearby car (own or traffic) with E.
+- Destruction: props/cars/peds knocked away as physics bodies; buildings collapse when
+  rammed fast; explosive barrels (40) with chain reactions; hit-stop on big smashes.
+- Cops: cruisers (ram damage) + foot cops (chase + shoot) scale with a wanted-heat
+  star system; police destroyable by gun/ram; helicopter at 5 stars (searchlight,
+  shoots, leaves when heat drops).
+- Player health: 體力 bar, damage from cops/heli/explosions, regen when safe, respawn
+  at spawn (brings the car — never lost). Health packs (16) heal.
+- World: procedural city (grid 30, TILE3D 14), designed buildings w/ windows/roofs,
+  pedestrians + drifting traffic (car-shaped), street trees, neon signs, curbs,
+  crosswalks, 5 tall landmark towers, day/dusk/night toggle (T), cone test-track.
+- Look/feel: procedural sky + SSAO + SSR + bloom + fog + shadows; screen flash on
+  explosions; combo callouts (失控!/瘋狂!/大屠殺!); minimap (player/police/heli/pickups).
+- Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
+  looping pitch sound annoying).
 
-### Tuning knobs
-- Car feel: `fp_car.gd` (ACCEL, MAX_SPEED, REVERSE_SPEED, TURN_RATE, GRIP, BASE/MAX_FOV, BRAKE_DECEL).
-- Knock-away force: `fp_target.gd` / `fp_ped.gd` `_spawn_flying_chunk` / `_spawn_flying_ped`.
-- World size: `rr_tuning.gd` CITY_COLS/ROWS; `fp_main.gd` TILE3D.
-- Look: `fp_main.gd` `_build_environment` (sky/SSAO/SSR/glow/fog).
+### Controls
+Car: WASD drive, Shift nitro, Space handbrake, E exit, , / . look. Foot: WASD move,
+J/left-click shoot, Shift sprint, Space jump, E enter/carjack, , / . rotate view. T day/night.
 
-### How to run
-```
-~/Downloads/godot-4.6.2/Godot.app/Contents/MacOS/Godot --path road-rage
-```
-WASD/arrows drive, SPACE handbrake, S/↓ reverse. Tests: `godot --headless -s addons/gut/gut_cmdln.gd -gdir=res://tests/unit -ginclude_subdirs -gexit` (23 green).
+### Verification (per delivery contract — always attach evidence)
+- `GODOT=~/Downloads/godot-4.6.2/Godot.app/Contents/MacOS/Godot`
+- Scan+cache: `"$GODOT" --headless --editor --quit`
+- Unit tests (23): `"$GODOT" --headless -s addons/gut/gut_cmdln.gd -gdir=res://tests/unit -ginclude_subdirs -gexit`
+- Feature check: `"$GODOT" --headless -s res://tests/run_feature_check.gd` → prints
+  FEATURE_CHECK carjack/respawn/camera/explosion/heli — all must be true.
+- Run for the user: `"$GODOT" --path road-rage` (GUI; feel/visuals need a real run).
+  Launch WITHOUT piping to head so the output file captures the Metal/Forward+ banner + any crash.
 
-### Next beauty/feature candidates (offered, user to pick)
-Sidewalk curbs · neon signs · real car-shaped traffic · dusk/night toggle with neon · more building styles · minimap · pickups/nitro · a real objective/score-chase framing.
+### Next candidates (offered)
+Weapon pickups, mission/objective framing, ramps/jumps, more vehicle types, weather,
+shoot-down the heli (needs vertical aim), more environment variety.
 
 ## Other games (paused, intact)
-- Night Market (夜市) — boot game in `src/`, ship-prep done (v0.59), 553 tests.
-- word-suika (一字一句) — juiced + title.
-- Lexicon Village — shelved (core-loop rebuild needed).
+- Night Market (夜市) — boot game in `src/`, v0.59, 553 tests. word-suika (一字一句) — juiced + title. Lexicon Village — shelved.
 
 ## Solo Mode
 `production/review-mode.txt` = `solo`.
