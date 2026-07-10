@@ -69,6 +69,12 @@ func _ready() -> void:
 	_build_city()
 	_spawn_car()
 	_build_hud()
+	# Force the game window to the front so it isn't hidden behind other windows.
+	var w := get_window()
+	if w:
+		w.title = "橫衝直撞 — Road Rage"
+		w.move_to_foreground()
+		w.grab_focus()
 
 func _process(delta: float) -> void:
 	_combo.tick(delta)
