@@ -42,6 +42,20 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
 Car: WASD drive, Shift nitro, Space handbrake, E exit, , / . look. Foot: WASD move,
 J/left-click shoot, Shift sprint, Space jump, E enter/carjack, , / . rotate view. T day/night.
 
+### FIXED 2026-07-23: orphaned WorldEnvironment (major visual bug)
+`_build_environment()` created the WorldEnvironment (`we`) but never `add_child(we)`,
+so the entire sky/ambient/fog/SSAO/SSR/bloom/ACES pipeline was inert — the game
+rendered as a murky dark street lit only by sun + streetlight omnis. This is almost
+certainly what the user meant by "沒看到更新" (they saw a dim, flat scene). One-line
+fix `add_child(we)` restored the bright daytime look. Then tuned sky (vivid blue,
+energy_multiplier 1.15) + lighter fog (0.0016). Proven by before/after screenshots.
+
+### SCREENSHOT WORKFLOW (how to actually SEE the game headlessly-ish)
+`tests/run_screenshot.gd` instantiates fp_main NON-headless, renders ~90 frames,
+saves a PNG we can Read. Scratchpad dir must exist first (mkdir -p). Run:
+`"$GODOT" --path road-rage -s res://tests/run_screenshot.gd` (NO --headless — needs GPU).
+Then Read the PNG. This is the ground-truth check for any visual change.
+
 ### Verification (per delivery contract — always attach evidence)
 - `GODOT=~/Downloads/godot-4.6.2/Godot.app/Contents/MacOS/Godot`
 - Scan+cache: `"$GODOT" --headless --editor --quit`
