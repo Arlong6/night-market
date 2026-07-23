@@ -59,6 +59,7 @@ var _ui_combo: Label = null
 var _ui_best: Label = null
 var _ui_speed: Label = null
 var _ui_wanted: Label = null
+var _ui_crosshair: Control = null   ## first-person aim reticle (on-foot only)
 
 func _ready() -> void:
 	_rng.randomize()
@@ -210,6 +211,8 @@ func _exit_car() -> void:
 	_walker.rotation = Vector3.ZERO
 	_walker.global_position = _car.global_position + side * 3.8 + Vector3(0.0, 0.3, 0.0)
 	_walker.make_current()
+	if _ui_crosshair:
+		_ui_crosshair.visible = true   # first-person aim reticle
 
 func _enter_car() -> void:
 	if not is_instance_valid(_walker) or not is_instance_valid(_car):
@@ -239,6 +242,8 @@ func _board_car() -> void:
 	_mode = "car"
 	_car.active = true
 	_car.focus_camera()
+	if _ui_crosshair:
+		_ui_crosshair.visible = false   # hide reticle while driving
 	if is_instance_valid(_walker):
 		_walker.queue_free()
 	_walker = null
@@ -751,7 +756,7 @@ func _build_hud() -> void:
 	ui.add_child(_ui_hp_fill)
 	_ui_speed = _mk_label(ui, Vector2(740, 500), 22, Color("#A0D0FF"))
 	var hint := _mk_label(ui, Vector2(20, 508), 15, Color("#B8C0CC"))
-	hint.text = "車:Shift 氮氣 空白 手煞 · E 上下車 · 步行:WASD J 射擊 Shift 衝刺 空白 跳 · , . 轉視角 · T 日夜"
+	hint.text = "車:WASD 開 Shift 氮氣 空白 手煞 · E 上下車 · 步行(第一人稱):WASD 移動 滑鼠 瞄準 J/左鍵 射擊 Shift 衝刺 空白 跳 · Esc 放開滑鼠 · T 日夜"
 	_ui_callout = _mk_label(ui, Vector2(0.0, 188.0), 46, Color("#FF9020"))
 	_ui_callout.size = Vector2(960.0, 64.0)
 	_ui_callout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -762,7 +767,30 @@ func _build_hud() -> void:
 	mm.game = self
 	mm.position = Vector2(794.0, 60.0)
 	ui.add_child(mm)
+	# First-person crosshair at screen centre — shown only while on foot. Each white
+	# bar sits on a slightly larger dark bar so it reads on any background.
+	_ui_crosshair = Control.new()
+	_ui_crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.add_child(_ui_crosshair)
+	_add_reticle_bar(Vector2(462.0, 266.0), Vector2(36.0, 8.0), Vector2(464.0, 268.0), Vector2(32.0, 4.0))  # horizontal
+	_add_reticle_bar(Vector2(476.0, 252.0), Vector2(8.0, 36.0), Vector2(478.0, 254.0), Vector2(4.0, 32.0))  # vertical
+	_ui_crosshair.visible = false   # default mode is car
 	_refresh()
+
+## One crosshair element: a dark backing rect + a white rect on top (for contrast).
+func _add_reticle_bar(back_pos: Vector2, back_size: Vector2, fg_pos: Vector2, fg_size: Vector2) -> void:
+	var back := ColorRect.new()
+	back.color = Color(0.0, 0.0, 0.0, 0.55)
+	back.position = back_pos
+	back.size = back_size
+	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ui_crosshair.add_child(back)
+	var fg := ColorRect.new()
+	fg.color = Color(1.0, 1.0, 1.0, 0.92)
+	fg.position = fg_pos
+	fg.size = fg_size
+	fg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ui_crosshair.add_child(fg)
 
 func _mk_label(ui: CanvasLayer, pos: Vector2, size: int, col: Color) -> Label:
 	var l := Label.new()

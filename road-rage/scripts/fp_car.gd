@@ -118,6 +118,7 @@ func _build_car_visual() -> void:
 func focus_camera() -> void:
 	if _cam:
 		_cam.current = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE   # driving uses the keyboard; free the cursor
 
 func speed() -> float:
 	return Vector3(velocity.x, 0.0, velocity.z).length()

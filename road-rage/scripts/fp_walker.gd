@@ -1,5 +1,6 @@
-## FPWalker — on-foot character for 橫衝直撞. Third-person, WASD move (camera-fixed),
-## faces movement, shoots a hitscan gun forward. Get in/out of the car via FPMain.
+## FPWalker — on-foot character for 橫衝直撞. FIRST-PERSON: mouse looks around
+## (yaw + pitch), WASD moves relative to look, hitscan gun fires exactly where the
+## crosshair points (so you can aim UP at the helicopter). Get in/out via FPMain.
 class_name FPWalker
 extends CharacterBody3D
 
@@ -9,7 +10,10 @@ const JUMP_VEL: float = 9.5      ## Space to jump
 const GRAVITY: float = 24.0
 const FIRE_RANGE: float = 60.0
 const FIRE_RATE: float = 0.13   ## seconds between shots when the fire key is held
-const BASE_FOV: float = 70.0
+const BASE_FOV: float = 74.0
+const EYE_HEIGHT: float = 1.6    ## first-person camera height
+const MOUSE_SENS: float = 0.0026 ## radians of look per pixel of mouse motion
+const MAX_PITCH: float = 1.35    ## clamp look up/down (~77 degrees)
 
 var _fire_cd: float = 0.0
 
@@ -19,7 +23,8 @@ var _muzzle: MeshInstance3D = null
 var _face: Vector3 = Vector3.FORWARD
 var _muzzle_t: float = 0.0
 var _fire_queued: bool = false
-var _cam_yaw: float = 0.0   ## camera orbit yaw (, / . rotate the view)
+var _cam_yaw: float = 0.0    ## look yaw (mouse X, or , / . keys)
+var _cam_pitch: float = 0.0  ## look pitch (mouse Y) — enables vertical aim
 var _trauma: float = 0.0   ## impact/explosion camera-shake energy (decays each frame)
 
 ## Feed camera-shake energy in (0..1 per hit) — crashes/explosions near the walker.
@@ -38,12 +43,13 @@ func _ready() -> void:
 	_visual = Node3D.new()
 	add_child(_visual)
 	_build_visual()
-	# Fixed third-person camera (behind in world +Z; body never rotates).
+	_visual.visible = false   # first-person: our own body isn't drawn into the view
+	# First-person camera at eye height; rotates in place from look yaw + pitch.
 	_cam = Camera3D.new()
-	_cam.position = Vector3(0.0, 3.6, 7.0)
-	_cam.rotation_degrees = Vector3(-20.0, 0.0, 0.0)
-	_cam.fov = 70.0
+	_cam.position = Vector3(0.0, EYE_HEIGHT, 0.0)
+	_cam.fov = BASE_FOV
 	add_child(_cam)
+	_build_viewmodel()
 
 func _build_visual() -> void:
 	var body := MeshInstance3D.new()
@@ -92,9 +98,39 @@ func _build_visual() -> void:
 	_muzzle.visible = false
 	_visual.add_child(_muzzle)
 
+## First-person weapon viewmodel — a gun barrel fixed to the camera (bottom-right)
+## plus its muzzle flash. Replaces the world-body muzzle for the FP view.
+func _build_viewmodel() -> void:
+	var gun := MeshInstance3D.new()
+	var gm := BoxMesh.new()
+	gm.size = Vector3(0.12, 0.14, 0.62)
+	var gmat := StandardMaterial3D.new()
+	gmat.albedo_color = Color("#3B3D47")   # gunmetal — light enough to read on screen
+	gmat.metallic = 0.6
+	gmat.roughness = 0.45
+	gm.material = gmat
+	gun.mesh = gm
+	gun.position = Vector3(0.22, -0.19, -0.5)
+	_cam.add_child(gun)
+	_muzzle = MeshInstance3D.new()   # reassign: FP muzzle lives on the viewmodel now
+	var mm := SphereMesh.new()
+	mm.radius = 0.11
+	mm.height = 0.22
+	var mmat := StandardMaterial3D.new()
+	mmat.albedo_color = Color("#FFE070")
+	mmat.emission_enabled = true
+	mmat.emission = Color("#FFC030")
+	mmat.emission_energy_multiplier = 6.0
+	mm.material = mmat
+	_muzzle.mesh = mm
+	_muzzle.position = Vector3(0.24, -0.22, -0.86)
+	_muzzle.visible = false
+	_cam.add_child(_muzzle)
+
 func make_current() -> void:
 	if _cam:
 		_cam.current = true
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED   # FP mouse-look on foot
 
 func _process(delta: float) -> void:
 	if _muzzle_t > 0.0:
@@ -109,20 +145,34 @@ func _process(delta: float) -> void:
 	if _cam:
 		_cam.fov = lerpf(_cam.fov, BASE_FOV, 0.25)
 	_trauma = maxf(0.0, _trauma - delta * 1.8)   # shake energy bleeds off
-	# Rotate the view with , / .
+	# Esc frees / re-locks the mouse cursor (so you can click away and come back).
+	if _cam and _cam.current and Input.is_action_just_pressed("ui_cancel"):
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED else Input.MOUSE_MODE_CAPTURED
+	# Keyboard yaw fallback (, / .) still works alongside the mouse.
 	_cam_yaw += Input.get_axis("cam_left", "cam_right") * 2.6 * delta
 	_update_camera()
+
+## Mouse-look: yaw from horizontal motion, pitch (vertical aim) from vertical.
+func _unhandled_input(event: InputEvent) -> void:
+	if _cam == null or not _cam.current:
+		return
+	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+		return
+	if event is InputEventMouseMotion:
+		_cam_yaw -= event.relative.x * MOUSE_SENS
+		_cam_pitch = clampf(_cam_pitch - event.relative.y * MOUSE_SENS, -MAX_PITCH, MAX_PITCH)
 
 func _update_camera() -> void:
 	if _cam == null:
 		return
-	_cam.position = Vector3(sin(_cam_yaw) * 7.0, 3.6, cos(_cam_yaw) * 7.0)
-	_cam.look_at(global_position + Vector3(0.0, 1.2, 0.0), Vector3.UP)
+	# First-person: camera sits at the eye and rotates in place (yaw + pitch).
+	_cam.position = Vector3(0.0, EYE_HEIGHT, 0.0)
+	_cam.rotation = Vector3(_cam_pitch, _cam_yaw, 0.0)
 	var t2: float = _trauma * _trauma
 	_cam.h_offset = randf_range(-1.0, 1.0) * t2 * 0.4
 	_cam.v_offset = randf_range(-1.0, 1.0) * t2 * 0.4
 	if _trauma > 0.001:
-		_cam.rotation.z += randf_range(-1.0, 1.0) * t2 * 0.05  # roll jolt on impact
+		_cam.rotation.z = randf_range(-1.0, 1.0) * t2 * 0.05  # roll jolt on impact
 
 func _physics_process(delta: float) -> void:
 	var spd: float = SPEED * (SPRINT_MULT if Input.is_action_pressed("nitro") else 1.0)
@@ -166,8 +216,10 @@ func fire() -> void:
 	_fire_queued = true
 
 func _do_fire() -> void:
-	var from: Vector3 = global_position + Vector3(0.0, 1.4, 0.0)
-	var to: Vector3 = from + _face * FIRE_RANGE
+	# Fire exactly where the camera looks (screen centre) — includes vertical aim.
+	var dir: Vector3 = (-_cam.global_transform.basis.z) if _cam != null else _face
+	var from: Vector3 = _cam.global_position if _cam != null else global_position + Vector3(0.0, 1.4, 0.0)
+	var to: Vector3 = from + dir * FIRE_RANGE
 	var space := get_world_3d().direct_space_state
 	var q := PhysicsRayQueryParameters3D.create(from, to)
 	q.collide_with_areas = true
@@ -181,7 +233,7 @@ func _do_fire() -> void:
 		if c != null and c.has_method("shoot_hit"):
 			c.shoot_hit()
 		_hit_spark(endp)
-	_tracer(from + _face * 0.8, endp)
+	_tracer(from + dir * 1.2, endp)
 
 func _tracer(a: Vector3, b: Vector3) -> void:
 	var host: Node = get_parent()

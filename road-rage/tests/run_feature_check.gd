@@ -45,11 +45,14 @@ func _process(_delta: float) -> bool:
 	# 3) Camera rotation logic runs without error and moves the walker cam.
 	if _m._mode == "car":
 		_m._exit_car()
+	# First-person camera: rotates in place from yaw + pitch (pitch = vertical aim).
 	var cam_ok: bool = false
 	if is_instance_valid(_m._walker):
 		_m._walker._cam_yaw = 1.2
+		_m._walker._cam_pitch = 0.5
 		_m._walker._update_camera()
-		cam_ok = _m._walker._cam != null and _m._walker._cam.position.x != 0.0
+		var wc = _m._walker._cam
+		cam_ok = wc != null and absf(wc.rotation.y - 1.2) < 0.01 and absf(wc.rotation.x - 0.5) < 0.01
 	out.append("camera_rotate=%s" % cam_ok)
 
 	# 4) Barrel explosion fires + emits its signal (drives the flash/damage/score).
