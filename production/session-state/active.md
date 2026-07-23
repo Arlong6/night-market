@@ -43,8 +43,11 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
   looping pitch sound annoying).
 
 ### Controls
-Car: WASD drive, Shift nitro, Space handbrake, E exit, , / . look. Foot: WASD move,
-J/left-click shoot, Shift sprint, Space jump, E enter/carjack, , / . rotate view. T day/night.
+Car (3rd-person): WASD drive, Shift nitro, Space handbrake, E exit, , / . look. T day/night.
+Foot (FIRST-PERSON, 2026-07-24): WASD move, MOUSE look (yaw+pitch, vertical aim),
+J/left-click shoot, Shift sprint, Space jump, E enter/carjack, Esc free/lock cursor.
+Mouse captured on foot, released in car. Centre crosshair (HUD, on-foot only).
+Fire travels along camera forward → can aim up and shoot the helicopter.
 
 ### FIXED 2026-07-23: orphaned WorldEnvironment (major visual bug)
 `_build_environment()` created the WorldEnvironment (`we`) but never `add_child(we)`,
