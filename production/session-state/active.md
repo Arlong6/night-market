@@ -35,6 +35,10 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
   crosswalks, 5 tall landmark towers, day/dusk/night toggle (T), cone test-track.
 - Look/feel: procedural sky + SSAO + SSR + bloom + fog + shadows; screen flash on
   explosions; combo callouts (失控!/瘋狂!/大屠殺!); minimap (player/police/heli/pickups).
+- JUICE (2026-07-24): trauma camera shake (car + walker, quadratic decay, offset+fov
+  punch+roll) routed through fp_main._add_shake() for every impact; bigger hit-stop on
+  building/blast; explosions add a ground-plane shockwave ring (TorusMesh, NO rotation —
+  it's already flat) + tumbling debris chunks on top of the fireball.
 - Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
   looping pitch sound annoying).
 
