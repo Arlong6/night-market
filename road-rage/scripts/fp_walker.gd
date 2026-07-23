@@ -20,6 +20,11 @@ var _face: Vector3 = Vector3.FORWARD
 var _muzzle_t: float = 0.0
 var _fire_queued: bool = false
 var _cam_yaw: float = 0.0   ## camera orbit yaw (, / . rotate the view)
+var _trauma: float = 0.0   ## impact/explosion camera-shake energy (decays each frame)
+
+## Feed camera-shake energy in (0..1 per hit) — crashes/explosions near the walker.
+func add_trauma(amt: float) -> void:
+	_trauma = minf(1.2, _trauma + amt)
 
 func _ready() -> void:
 	up_direction = Vector3.UP
@@ -103,6 +108,7 @@ func _process(delta: float) -> void:
 	# Ease the recoil FOV kick back to normal.
 	if _cam:
 		_cam.fov = lerpf(_cam.fov, BASE_FOV, 0.25)
+	_trauma = maxf(0.0, _trauma - delta * 1.8)   # shake energy bleeds off
 	# Rotate the view with , / .
 	_cam_yaw += Input.get_axis("cam_left", "cam_right") * 2.6 * delta
 	_update_camera()
@@ -112,6 +118,11 @@ func _update_camera() -> void:
 		return
 	_cam.position = Vector3(sin(_cam_yaw) * 7.0, 3.6, cos(_cam_yaw) * 7.0)
 	_cam.look_at(global_position + Vector3(0.0, 1.2, 0.0), Vector3.UP)
+	var t2: float = _trauma * _trauma
+	_cam.h_offset = randf_range(-1.0, 1.0) * t2 * 0.4
+	_cam.v_offset = randf_range(-1.0, 1.0) * t2 * 0.4
+	if _trauma > 0.001:
+		_cam.rotation.z += randf_range(-1.0, 1.0) * t2 * 0.05  # roll jolt on impact
 
 func _physics_process(delta: float) -> void:
 	var spd: float = SPEED * (SPRINT_MULT if Input.is_action_pressed("nitro") else 1.0)

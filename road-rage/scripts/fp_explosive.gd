@@ -113,6 +113,54 @@ func _blast_fx(host: Node, at: Vector3) -> void:
 	lt.tween_property(light, "light_energy", 0.0, 0.35)
 	lt.tween_callback(func() -> void:
 		if is_instance_valid(light): light.queue_free())
+	# Expanding shockwave ring on the ground — reads as a physical blast wave.
+	var ring := MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.9
+	torus.outer_radius = 1.35
+	var rmat := StandardMaterial3D.new()
+	rmat.albedo_color = Color("#FFD070")
+	rmat.emission_enabled = true
+	rmat.emission = Color("#FFB24A")
+	rmat.emission_energy_multiplier = 2.4
+	rmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	torus.material = rmat
+	ring.mesh = torus
+	# TorusMesh already lies flat in the XZ plane (donut on a table) — no rotation,
+	# so the shockwave spreads outward along the ground.
+	host.add_child(ring)
+	ring.global_position = at + Vector3(0.0, -0.7, 0.0)   # just above the road
+	var rt := ring.create_tween()
+	rt.set_parallel(true)
+	rt.tween_property(ring, "scale", Vector3.ONE * (RADIUS * 0.85), 0.45)
+	rt.tween_property(rmat, "albedo_color:a", 0.0, 0.45)
+	rt.chain().tween_callback(func() -> void:
+		if is_instance_valid(ring): ring.queue_free())
+	# Dark debris chunks flung outward and tumbling.
+	var d := CPUParticles3D.new()
+	d.amount = 26
+	d.lifetime = 1.1
+	d.one_shot = true
+	d.explosiveness = 1.0
+	d.direction = Vector3(0.0, 0.6, 0.0)
+	d.spread = 80.0
+	d.initial_velocity_min = 8.0
+	d.initial_velocity_max = 22.0
+	d.gravity = Vector3(0.0, -18.0, 0.0)
+	d.angular_velocity_min = -400.0
+	d.angular_velocity_max = 400.0
+	d.scale_amount_min = 0.25
+	d.scale_amount_max = 0.6
+	var dmat := StandardMaterial3D.new()
+	dmat.albedo_color = Color("#2B2B30")
+	var dbm := BoxMesh.new()
+	dbm.material = dmat
+	d.mesh = dbm
+	host.add_child(d)
+	d.global_position = at
+	d.emitting = true
+	get_tree().create_timer(1.6).timeout.connect(func() -> void:
+		if is_instance_valid(d): d.queue_free())
 	RRAudio.explosion(host)
 	get_tree().create_timer(1.2).timeout.connect(func() -> void:
 		if is_instance_valid(p): p.queue_free())

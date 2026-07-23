@@ -17,7 +17,12 @@ const MAX_FOV: float = 86.0        ## widens with speed for an acceleration rush
 var _cam: Camera3D = null
 var _engine: AudioStreamPlayer = null
 var _engine_started: bool = false
+var _trauma: float = 0.0   ## impact/explosion camera-shake energy (decays each frame)
 var active: bool = true   ## false when the player has stepped out (car parks)
+
+## Feed camera-shake energy in (0..1 range per hit). Used for crashes/explosions.
+func add_trauma(amt: float) -> void:
+	_trauma = minf(1.2, _trauma + amt)
 var _look_yaw: float = 0.0   ## camera look-around (, / .), recenters when released
 
 func _ready() -> void:
@@ -166,14 +171,16 @@ func _physics_process(delta: float) -> void:
 					other.ram_wreck()
 	# ── Speed feel ──
 	var frac: float = clampf(speed() / MAX_SPEED, 0.0, 1.0)
+	_trauma = maxf(0.0, _trauma - delta * 1.8)   # shake energy bleeds off fast
 	if _cam != null:
+		var t2: float = _trauma * _trauma        # quadratic: sharp on impact, calm tail
 		var tgt_fov: float = lerpf(BASE_FOV, MAX_FOV, frac)
 		if throttle > 0.0:
 			tgt_fov += 3.0
 		if boosting:
 			tgt_fov += 9.0   # nitro rush
-		_cam.fov = lerpf(_cam.fov, tgt_fov, 0.10)
-		var shake: float = maxf(0.0, frac - 0.6) * 0.08
+		_cam.fov = lerpf(_cam.fov, tgt_fov + t2 * 6.0, 0.10)   # impact punch-out
+		var shake: float = maxf(0.0, frac - 0.6) * 0.08 + t2 * 0.5
 		_cam.h_offset = randf_range(-shake, shake)
 		_cam.v_offset = randf_range(-shake, shake)
 		# Look around with , / . (recenters when released).
@@ -185,6 +192,8 @@ func _physics_process(delta: float) -> void:
 		var base := Vector2(0.0, 16.5).rotated(_look_yaw)
 		_cam.position = Vector3(base.x, 8.0, base.y)
 		_cam.look_at(global_position + Vector3(0.0, 1.5, 0.0), Vector3.UP)
+		if _trauma > 0.001:
+			_cam.rotation.z += randf_range(-1.0, 1.0) * (_trauma * _trauma) * 0.05  # roll jolt
 	# Engine sound disabled per feedback (looping drone / pitch-zipper "click" was
 	# annoying). Re-add with a cleaner one-shot rev sample later if wanted.
 	# Safety: a run never "ends" — respawn if the car drops off the world.

@@ -149,6 +149,7 @@ func _player_pos() -> Vector3:
 func _damage(amt: float) -> void:
 	_hp = maxf(0.0, _hp - amt)
 	_regen_delay = 2.5
+	_add_shake(clampf(amt * 0.02, 0.2, 0.6))   # taking a hit jolts the camera
 	if _hp <= 0.0:
 		_respawn()
 
@@ -444,7 +445,8 @@ func _add_building(cell: Vector2i) -> void:
 	b.connect("collapsed", _on_building_collapsed)
 
 func _on_building_collapsed(pos: Vector3) -> void:
-	_hit_stop(0.05)
+	_hit_stop(0.08)   # leveling a building — the meatiest freeze
+	_add_shake(0.85)
 	var pts: int = _combo.register(150)
 	_score.add(pts, 1)
 	_smashed += 1
@@ -457,8 +459,11 @@ func _on_building_collapsed(pos: Vector3) -> void:
 
 func _on_explosion(pos: Vector3) -> void:
 	_flash = 0.55
-	_hit_stop(0.04)
-	if _player_pos().distance_to(pos) < 15.0:
+	_hit_stop(0.07)
+	# Shake scales with proximity — a blast in your face rattles the whole screen.
+	var d: float = _player_pos().distance_to(pos)
+	_add_shake(clampf(1.1 - d * 0.03, 0.35, 1.1))
+	if d < 15.0:
 		_damage(26.0)
 	var pts: int = _combo.register(60)
 	_score.add(pts, 1)
@@ -477,6 +482,13 @@ func _hit_stop(dur: float) -> void:
 	Engine.time_scale = 0.0
 	get_tree().create_timer(dur, true, false, true).timeout.connect(func() -> void:
 		Engine.time_scale = 1.0)
+
+## Kick the active camera (car OR walker) with shake energy. Central so every
+## impact/explosion routes through one place regardless of on-foot / driving.
+func _add_shake(amt: float) -> void:
+	var holder: Node = _car if _mode == "car" else _walker
+	if is_instance_valid(holder) and holder.has_method("add_trauma"):
+		holder.add_trauma(amt)
 
 func _spawn_landmarks() -> void:
 	var cells: Array[Vector2i] = [Vector2i(6, 6), Vector2i(6, 22), Vector2i(22, 6), Vector2i(22, 22), Vector2i(14, 18)]
@@ -664,6 +676,7 @@ func _spawn_car() -> void:
 func _on_smashed(value: int, heat: int, pos: Vector3) -> void:
 	var pts: int = _combo.register(value)
 	_score.add(pts, 1)
+	_add_shake(clampf(float(value) * 0.015, 0.12, 0.4))   # bigger targets hit harder
 	_smashed += 1
 	_wanted_heat += float(heat)
 	if _score.score > _best:
