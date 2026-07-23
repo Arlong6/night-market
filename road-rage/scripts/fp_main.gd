@@ -255,22 +255,23 @@ func _build_environment() -> void:
 	# Grand procedural sky — a gradient dome with a sun disk (follows the sun light).
 	var sky := Sky.new()
 	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color("#2E5FA8")
-	sky_mat.sky_horizon_color = Color("#C4D9EC")
+	sky_mat.sky_top_color = Color("#1F6BD6")       # more vivid daytime blue
+	sky_mat.sky_horizon_color = Color("#BFDBF2")
 	sky_mat.ground_bottom_color = Color("#3E434E")
 	sky_mat.ground_horizon_color = Color("#9EACBC")
 	sky_mat.sun_angle_max = 12.0
+	sky_mat.energy_multiplier = 1.15               # brighter sky so it reads as open daylight
 	sky.sky_material = sky_mat
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.ambient_light_energy = 1.0
-	# Atmospheric depth.
+	# Atmospheric depth — lighter haze so the skyline stays crisp instead of washed out.
 	env.fog_enabled = true
 	env.fog_light_color = Color("#C6D8EC")
-	env.fog_density = 0.0026
-	env.fog_aerial_perspective = 0.5
-	env.fog_sky_affect = 0.3
+	env.fog_density = 0.0016
+	env.fog_aerial_perspective = 0.4
+	env.fog_sky_affect = 0.2
 	# Grandeur: ambient occlusion + bloom + cinematic tonemap (Forward+ features).
 	env.ssao_enabled = true
 	env.ssao_radius = 2.0
