@@ -284,6 +284,8 @@ func _build_environment() -> void:
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	env.tonemap_exposure = 1.0
 	we.environment = env
+	add_child(we)   # CRITICAL: without this the WorldEnvironment is orphaned and
+	                # the whole sky/ambient/fog/bloom/tonemap pipeline never renders.
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-58.0, -52.0, 0.0)  # high midday angle
 	sun.light_color = Color("#EAF2FB")  # cool daylight white
