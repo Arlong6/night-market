@@ -39,6 +39,12 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
   punch+roll) routed through fp_main._add_shake() for every impact; bigger hit-stop on
   building/blast; explosions add a ground-plane shockwave ring (TorusMesh, NO rotation —
   it's already flat) + tumbling debris chunks on top of the fireball.
+- CROWD + FEEDBACK (2026-07-25): FPPed flee state (panic) — bolt from a fast car nearby
+  (passive) or from gunfire/blast/kill via fp_main.alarm_peds() broadcast (group
+  "pedestrian"). Directional damage indicator: _damage(amt, source_pos) — all 4 call
+  sites pass source; FPDamageIndicator (scripts/fp_damage_indicator.gd) draws a red arc
+  at screen centre pointing at the hit, angle from the ACTIVE camera forward (works in
+  car + foot). Feature check now asserts ped_panic + dmg_indicator.
 - Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
   looping pitch sound annoying).
 
