@@ -123,7 +123,7 @@ func _shoot() -> void:
 	_muzzle_t = 0.06
 	RRAudio.gunshot(self)
 	if game != null and game.has_method("_damage"):
-		game._damage(SHOT_DMG)
+		game._damage(SHOT_DMG, global_position)
 
 func shoot_hit() -> void:
 	hp -= 1

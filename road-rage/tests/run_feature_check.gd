@@ -70,5 +70,19 @@ func _process(_delta: float) -> bool:
 	_m._manage_police()
 	out.append("heli_high_wanted=%s" % is_instance_valid(_m._heli))
 
+	# 6) Pedestrians panic (flee state) when alarmed by violence.
+	var peds: Array = _m.get_tree().get_nodes_in_group("pedestrian")
+	var ped_ok: bool = false
+	if peds.size() > 0:
+		var pd = peds[0]
+		pd.panic(pd.global_position + Vector3(0.0, 0.0, 3.0))
+		ped_ok = pd._panic_t > 0.0
+	out.append("ped_panic[count=%d fleeing=%s]" % [peds.size(), ped_ok])
+
+	# 7) Taking damage from a source arms the directional damage indicator.
+	_m._hp = 100.0
+	_m._damage(5.0, _m._player_pos() + Vector3(10.0, 0.0, 0.0))
+	out.append("dmg_indicator=%s" % (_m._dmg_t > 0.0))
+
 	print("FEATURE_CHECK " + " ".join(out))
 	return true

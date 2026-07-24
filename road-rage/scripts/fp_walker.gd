@@ -234,6 +234,10 @@ func _do_fire() -> void:
 			c.shoot_hit()
 		_hit_spark(endp)
 	_tracer(from + dir * 1.2, endp)
+	# Gunshots scatter nearby civilians.
+	var g: Node = get_parent()
+	if g != null and g.has_method("alarm_peds"):
+		g.alarm_peds(global_position, 22.0)
 
 func _tracer(a: Vector3, b: Vector3) -> void:
 	var host: Node = get_parent()

@@ -31,6 +31,10 @@ const _SHIRT_COLORS: Array[Color] = [
 	Color("#E96FB0"),  # pink
 ]
 
+const PANIC_TIME: float = 2.6      ## seconds a ped keeps fleeing after a scare
+const PANIC_SPEED: float = 5.4     ## flee speed (much faster than the idle drift)
+const FEAR_RADIUS: float = 9.0     ## bolt if a fast car comes this close
+
 var _broke: bool = false
 var _root: Node3D = null          # visual pivot we bob/sway, leaving collision steady
 var _origin: Vector3 = Vector3.ZERO
@@ -38,6 +42,8 @@ var _wander_dir: Vector3 = Vector3.FORWARD
 var _traveled: float = 0.0
 var _bob_phase: float = 0.0
 var _shirt_color: Color = Color("#4F9DE9")
+var _game: Node = null            # FPMain — for player position / threat awareness
+var _panic_t: float = 0.0         # >0 while fleeing
 
 func _ready() -> void:
 	_shirt_color = _SHIRT_COLORS[randi() % _SHIRT_COLORS.size()]
@@ -62,6 +68,8 @@ func _ready() -> void:
 
 	_origin = global_position
 	add_to_group("blastable")
+	add_to_group("pedestrian")   # so FPMain can scare the crowd on gunfire/blasts
+	_game = get_parent()         # peds are spawned as children of FPMain
 	body_entered.connect(_on_body_entered)
 
 ## Assemble the little person from primitives. Heights are fractions of body_height.
@@ -123,21 +131,54 @@ func _build_figure() -> void:
 func _process(delta: float) -> void:
 	if _broke:
 		return
-	# Idle bob + tiny sway so the crowd feels alive.
+	# Passive fear: bolt if the player's car is bearing down close and fast.
+	if _panic_t <= 0.0 and is_instance_valid(_game) and _game.has_method("_player_pos"):
+		var pp: Vector3 = _game._player_pos()
+		if global_position.distance_to(pp) < FEAR_RADIUS and _game._mode == "car" \
+				and is_instance_valid(_game._car) and _game._car.speed() > 6.0:
+			panic(pp)
+	if _panic_t > 0.0:
+		_panic_t -= delta
+		_update_panic(delta)
+	else:
+		_update_idle(delta)
+
+## Idle bob + slow ping-pong wander so the crowd feels alive.
+func _update_idle(delta: float) -> void:
 	_bob_phase += delta * 3.0
 	if _root != null:
 		_root.position.y = absf(sin(_bob_phase)) * 0.06
 		_root.rotation.z = sin(_bob_phase * 0.5) * 0.05
-	# Wander: slow ping-pong drift on the ground plane.
 	var step: float = drift_speed * delta
 	global_position += _wander_dir * step
 	_traveled += step
 	if _traveled >= wander_range:
 		_traveled = 0.0
 		_wander_dir = -_wander_dir  # turn around, stay near the street
-		# Face the new walking direction (cartoon turn-on-the-spot).
 		if _root != null:
 			_root.rotation.y = atan2(_wander_dir.x, _wander_dir.z)
+
+## Sprint away from the threat with a frantic exaggerated bounce.
+func _update_panic(delta: float) -> void:
+	_bob_phase += delta * 9.0
+	if _root != null:
+		_root.position.y = absf(sin(_bob_phase)) * 0.16   # big panicked hops
+		_root.rotation.z = sin(_bob_phase * 0.5) * 0.06
+	global_position += _wander_dir * PANIC_SPEED * delta
+
+## Scare this pedestrian: bolt away from `threat_pos` for a couple of seconds.
+## Called by FPMain on gunfire, explosions, or a nearby kill.
+func panic(threat_pos: Vector3) -> void:
+	if _broke:
+		return
+	_panic_t = PANIC_TIME
+	var away: Vector3 = global_position - threat_pos
+	away.y = 0.0
+	if away.length() < 0.1:
+		away = Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0))
+	_wander_dir = away.normalized()
+	if _root != null:
+		_root.rotation.y = atan2(_wander_dir.x, _wander_dir.z)
 
 func _on_body_entered(body: Node) -> void:
 	if _broke or not body is FPCar:

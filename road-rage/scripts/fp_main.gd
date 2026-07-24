@@ -60,6 +60,9 @@ var _ui_best: Label = null
 var _ui_speed: Label = null
 var _ui_wanted: Label = null
 var _ui_crosshair: Control = null   ## first-person aim reticle (on-foot only)
+var _ui_dmg: FPDamageIndicator = null   ## red directional "hit came from here" arc
+var _dmg_src: Vector3 = Vector3.ZERO    ## world pos of the last damage source
+var _dmg_t: float = 0.0                 ## indicator fade timer
 
 func _ready() -> void:
 	_rng.randomize()
@@ -94,6 +97,7 @@ func _process(delta: float) -> void:
 		var stars: int = _wanted_stars()
 		_ui_wanted.text = "通緝 " + "★".repeat(stars) + "☆".repeat(5 - stars)
 	_update_health(delta)
+	_update_dmg_indicator(delta)
 	if _flash > 0.0:
 		_flash = maxf(0.0, _flash - delta * 1.6)
 	if _ui_flash:
@@ -147,12 +151,38 @@ func _player_pos() -> Vector3:
 		return _car.global_position
 	return Vector3.ZERO
 
-func _damage(amt: float) -> void:
+func _damage(amt: float, source_pos: Vector3 = Vector3.ZERO) -> void:
+	if source_pos != Vector3.ZERO:
+		_dmg_src = source_pos
+		_dmg_t = 1.2   # arm the directional damage indicator
 	_hp = maxf(0.0, _hp - amt)
 	_regen_delay = 2.5
 	_add_shake(clampf(amt * 0.02, 0.2, 0.6))   # taking a hit jolts the camera
 	if _hp <= 0.0:
 		_respawn()
+
+## Point the red damage arc at the last hit's source, relative to where the
+## player is looking. Uses the ACTIVE camera's forward vector so it is correct
+## in both the car chase-cam and the on-foot first-person view.
+func _update_dmg_indicator(delta: float) -> void:
+	if _ui_dmg == null:
+		return
+	if _dmg_t <= 0.0:
+		_ui_dmg.alpha = 0.0
+		return
+	_dmg_t -= delta
+	var cam := get_viewport().get_camera_3d()
+	if cam != null:
+		var fwd: Vector3 = -cam.global_transform.basis.z
+		fwd.y = 0.0
+		var to_src: Vector3 = _dmg_src - _player_pos()
+		to_src.y = 0.0
+		if fwd.length() > 0.01 and to_src.length() > 0.01:
+			fwd = fwd.normalized()
+			to_src = to_src.normalized()
+			var right: Vector3 = fwd.cross(Vector3.UP)   # +X when facing -Z = player's right
+			_ui_dmg.arc_angle = atan2(to_src.dot(right), to_src.dot(fwd))
+	_ui_dmg.alpha = clampf(_dmg_t / 1.2, 0.0, 1.0)
 
 func _respawn() -> void:
 	_hp = _max_hp
@@ -170,7 +200,7 @@ func _update_health(delta: float) -> void:
 	var pp: Vector3 = _player_pos()
 	for p in _police:
 		if is_instance_valid(p) and p.global_position.distance_to(pp) < 5.0:
-			_damage(18.0 * delta)
+			_damage(18.0 * delta, p.global_position)
 	if _regen_delay > 0.0:
 		_regen_delay -= delta
 	elif _hp < _max_hp:
@@ -468,8 +498,9 @@ func _on_explosion(pos: Vector3) -> void:
 	# Shake scales with proximity — a blast in your face rattles the whole screen.
 	var d: float = _player_pos().distance_to(pos)
 	_add_shake(clampf(1.1 - d * 0.03, 0.35, 1.1))
+	alarm_peds(pos, 30.0)   # a blast sends the whole block running
 	if d < 15.0:
-		_damage(26.0)
+		_damage(26.0, pos)
 	var pts: int = _combo.register(60)
 	_score.add(pts, 1)
 	_smashed += 1
@@ -494,6 +525,13 @@ func _add_shake(amt: float) -> void:
 	var holder: Node = _car if _mode == "car" else _walker
 	if is_instance_valid(holder) and holder.has_method("add_trauma"):
 		holder.add_trauma(amt)
+
+## Scare every pedestrian within `radius` of a violent event so the crowd bolts.
+func alarm_peds(at: Vector3, radius: float) -> void:
+	for ped in get_tree().get_nodes_in_group("pedestrian"):
+		if is_instance_valid(ped) and ped.has_method("panic") \
+				and ped.global_position.distance_to(at) < radius:
+			ped.panic(at)
 
 func _spawn_landmarks() -> void:
 	var cells: Array[Vector2i] = [Vector2i(6, 6), Vector2i(6, 22), Vector2i(22, 6), Vector2i(22, 22), Vector2i(14, 18)]
@@ -682,6 +720,7 @@ func _on_smashed(value: int, heat: int, pos: Vector3) -> void:
 	var pts: int = _combo.register(value)
 	_score.add(pts, 1)
 	_add_shake(clampf(float(value) * 0.015, 0.12, 0.4))   # bigger targets hit harder
+	alarm_peds(pos, 16.0)   # bystanders scatter from a nearby kill
 	_smashed += 1
 	_wanted_heat += float(heat)
 	if _score.score > _best:
@@ -767,6 +806,10 @@ func _build_hud() -> void:
 	mm.game = self
 	mm.position = Vector2(794.0, 60.0)
 	ui.add_child(mm)
+	# Directional damage indicator (red arc pointing at whatever just hit you).
+	_ui_dmg = FPDamageIndicator.new()
+	_ui_dmg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.add_child(_ui_dmg)
 	# First-person crosshair at screen centre — shown only while on foot. Each white
 	# bar sits on a slightly larger dark bar so it reads on any background.
 	_ui_crosshair = Control.new()
