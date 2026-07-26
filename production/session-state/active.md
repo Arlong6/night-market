@@ -45,6 +45,12 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
   sites pass source; FPDamageIndicator (scripts/fp_damage_indicator.gd) draws a red arc
   at screen centre pointing at the hit, angle from the ACTIVE camera forward (works in
   car + foot). Feature check now asserts ped_panic + dmg_indicator.
+- PANIC POLISH + FIRE MODE (2026-07-26): panicked peds throw arms overhead + flail
+  (sin wave) and zig-zag flee (re-roll heading every ~0.25-0.5s, +/-57deg jitter).
+  Gun fire mode: FPWalker._auto_fire toggled with F — 連發 hold-to-spray / 單發 tap.
+  "fire" input action now includes MOUSE_BUTTON_LEFT (walker fire loop covers mouse+J;
+  fp_main's old left-click handler removed to avoid double-fire). HUD shows 連發/單發 [F]
+  on foot. Feature check asserts fire_mode_toggle.
 - Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
   looping pitch sound annoying).
 
