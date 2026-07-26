@@ -44,6 +44,9 @@ var _bob_phase: float = 0.0
 var _shirt_color: Color = Color("#4F9DE9")
 var _game: Node = null            # FPMain — for player position / threat awareness
 var _panic_t: float = 0.0         # >0 while fleeing
+var _arms: Array[MeshInstance3D] = []   # so we can throw them up in a panic
+var _threat_pos: Vector3 = Vector3.ZERO # what we're fleeing from
+var _reroll_t: float = 0.0        # timer to re-pick an erratic flee heading
 
 func _ready() -> void:
 	_shirt_color = _SHIRT_COLORS[randi() % _SHIRT_COLORS.size()]
@@ -117,6 +120,7 @@ func _build_figure() -> void:
 		arm.mesh = am
 		arm.position = Vector3(side * 0.34, leg_h + h * 0.22, 0.0)
 		_root.add_child(arm)
+		_arms.append(arm)
 
 	# Head — a skin-toned sphere on top.
 	var head := MeshInstance3D.new()
@@ -149,6 +153,10 @@ func _update_idle(delta: float) -> void:
 	if _root != null:
 		_root.position.y = absf(sin(_bob_phase)) * 0.06
 		_root.rotation.z = sin(_bob_phase * 0.5) * 0.05
+	# Arms ease back down to a resting hang.
+	for a in _arms:
+		if is_instance_valid(a):
+			a.rotation.x = lerpf(a.rotation.x, 0.0, 0.2)
 	var step: float = drift_speed * delta
 	global_position += _wander_dir * step
 	_traveled += step
@@ -158,13 +166,34 @@ func _update_idle(delta: float) -> void:
 		if _root != null:
 			_root.rotation.y = atan2(_wander_dir.x, _wander_dir.z)
 
-## Sprint away from the threat with a frantic exaggerated bounce.
+## Flee: arms thrown overhead and flailing, running in a frantic zig-zag away.
 func _update_panic(delta: float) -> void:
-	_bob_phase += delta * 9.0
+	_bob_phase += delta * 11.0
 	if _root != null:
-		_root.position.y = absf(sin(_bob_phase)) * 0.16   # big panicked hops
-		_root.rotation.z = sin(_bob_phase * 0.5) * 0.06
+		_root.position.y = absf(sin(_bob_phase)) * 0.17   # big panicked hops
+		_root.rotation.z = sin(_bob_phase * 0.5) * 0.07
+	# Hands up, waving in terror.
+	var wave: float = sin(_bob_phase * 1.6) * 0.35
+	for a in _arms:
+		if is_instance_valid(a):
+			a.rotation.x = -2.3 + wave   # ~ -130deg: arms flung overhead, flailing
+	# Re-pick an erratic heading now and then (generally away from the threat).
+	_reroll_t -= delta
+	if _reroll_t <= 0.0:
+		_reroll_t = randf_range(0.25, 0.5)
+		_pick_flee_dir()
 	global_position += _wander_dir * PANIC_SPEED * delta
+
+## Choose a flee heading: away from the threat, jittered for a panicked scramble.
+func _pick_flee_dir() -> void:
+	var away: Vector3 = global_position - _threat_pos
+	away.y = 0.0
+	if away.length() < 0.1:
+		away = Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0))
+	away = away.normalized().rotated(Vector3.UP, randf_range(-1.0, 1.0))  # +/- ~57deg jitter
+	_wander_dir = away.normalized()
+	if _root != null:
+		_root.rotation.y = atan2(_wander_dir.x, _wander_dir.z)
 
 ## Scare this pedestrian: bolt away from `threat_pos` for a couple of seconds.
 ## Called by FPMain on gunfire, explosions, or a nearby kill.
@@ -172,13 +201,9 @@ func panic(threat_pos: Vector3) -> void:
 	if _broke:
 		return
 	_panic_t = PANIC_TIME
-	var away: Vector3 = global_position - threat_pos
-	away.y = 0.0
-	if away.length() < 0.1:
-		away = Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0))
-	_wander_dir = away.normalized()
-	if _root != null:
-		_root.rotation.y = atan2(_wander_dir.x, _wander_dir.z)
+	_threat_pos = threat_pos
+	_reroll_t = 0.0        # pick a heading immediately
+	_pick_flee_dir()
 
 func _on_body_entered(body: Node) -> void:
 	if _broke or not body is FPCar:

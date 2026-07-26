@@ -16,6 +16,7 @@ const MOUSE_SENS: float = 0.0026 ## radians of look per pixel of mouse motion
 const MAX_PITCH: float = 1.35    ## clamp look up/down (~77 degrees)
 
 var _fire_cd: float = 0.0
+var _auto_fire: bool = true   ## true = 連發 (hold to spray), false = 單發 (tap per shot)
 
 var _cam: Camera3D = null
 var _visual: Node3D = null
@@ -137,9 +138,13 @@ func _process(delta: float) -> void:
 		_muzzle_t -= delta
 		if _muzzle_t <= 0.0 and _muzzle:
 			_muzzle.visible = false
-	# Auto-fire while the fire key (J) is held.
+	# Toggle 連發/單發 fire mode with F.
+	if Input.is_action_just_pressed("fire_mode"):
+		_auto_fire = not _auto_fire
+	# 連發: fire while held. 單發: one shot per press.
 	_fire_cd = maxf(0.0, _fire_cd - delta)
-	if _fire_cd <= 0.0 and Input.is_action_pressed("fire"):
+	var wants_fire: bool = Input.is_action_pressed("fire") if _auto_fire else Input.is_action_just_pressed("fire")
+	if _fire_cd <= 0.0 and wants_fire:
 		fire()
 	# Ease the recoil FOV kick back to normal.
 	if _cam:

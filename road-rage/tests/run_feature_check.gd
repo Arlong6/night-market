@@ -84,5 +84,13 @@ func _process(_delta: float) -> bool:
 	_m._damage(5.0, _m._player_pos() + Vector3(10.0, 0.0, 0.0))
 	out.append("dmg_indicator=%s" % (_m._dmg_t > 0.0))
 
+	# 8) Gun fire-mode toggle exists and flips (連發 <-> 單發).
+	var fire_ok: bool = false
+	if is_instance_valid(_m._walker):
+		var was: bool = _m._walker._auto_fire
+		_m._walker._auto_fire = not was
+		fire_ok = _m._walker._auto_fire != was
+	out.append("fire_mode_toggle=%s" % fire_ok)
+
 	print("FEATURE_CHECK " + " ".join(out))
 	return true
