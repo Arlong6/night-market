@@ -51,6 +51,10 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
   "fire" input action now includes MOUSE_BUTTON_LEFT (walker fire loop covers mouse+J;
   fp_main's old left-click handler removed to avoid double-fire). HUD shows 連發/單發 [F]
   on foot. Feature check asserts fire_mode_toggle.
+- GUN + SCREAM JUICE (2026-07-28): FPWalker recoil spread (_spread bloom grows while
+  spraying up to ~3.4deg, decays at rest) + brass shell ejection per shot (tumbling
+  arc, freed 0.7s). RRAudio.scream() procedural yelp with per-ped pitch; FPPed cries
+  out ~30% only on the calm->panic transition (no spam).
 - Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
   looping pitch sound annoying).
 
