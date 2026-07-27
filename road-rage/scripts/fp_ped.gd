@@ -200,10 +200,15 @@ func _pick_flee_dir() -> void:
 func panic(threat_pos: Vector3) -> void:
 	if _broke:
 		return
+	var was_calm: bool = _panic_t <= 0.0
 	_panic_t = PANIC_TIME
 	_threat_pos = threat_pos
 	_reroll_t = 0.0        # pick a heading immediately
 	_pick_flee_dir()
+	# Only some peds cry out, and only at the moment of the scare (not on re-alarms),
+	# so a scared crowd sounds like a scatter of yelps rather than a wall of noise.
+	if was_calm and randf() < 0.3:
+		RRAudio.scream(self, randf_range(0.85, 1.4))
 
 func _on_body_entered(body: Node) -> void:
 	if _broke or not body is FPCar:

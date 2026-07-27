@@ -10,6 +10,9 @@ const JUMP_VEL: float = 9.5      ## Space to jump
 const GRAVITY: float = 24.0
 const FIRE_RANGE: float = 60.0
 const FIRE_RATE: float = 0.13   ## seconds between shots when the fire key is held
+const SPREAD_MAX: float = 0.06      ## max bloom (~3.4deg) built up by sustained auto-fire
+const SPREAD_PER_SHOT: float = 0.016
+const SPREAD_DECAY: float = 0.22    ## bloom recovered per second when not firing
 const BASE_FOV: float = 74.0
 const EYE_HEIGHT: float = 1.6    ## first-person camera height
 const MOUSE_SENS: float = 0.0026 ## radians of look per pixel of mouse motion
@@ -17,6 +20,7 @@ const MAX_PITCH: float = 1.35    ## clamp look up/down (~77 degrees)
 
 var _fire_cd: float = 0.0
 var _auto_fire: bool = true   ## true = 連發 (hold to spray), false = 單發 (tap per shot)
+var _spread: float = 0.0      ## current bloom; grows while spraying, decays at rest
 
 var _cam: Camera3D = null
 var _visual: Node3D = null
@@ -150,6 +154,7 @@ func _process(delta: float) -> void:
 	if _cam:
 		_cam.fov = lerpf(_cam.fov, BASE_FOV, 0.25)
 	_trauma = maxf(0.0, _trauma - delta * 1.8)   # shake energy bleeds off
+	_spread = maxf(0.0, _spread - SPREAD_DECAY * delta)   # accuracy recovers at rest
 	# Esc frees / re-locks the mouse cursor (so you can click away and come back).
 	if _cam and _cam.current and Input.is_action_just_pressed("ui_cancel"):
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED else Input.MOUSE_MODE_CAPTURED
@@ -221,8 +226,15 @@ func fire() -> void:
 	_fire_queued = true
 
 func _do_fire() -> void:
-	# Fire exactly where the camera looks (screen centre) — includes vertical aim.
+	# Aim where the camera looks (screen centre) — includes vertical aim. Sustained
+	# auto-fire blooms the shots off-centre (recoil spread).
 	var dir: Vector3 = (-_cam.global_transform.basis.z) if _cam != null else _face
+	if _cam != null and _spread > 0.0001:
+		var rt: Vector3 = _cam.global_transform.basis.x
+		var up: Vector3 = _cam.global_transform.basis.y
+		dir = (dir + rt * randf_range(-_spread, _spread) + up * randf_range(-_spread, _spread)).normalized()
+	_spread = minf(SPREAD_MAX, _spread + SPREAD_PER_SHOT)
+	_eject_shell()
 	var from: Vector3 = _cam.global_position if _cam != null else global_position + Vector3(0.0, 1.4, 0.0)
 	var to: Vector3 = from + dir * FIRE_RANGE
 	var space := get_world_3d().direct_space_state
@@ -243,6 +255,41 @@ func _do_fire() -> void:
 	var g: Node = get_parent()
 	if g != null and g.has_method("alarm_peds"):
 		g.alarm_peds(global_position, 22.0)
+
+## Toss a brass shell casing out of the ejection port with a short tumble + drop.
+func _eject_shell() -> void:
+	if _cam == null:
+		return
+	var host: Node = get_parent()
+	if host == null:
+		return
+	var shell := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.05, 0.05, 0.12)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color("#E7B84A")   # bright brass
+	mat.metallic = 0.7
+	mat.roughness = 0.35
+	mat.emission_enabled = true
+	mat.emission = Color("#6A4E12")       # faint sheen so it reads against dark ground
+	mat.emission_energy_multiplier = 0.5
+	bm.material = mat
+	shell.mesh = bm
+	host.add_child(shell)
+	var xf: Transform3D = _cam.global_transform
+	var start: Vector3 = xf * Vector3(0.2, -0.15, -0.5)   # ejection port, just right of the gun
+	shell.global_position = start
+	var rt: Vector3 = xf.basis.x
+	var up: Vector3 = xf.basis.y
+	var apex: Vector3 = start + rt * 0.28 + up * 0.24
+	var landing: Vector3 = start + rt * 0.5 - up * 1.4
+	var mv := shell.create_tween()
+	mv.tween_property(shell, "global_position", apex, 0.11)
+	mv.tween_property(shell, "global_position", landing, 0.34)
+	var sp := shell.create_tween()
+	sp.tween_property(shell, "rotation", Vector3(randf_range(-14.0, 14.0), randf_range(-14.0, 14.0), randf_range(-14.0, 14.0)), 0.55)
+	get_tree().create_timer(0.7).timeout.connect(func() -> void:
+		if is_instance_valid(shell): shell.queue_free())
 
 func _tracer(a: Vector3, b: Vector3) -> void:
 	var host: Node = get_parent()

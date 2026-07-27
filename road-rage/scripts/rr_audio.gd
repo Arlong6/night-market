@@ -8,6 +8,7 @@ static var _impact: AudioStreamWAV = null
 static var _explosion: AudioStreamWAV = null
 static var _siren: AudioStreamWAV = null
 static var _gunshot: AudioStreamWAV = null
+static var _scream: AudioStreamWAV = null
 
 static func impact(parent: Node, force: float) -> void:
 	if _impact == null: _impact = _make_impact()
@@ -26,11 +27,17 @@ static func gunshot(parent: Node) -> void:
 	if _gunshot == null: _gunshot = _make_gunshot()
 	_play(parent, _gunshot, -7.0)
 
-static func _play(parent: Node, stream: AudioStream, db: float) -> void:
+## A panicked pedestrian yelp. `pitch` varies per ped so a crowd doesn't sound cloned.
+static func scream(parent: Node, pitch: float = 1.0) -> void:
+	if _scream == null: _scream = _make_scream()
+	_play(parent, _scream, -13.0, pitch)
+
+static func _play(parent: Node, stream: AudioStream, db: float, pitch: float = 1.0) -> void:
 	if parent == null or stream == null or not is_instance_valid(parent): return
 	var p := AudioStreamPlayer.new()
 	p.stream = stream
 	p.volume_db = db
+	p.pitch_scale = pitch
 	parent.add_child(p)
 	p.play()
 	p.finished.connect(p.queue_free)
@@ -97,6 +104,25 @@ static func make_engine_stream() -> AudioStreamWAV:
 	st.loop_begin = 0
 	st.loop_end = n
 	return st
+
+# A short startled yelp: pitch swoops up then sags, with vibrato + breath.
+static func _make_scream() -> AudioStreamWAV:
+	var dur := 0.42
+	var n := int(SAMPLE_RATE * dur)
+	var data := PackedByteArray(); data.resize(n * 2)
+	var seed_v := 2029
+	var phase := 0.0
+	for i in n:
+		var t: float = float(i) / SAMPLE_RATE
+		var frac: float = t / dur
+		var env: float = sin(frac * PI)                       # soft bell in/out
+		var f: float = 300.0 + 300.0 * sin(frac * PI) + 28.0 * sin(t * TAU * 12.0)  # swoop + vibrato
+		phase += f / SAMPLE_RATE
+		var tone: float = sin(phase * TAU) + 0.3 * sin(phase * TAU * 2.0)  # a formant harmonic
+		seed_v = (seed_v * 1103515245 + 12345) & 0x7fffffff
+		var breath: float = ((float(seed_v) / 1073741823.0) - 1.0) * 0.12
+		_w(data, i, (tone * 0.85 + breath) * env * 0.5)
+	return _wrap(data)
 
 # Short sharp gunshot crack.
 static func _make_gunshot() -> AudioStreamWAV:
