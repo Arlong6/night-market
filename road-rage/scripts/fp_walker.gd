@@ -8,12 +8,19 @@ const SPEED: float = 8.0
 const SPRINT_MULT: float = 1.7   ## hold Shift to sprint
 const JUMP_VEL: float = 9.5      ## Space to jump
 const GRAVITY: float = 24.0
-const FIRE_RANGE: float = 60.0
-const FIRE_RATE: float = 0.13   ## seconds between shots when the fire key is held
-const SPREAD_MAX: float = 0.06      ## max bloom (~3.4deg) built up by sustained auto-fire
-const SPREAD_PER_SHOT: float = 0.016
 const SPREAD_DECAY: float = 0.22    ## bloom recovered per second when not firing
 const BASE_FOV: float = 74.0
+
+## Data-driven weapon table. Switch with 1/2/3. Per-weapon: rays per trigger pull,
+## fire cooldown, inherent cone + recoil bloom, range, sound pitch, and viewmodel
+## size/colour so each gun looks and feels distinct.
+var _weapons: Array[Dictionary] = [
+	{"name": "手槍", "pellets": 1, "rate": 0.20, "spread": 0.004, "bloom": 0.006, "bloom_max": 0.03, "range": 60.0, "pitch": 1.0, "len": 0.58, "thick": 0.12, "col": Color("#3B3D47")},
+	{"name": "衝鋒槍", "pellets": 1, "rate": 0.075, "spread": 0.012, "bloom": 0.020, "bloom_max": 0.11, "range": 55.0, "pitch": 1.18, "len": 0.82, "thick": 0.11, "col": Color("#2E2F37")},
+	{"name": "散彈槍", "pellets": 8, "rate": 0.72, "spread": 0.060, "bloom": 0.0, "bloom_max": 0.02, "range": 34.0, "pitch": 0.7, "len": 0.92, "thick": 0.17, "col": Color("#4A3A2A")},
+]
+var _weapon: int = 0
+var _gun: MeshInstance3D = null   ## viewmodel body (reshaped per weapon)
 const EYE_HEIGHT: float = 1.6    ## first-person camera height
 const MOUSE_SENS: float = 0.0026 ## radians of look per pixel of mouse motion
 const MAX_PITCH: float = 1.35    ## clamp look up/down (~77 degrees)
@@ -106,17 +113,15 @@ func _build_visual() -> void:
 ## First-person weapon viewmodel — a gun barrel fixed to the camera (bottom-right)
 ## plus its muzzle flash. Replaces the world-body muzzle for the FP view.
 func _build_viewmodel() -> void:
-	var gun := MeshInstance3D.new()
+	_gun = MeshInstance3D.new()
 	var gm := BoxMesh.new()
-	gm.size = Vector3(0.12, 0.14, 0.62)
 	var gmat := StandardMaterial3D.new()
-	gmat.albedo_color = Color("#3B3D47")   # gunmetal — light enough to read on screen
 	gmat.metallic = 0.6
 	gmat.roughness = 0.45
 	gm.material = gmat
-	gun.mesh = gm
-	gun.position = Vector3(0.22, -0.19, -0.5)
-	_cam.add_child(gun)
+	_gun.mesh = gm
+	_gun.position = Vector3(0.22, -0.19, -0.5)
+	_cam.add_child(_gun)
 	_muzzle = MeshInstance3D.new()   # reassign: FP muzzle lives on the viewmodel now
 	var mm := SphereMesh.new()
 	mm.radius = 0.11
@@ -128,9 +133,23 @@ func _build_viewmodel() -> void:
 	mmat.emission_energy_multiplier = 6.0
 	mm.material = mmat
 	_muzzle.mesh = mm
-	_muzzle.position = Vector3(0.24, -0.22, -0.86)
 	_muzzle.visible = false
 	_cam.add_child(_muzzle)
+	_apply_weapon_visual()   # size the gun + place the muzzle for weapon 0
+
+## Reshape the viewmodel + reposition the muzzle to match the current weapon.
+func _apply_weapon_visual() -> void:
+	var w: Dictionary = _weapons[_weapon]
+	var wlen: float = w["len"]
+	var thick: float = w["thick"]
+	if _gun != null and _gun.mesh is BoxMesh:
+		_gun.mesh.size = Vector3(thick, thick * 1.15, wlen)
+		var m := _gun.get_active_material(0)
+		if m is StandardMaterial3D:
+			m.albedo_color = w["col"]
+	if _muzzle != null:
+		# Sit the flash at the barrel tip (gun is centred at z=-0.5).
+		_muzzle.position = Vector3(0.22, -0.19, -0.5 - wlen * 0.5 - 0.04)
 
 func make_current() -> void:
 	if _cam:
@@ -145,6 +164,13 @@ func _process(delta: float) -> void:
 	# Toggle 連發/單發 fire mode with F.
 	if Input.is_action_just_pressed("fire_mode"):
 		_auto_fire = not _auto_fire
+	# Switch weapons with 1 / 2 / 3.
+	if Input.is_action_just_pressed("weap_1"):
+		_set_weapon(0)
+	elif Input.is_action_just_pressed("weap_2"):
+		_set_weapon(1)
+	elif Input.is_action_just_pressed("weap_3"):
+		_set_weapon(2)
 	# 連發: fire while held. 單發: one shot per press.
 	_fire_cd = maxf(0.0, _fire_cd - delta)
 	var wants_fire: bool = Input.is_action_pressed("fire") if _auto_fire else Input.is_action_just_pressed("fire")
@@ -216,27 +242,52 @@ func _physics_process(delta: float) -> void:
 func fire() -> void:
 	if _fire_cd > 0.0:
 		return
-	_fire_cd = FIRE_RATE
+	var w: Dictionary = _weapons[_weapon]
+	_fire_cd = w["rate"]
 	if _muzzle:
 		_muzzle.visible = true
 	_muzzle_t = 0.05
-	RRAudio.gunshot(self)
+	RRAudio.gunshot(self, w["pitch"])
 	if _cam:
-		_cam.fov = BASE_FOV + 3.0   # recoil kick, eased back in _process
+		_cam.fov = BASE_FOV + (6.0 if int(w["pellets"]) > 1 else 3.0)  # shotgun kicks harder
 	_fire_queued = true
 
+## Switch to weapon `i` (1/2/3). Resets bloom and reshapes the viewmodel.
+func _set_weapon(i: int) -> void:
+	if i < 0 or i >= _weapons.size() or i == _weapon:
+		return
+	_weapon = i
+	_spread = 0.0
+	_fire_cd = maxf(_fire_cd, 0.12)   # tiny raise delay on swap
+	_apply_weapon_visual()
+
+func weapon_name() -> String:
+	return String(_weapons[_weapon]["name"])
+
 func _do_fire() -> void:
-	# Aim where the camera looks (screen centre) — includes vertical aim. Sustained
-	# auto-fire blooms the shots off-centre (recoil spread).
-	var dir: Vector3 = (-_cam.global_transform.basis.z) if _cam != null else _face
-	if _cam != null and _spread > 0.0001:
-		var rt: Vector3 = _cam.global_transform.basis.x
-		var up: Vector3 = _cam.global_transform.basis.y
-		dir = (dir + rt * randf_range(-_spread, _spread) + up * randf_range(-_spread, _spread)).normalized()
-	_spread = minf(SPREAD_MAX, _spread + SPREAD_PER_SHOT)
-	_eject_shell()
+	var w: Dictionary = _weapons[_weapon]
+	var base_dir: Vector3 = (-_cam.global_transform.basis.z) if _cam != null else _face
 	var from: Vector3 = _cam.global_position if _cam != null else global_position + Vector3(0.0, 1.4, 0.0)
-	var to: Vector3 = from + dir * FIRE_RANGE
+	var rng: float = float(w["range"])
+	var cone: float = float(w["spread"]) + _spread   # inherent cone + accumulated recoil bloom
+	var pellets: int = int(w["pellets"])
+	var rt: Vector3 = _cam.global_transform.basis.x if _cam != null else Vector3.RIGHT
+	var up: Vector3 = _cam.global_transform.basis.y if _cam != null else Vector3.UP
+	for i in pellets:
+		var dir := base_dir
+		if cone > 0.0001:
+			dir = (base_dir + rt * randf_range(-cone, cone) + up * randf_range(-cone, cone)).normalized()
+		_fire_ray(from, dir, rng)
+	_spread = minf(float(w["bloom_max"]), _spread + float(w["bloom"]))
+	_eject_shell()
+	# Gunshots scatter nearby civilians.
+	var g: Node = get_parent()
+	if g != null and g.has_method("alarm_peds"):
+		g.alarm_peds(global_position, 22.0)
+
+## One hitscan pellet: raycast, damage what it hits, draw a tracer.
+func _fire_ray(from: Vector3, dir: Vector3, rng: float) -> void:
+	var to: Vector3 = from + dir * rng
 	var space := get_world_3d().direct_space_state
 	var q := PhysicsRayQueryParameters3D.create(from, to)
 	q.collide_with_areas = true
@@ -251,10 +302,6 @@ func _do_fire() -> void:
 			c.shoot_hit()
 		_hit_spark(endp)
 	_tracer(from + dir * 1.2, endp)
-	# Gunshots scatter nearby civilians.
-	var g: Node = get_parent()
-	if g != null and g.has_method("alarm_peds"):
-		g.alarm_peds(global_position, 22.0)
 
 ## Toss a brass shell casing out of the ejection port with a short tumble + drop.
 func _eject_shell() -> void:

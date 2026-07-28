@@ -92,5 +92,14 @@ func _process(_delta: float) -> bool:
 		fire_ok = _m._walker._auto_fire != was
 	out.append("fire_mode_toggle=%s" % fire_ok)
 
+	# 9) Weapon switching changes weapon index + stats (pistol -> shotgun = 8 pellets).
+	var weap_ok: bool = false
+	if is_instance_valid(_m._walker):
+		_m._walker._set_weapon(2)
+		var wd = _m._walker._weapons[_m._walker._weapon]
+		weap_ok = _m._walker._weapon == 2 and int(wd["pellets"]) == 8 and _m._walker.weapon_name() == "散彈槍"
+		_m._walker._set_weapon(0)
+	out.append("weapons[switch=%s]" % weap_ok)
+
 	print("FEATURE_CHECK " + " ".join(out))
 	return true

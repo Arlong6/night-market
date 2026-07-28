@@ -89,7 +89,8 @@ func _process(delta: float) -> void:
 	if _ui_speed and is_instance_valid(_car):
 		_ui_speed.text = "%d km/h" % int(_car.speed() * 3.6)
 	if _ui_firemode and _ui_firemode.visible and is_instance_valid(_walker):
-		_ui_firemode.text = "連發 [F]" if _walker._auto_fire else "單發 [F]"
+		var fm: String = "連發" if _walker._auto_fire else "單發"
+		_ui_firemode.text = "%s · %s  [1/2/3 換槍 · F]" % [_walker.weapon_name(), fm]
 	# Wanted heat decays; police escalate with the star level.
 	_wanted_heat = maxf(0.0, _wanted_heat - 6.0 * delta)
 	_pol_timer -= delta
@@ -800,7 +801,7 @@ func _build_hud() -> void:
 	ui.add_child(_ui_hp_fill)
 	_ui_speed = _mk_label(ui, Vector2(740, 500), 22, Color("#A0D0FF"))
 	var hint := _mk_label(ui, Vector2(20, 508), 15, Color("#B8C0CC"))
-	hint.text = "車:WASD 開 Shift 氮氣 空白 手煞 · E 上下車 · 步行(第一人稱):WASD 移動 滑鼠 瞄準 J/左鍵 射擊 F 單發連發 Shift 衝刺 空白 跳 · Esc 放開滑鼠 · T 日夜"
+	hint.text = "車:WASD 開 Shift 氮氣 空白 手煞 · E 上下車 · 步行:WASD 移動 滑鼠 瞄準 J/左鍵 射擊 1/2/3 換槍 F 單發連發 Shift 衝刺 空白 跳 · Esc 游標 · T 日夜"
 	_ui_callout = _mk_label(ui, Vector2(0.0, 188.0), 46, Color("#FF9020"))
 	_ui_callout.size = Vector2(960.0, 64.0)
 	_ui_callout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -823,8 +824,8 @@ func _build_hud() -> void:
 	_add_reticle_bar(Vector2(462.0, 266.0), Vector2(36.0, 8.0), Vector2(464.0, 268.0), Vector2(32.0, 4.0))  # horizontal
 	_add_reticle_bar(Vector2(476.0, 252.0), Vector2(8.0, 36.0), Vector2(478.0, 254.0), Vector2(4.0, 32.0))  # vertical
 	_ui_crosshair.visible = false   # default mode is car
-	# Fire-mode readout (連發/單發), shown only on foot, under the crosshair.
-	_ui_firemode = _mk_label(ui, Vector2(412.0, 300.0), 18, Color("#FFD27A"))
+	# Weapon + fire-mode readout, shown only on foot, under the crosshair.
+	_ui_firemode = _mk_label(ui, Vector2(360.0, 300.0), 18, Color("#FFD27A"))
 	_ui_firemode.visible = false
 	_refresh()
 

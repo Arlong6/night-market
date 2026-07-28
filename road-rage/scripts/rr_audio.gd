@@ -23,9 +23,9 @@ static func siren(parent: Node) -> void:
 	if _siren == null: _siren = _make_siren()
 	_play(parent, _siren, -10.0)
 
-static func gunshot(parent: Node) -> void:
+static func gunshot(parent: Node, pitch: float = 1.0) -> void:
 	if _gunshot == null: _gunshot = _make_gunshot()
-	_play(parent, _gunshot, -7.0)
+	_play(parent, _gunshot, -7.0, pitch)
 
 ## A panicked pedestrian yelp. `pitch` varies per ped so a crowd doesn't sound cloned.
 static func scream(parent: Node, pitch: float = 1.0) -> void:
