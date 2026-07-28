@@ -55,6 +55,12 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
   spraying up to ~3.4deg, decays at rest) + brass shell ejection per shot (tumbling
   arc, freed 0.7s). RRAudio.scream() procedural yelp with per-ped pitch; FPPed cries
   out ~30% only on the calm->panic transition (no spam).
+- MULTI-WEAPON (2026-07-28): data-driven _weapons table in FPWalker — 手槍/衝鋒槍/散彈槍,
+  switch with keys 1/2/3. Per-weapon pellets/rate/spread/bloom_max/range/pitch + viewmodel
+  len/thick/col (reshaped in _apply_weapon_visual). Firing loops pellets via _fire_ray()
+  (shotgun = 8-pellet cone). RRAudio.gunshot(pitch). HUD firemode label now shows weapon
+  name. Feature check asserts weapons[switch]. Damage still via shoot_hit() (1 hit/pellet)
+  — no per-damage refactor; differentiation comes from pellets * fire rate.
 - Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
   looping pitch sound annoying).
 
