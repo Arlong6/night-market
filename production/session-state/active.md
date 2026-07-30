@@ -61,6 +61,11 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
   (shotgun = 8-pellet cone). RRAudio.gunshot(pitch). HUD firemode label now shows weapon
   name. Feature check asserts weapons[switch]. Damage still via shoot_hit() (1 hit/pellet)
   — no per-damage refactor; differentiation comes from pellets * fire rate.
+- ROCKET LAUNCHER (2026-07-30): 4th weapon 火箭筒 (key 4). Weapon entry has "rocket": true;
+  _do_fire branches to _fire_rocket() which spawns FPRocket (scripts/fp_rocket.gd) — a
+  Node3D flying 48u/s with smoke trail, raycasting ahead; on impact/95u it spawns an
+  FPExplosive + connects exploded->game._on_explosion + explode(), reusing the whole
+  blast path. Feature check asserts rocket[ok].
 - Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
   looping pitch sound annoying).
 
