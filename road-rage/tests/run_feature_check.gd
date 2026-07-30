@@ -101,5 +101,20 @@ func _process(_delta: float) -> bool:
 		_m._walker._set_weapon(0)
 	out.append("weapons[switch=%s]" % weap_ok)
 
+	# 10) Rocket launcher (weapon 3) exists and firing spawns an FPRocket projectile.
+	var rocket_ok: bool = false
+	if is_instance_valid(_m._walker):
+		_m._walker._set_weapon(3)
+		var name_ok: bool = _m._walker.weapon_name() == "火箭筒"
+		_m._walker._do_fire()
+		var spawned: bool = false
+		for c in _m.get_children():
+			if c is FPRocket:
+				spawned = true
+				break
+		rocket_ok = name_ok and spawned
+		_m._walker._set_weapon(0)
+	out.append("rocket[ok=%s]" % rocket_ok)
+
 	print("FEATURE_CHECK " + " ".join(out))
 	return true

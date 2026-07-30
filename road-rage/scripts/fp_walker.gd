@@ -18,6 +18,7 @@ var _weapons: Array[Dictionary] = [
 	{"name": "手槍", "pellets": 1, "rate": 0.20, "spread": 0.004, "bloom": 0.006, "bloom_max": 0.03, "range": 60.0, "pitch": 1.0, "len": 0.58, "thick": 0.12, "col": Color("#3B3D47")},
 	{"name": "衝鋒槍", "pellets": 1, "rate": 0.075, "spread": 0.012, "bloom": 0.020, "bloom_max": 0.11, "range": 55.0, "pitch": 1.18, "len": 0.82, "thick": 0.11, "col": Color("#2E2F37")},
 	{"name": "散彈槍", "pellets": 8, "rate": 0.72, "spread": 0.060, "bloom": 0.0, "bloom_max": 0.02, "range": 34.0, "pitch": 0.7, "len": 0.92, "thick": 0.17, "col": Color("#4A3A2A")},
+	{"name": "火箭筒", "pellets": 0, "rate": 1.1, "spread": 0.0, "bloom": 0.0, "bloom_max": 0.0, "range": 0.0, "pitch": 0.55, "len": 1.0, "thick": 0.22, "col": Color("#3E4A2E"), "rocket": true},
 ]
 var _weapon: int = 0
 var _gun: MeshInstance3D = null   ## viewmodel body (reshaped per weapon)
@@ -171,6 +172,8 @@ func _process(delta: float) -> void:
 		_set_weapon(1)
 	elif Input.is_action_just_pressed("weap_3"):
 		_set_weapon(2)
+	elif Input.is_action_just_pressed("weap_4"):
+		_set_weapon(3)
 	# 連發: fire while held. 單發: one shot per press.
 	_fire_cd = maxf(0.0, _fire_cd - delta)
 	var wants_fire: bool = Input.is_action_pressed("fire") if _auto_fire else Input.is_action_just_pressed("fire")
@@ -267,23 +270,38 @@ func weapon_name() -> String:
 func _do_fire() -> void:
 	var w: Dictionary = _weapons[_weapon]
 	var base_dir: Vector3 = (-_cam.global_transform.basis.z) if _cam != null else _face
-	var from: Vector3 = _cam.global_position if _cam != null else global_position + Vector3(0.0, 1.4, 0.0)
-	var rng: float = float(w["range"])
-	var cone: float = float(w["spread"]) + _spread   # inherent cone + accumulated recoil bloom
-	var pellets: int = int(w["pellets"])
-	var rt: Vector3 = _cam.global_transform.basis.x if _cam != null else Vector3.RIGHT
-	var up: Vector3 = _cam.global_transform.basis.y if _cam != null else Vector3.UP
-	for i in pellets:
-		var dir := base_dir
-		if cone > 0.0001:
-			dir = (base_dir + rt * randf_range(-cone, cone) + up * randf_range(-cone, cone)).normalized()
-		_fire_ray(from, dir, rng)
-	_spread = minf(float(w["bloom_max"]), _spread + float(w["bloom"]))
-	_eject_shell()
-	# Gunshots scatter nearby civilians.
+	if w.get("rocket", false):
+		_fire_rocket(base_dir)
+	else:
+		var from: Vector3 = _cam.global_position if _cam != null else global_position + Vector3(0.0, 1.4, 0.0)
+		var rng: float = float(w["range"])
+		var cone: float = float(w["spread"]) + _spread   # inherent cone + accumulated recoil bloom
+		var pellets: int = int(w["pellets"])
+		var rt: Vector3 = _cam.global_transform.basis.x if _cam != null else Vector3.RIGHT
+		var up: Vector3 = _cam.global_transform.basis.y if _cam != null else Vector3.UP
+		for i in pellets:
+			var dir := base_dir
+			if cone > 0.0001:
+				dir = (base_dir + rt * randf_range(-cone, cone) + up * randf_range(-cone, cone)).normalized()
+			_fire_ray(from, dir, rng)
+		_spread = minf(float(w["bloom_max"]), _spread + float(w["bloom"]))
+		_eject_shell()
+	# The shot scatters nearby civilians.
 	var g: Node = get_parent()
 	if g != null and g.has_method("alarm_peds"):
-		g.alarm_peds(global_position, 22.0)
+		g.alarm_peds(global_position, 24.0)
+
+## Launch a rocket projectile from the muzzle along `dir` (used by the 火箭筒).
+func _fire_rocket(dir: Vector3) -> void:
+	var host: Node = get_parent()
+	if host == null:
+		return
+	var FPRocket = load("res://scripts/fp_rocket.gd")
+	var r = FPRocket.new()
+	host.add_child(r)
+	var origin: Vector3 = (_cam.global_position + dir * 1.0) if _cam != null else (global_position + Vector3(0.0, 1.4, 0.0) + dir)
+	r.global_position = origin
+	r.setup(dir, get_rid(), host)
 
 ## One hitscan pellet: raycast, damage what it hits, draw a tracer.
 func _fire_ray(from: Vector3, dir: Vector3, rng: float) -> void:
