@@ -267,6 +267,11 @@ func _set_weapon(i: int) -> void:
 func weapon_name() -> String:
 	return String(_weapons[_weapon]["name"])
 
+## Current total aim cone (inherent weapon spread + accumulated recoil bloom).
+## Drives how wide the HUD crosshair opens.
+func current_spread() -> float:
+	return float(_weapons[_weapon].get("spread", 0.0)) + _spread
+
 func _do_fire() -> void:
 	var w: Dictionary = _weapons[_weapon]
 	var base_dir: Vector3 = (-_cam.global_transform.basis.z) if _cam != null else _face

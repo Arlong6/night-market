@@ -60,6 +60,7 @@ var _ui_best: Label = null
 var _ui_speed: Label = null
 var _ui_wanted: Label = null
 var _ui_crosshair: Control = null   ## first-person aim reticle (on-foot only)
+var _ch_arms: Array = []            ## the 4 reticle arms — spread apart with aim cone
 var _ui_firemode: Label = null      ## shows 連發/單發, on-foot only
 var _ui_dmg: FPDamageIndicator = null   ## red directional "hit came from here" arc
 var _dmg_src: Vector3 = Vector3.ZERO    ## world pos of the last damage source
@@ -90,7 +91,13 @@ func _process(delta: float) -> void:
 		_ui_speed.text = "%d km/h" % int(_car.speed() * 3.6)
 	if _ui_firemode and _ui_firemode.visible and is_instance_valid(_walker):
 		var fm: String = "連發" if _walker._auto_fire else "單發"
-		_ui_firemode.text = "%s · %s  [1/2/3 換槍 · F]" % [_walker.weapon_name(), fm]
+		_ui_firemode.text = "%s · %s  [1/2/3/4 換槍 · F]" % [_walker.weapon_name(), fm]
+	# Crosshair arms spread apart with the current aim cone (recoil feedback).
+	if not _ch_arms.is_empty() and _ui_crosshair and _ui_crosshair.visible and is_instance_valid(_walker):
+		var cone: float = _walker.current_spread() if _walker.has_method("current_spread") else 0.0
+		var gap: float = 4.0 + cone * 520.0
+		for a in _ch_arms:
+			a["node"].position = Vector2(480.0, 270.0) + (a["dir"] as Vector2) * (gap + 6.0)
 	# Wanted heat decays; police escalate with the star level.
 	_wanted_heat = maxf(0.0, _wanted_heat - 6.0 * delta)
 	_pol_timer -= delta
@@ -816,33 +823,45 @@ func _build_hud() -> void:
 	_ui_dmg = FPDamageIndicator.new()
 	_ui_dmg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(_ui_dmg)
-	# First-person crosshair at screen centre — shown only while on foot. Each white
-	# bar sits on a slightly larger dark bar so it reads on any background.
+	# First-person crosshair — 4 arms that spread apart with the weapon's aim cone +
+	# recoil bloom (shown only on foot). Positions are driven from _process.
 	_ui_crosshair = Control.new()
 	_ui_crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(_ui_crosshair)
-	_add_reticle_bar(Vector2(462.0, 266.0), Vector2(36.0, 8.0), Vector2(464.0, 268.0), Vector2(32.0, 4.0))  # horizontal
-	_add_reticle_bar(Vector2(476.0, 252.0), Vector2(8.0, 36.0), Vector2(478.0, 254.0), Vector2(4.0, 32.0))  # vertical
+	_add_ch_arm(Vector2(0.0, -1.0), false)  # top
+	_add_ch_arm(Vector2(0.0, 1.0), false)   # bottom
+	_add_ch_arm(Vector2(-1.0, 0.0), true)   # left
+	_add_ch_arm(Vector2(1.0, 0.0), true)    # right
 	_ui_crosshair.visible = false   # default mode is car
 	# Weapon + fire-mode readout, shown only on foot, under the crosshair.
 	_ui_firemode = _mk_label(ui, Vector2(360.0, 300.0), 18, Color("#FFD27A"))
 	_ui_firemode.visible = false
 	_refresh()
 
-## One crosshair element: a dark backing rect + a white rect on top (for contrast).
-func _add_reticle_bar(back_pos: Vector2, back_size: Vector2, fg_pos: Vector2, fg_size: Vector2) -> void:
+## One crosshair arm (white bar on a dark backing) pointing outward `dir`. Its
+## children are centred on the arm's origin so _process can place it by moving the
+## origin out from screen centre as the aim cone widens.
+func _add_ch_arm(dir: Vector2, horizontal: bool) -> void:
+	var arm := Control.new()
+	arm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ui_crosshair.add_child(arm)
+	var length := 11.0
+	var thick := 4.0
+	var w: float = length if horizontal else thick
+	var h: float = thick if horizontal else length
 	var back := ColorRect.new()
 	back.color = Color(0.0, 0.0, 0.0, 0.55)
-	back.position = back_pos
-	back.size = back_size
+	back.size = Vector2(w + 4.0, h + 4.0)
+	back.position = Vector2(-(w + 4.0) * 0.5, -(h + 4.0) * 0.5)
 	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_ui_crosshair.add_child(back)
+	arm.add_child(back)
 	var fg := ColorRect.new()
 	fg.color = Color(1.0, 1.0, 1.0, 0.92)
-	fg.position = fg_pos
-	fg.size = fg_size
+	fg.size = Vector2(w, h)
+	fg.position = Vector2(-w * 0.5, -h * 0.5)
 	fg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_ui_crosshair.add_child(fg)
+	arm.add_child(fg)
+	_ch_arms.append({"node": arm, "dir": dir})
 
 func _mk_label(ui: CanvasLayer, pos: Vector2, size: int, col: Color) -> Label:
 	var l := Label.new()
