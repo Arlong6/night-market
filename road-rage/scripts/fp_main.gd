@@ -65,6 +65,10 @@ var _ui_firemode: Label = null      ## shows 連發/單發, on-foot only
 var _ui_dmg: FPDamageIndicator = null   ## red directional "hit came from here" arc
 var _dmg_src: Vector3 = Vector3.ZERO    ## world pos of the last damage source
 var _dmg_t: float = 0.0                 ## indicator fade timer
+## Weapon ownership persists on the game (the walker is rebuilt each dismount).
+## Start with pistol + SMG; shotgun + rocket are found as pickups in the city.
+var _weapons_owned: Array = [true, true, false, false]
+var _cur_weapon: int = 0                ## carries the on-foot weapon across car trips
 
 func _ready() -> void:
 	_rng.randomize()
@@ -74,6 +78,7 @@ func _ready() -> void:
 	_build_bounds()
 	_build_city()
 	_spawn_car()
+	_spawn_weapon_pickups()
 	_build_hud()
 	# Force the game window to the front so it isn't hidden behind other windows.
 	var w := get_window()
@@ -250,6 +255,7 @@ func _exit_car() -> void:
 	_walker.rotation = Vector3.ZERO
 	_walker.global_position = _car.global_position + side * 3.8 + Vector3(0.0, 0.3, 0.0)
 	_walker.make_current()
+	_walker.set_owned(_weapons_owned, _cur_weapon)   # restore unlocked weapons + last used
 	if _ui_crosshair:
 		_ui_crosshair.visible = true   # first-person aim reticle
 	if _ui_firemode:
@@ -281,6 +287,8 @@ func _enter_car() -> void:
 
 func _board_car() -> void:
 	_mode = "car"
+	if is_instance_valid(_walker):
+		_cur_weapon = _walker._weapon   # remember the weapon for next dismount
 	_car.active = true
 	_car.focus_camera()
 	if _ui_crosshair:
@@ -545,6 +553,28 @@ func alarm_peds(at: Vector3, radius: float) -> void:
 		if is_instance_valid(ped) and ped.has_method("panic") \
 				and ped.global_position.distance_to(at) < radius:
 			ped.panic(at)
+
+## Scatter shotgun + rocket crates near the spawn ring so they're easy to find.
+func _spawn_weapon_pickups() -> void:
+	var spots: Array = [
+		{"i": 2, "cell": Vector2i(10, 14)},
+		{"i": 2, "cell": Vector2i(19, 17)},
+		{"i": 3, "cell": Vector2i(14, 9)},
+		{"i": 3, "cell": Vector2i(8, 19)},
+	]
+	for s in spots:
+		var p := FPWeaponPickup.new()
+		p.weapon_index = int(s["i"])
+		add_child(p)
+		p.global_position = _world_pos(s["cell"])
+		p.collected.connect(_on_weapon_collected)
+
+func _on_weapon_collected(idx: int, pos: Vector3) -> void:
+	var names: Array = ["手槍", "衝鋒槍", "散彈槍", "火箭筒"]
+	if idx >= 0 and idx < _weapons_owned.size():
+		_weapons_owned[idx] = true
+	_cur_weapon = idx
+	_popup(pos + Vector3(0.0, 2.4, 0.0), "取得 %s!" % names[idx])
 
 func _spawn_landmarks() -> void:
 	var cells: Array[Vector2i] = [Vector2i(6, 6), Vector2i(6, 22), Vector2i(22, 6), Vector2i(22, 22), Vector2i(14, 18)]

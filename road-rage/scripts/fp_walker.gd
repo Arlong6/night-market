@@ -21,6 +21,7 @@ var _weapons: Array[Dictionary] = [
 	{"name": "火箭筒", "pellets": 0, "rate": 1.1, "spread": 0.0, "bloom": 0.0, "bloom_max": 0.0, "range": 0.0, "pitch": 0.55, "len": 1.0, "thick": 0.22, "col": Color("#3E4A2E"), "rocket": true},
 ]
 var _weapon: int = 0
+var _owned: Array = [true, true, true, true]   ## which weapons are unlocked (set by FPMain)
 var _gun: MeshInstance3D = null   ## viewmodel body (reshaped per weapon)
 const EYE_HEIGHT: float = 1.6    ## first-person camera height
 const MOUSE_SENS: float = 0.0026 ## radians of look per pixel of mouse motion
@@ -255,13 +256,35 @@ func fire() -> void:
 		_cam.fov = BASE_FOV + (6.0 if int(w["pellets"]) > 1 else 3.0)  # shotgun kicks harder
 	_fire_queued = true
 
-## Switch to weapon `i` (1/2/3). Resets bloom and reshapes the viewmodel.
+## Switch to weapon `i` (1/2/3/4). Ignored if the weapon isn't unlocked yet.
 func _set_weapon(i: int) -> void:
 	if i < 0 or i >= _weapons.size() or i == _weapon:
 		return
+	if i < _owned.size() and not _owned[i]:
+		return   # not picked up yet
 	_weapon = i
 	_spread = 0.0
 	_fire_cd = maxf(_fire_cd, 0.12)   # tiny raise delay on swap
+	_apply_weapon_visual()
+
+## Point ownership at FPMain's persistent array and start on `start_weapon` if owned.
+## Called when the walker is (re)created so owned weapons survive car trips + respawns.
+func set_owned(arr: Array, start_weapon: int = 0) -> void:
+	_owned = arr
+	if start_weapon >= 0 and start_weapon < _weapons.size() and start_weapon < _owned.size() and _owned[start_weapon]:
+		_weapon = start_weapon
+	else:
+		_weapon = 0
+	_apply_weapon_visual()
+
+## Unlock weapon `i` (from a pickup) and switch to it.
+func grant_weapon(i: int) -> void:
+	if i < 0 or i >= _weapons.size():
+		return
+	if i < _owned.size():
+		_owned[i] = true
+	_weapon = i
+	_spread = 0.0
 	_apply_weapon_visual()
 
 func weapon_name() -> String:
