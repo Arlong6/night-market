@@ -838,7 +838,7 @@ func _build_hud() -> void:
 	ui.add_child(_ui_hp_fill)
 	_ui_speed = _mk_label(ui, Vector2(740, 500), 22, Color("#A0D0FF"))
 	var hint := _mk_label(ui, Vector2(20, 508), 15, Color("#B8C0CC"))
-	hint.text = "車:WASD 開 Shift 氮氣 空白 手煞 · E 上下車 · 步行:WASD 移動 滑鼠 瞄準 J/左鍵 射擊 1/2/3 換槍 F 單發連發 Shift 衝刺 空白 跳 · Esc 游標 · T 日夜"
+	hint.text = "車:WASD 開 Shift 氮氣 空白 手煞 J/左鍵 掃射 · E 上下車 · 步行:WASD 移動 滑鼠 瞄準 J/左鍵 射擊 1/2/3/4 換槍(需撿) F 單發連發 Shift 衝刺 空白 跳 · T 日夜"
 	_ui_callout = _mk_label(ui, Vector2(0.0, 188.0), 46, Color("#FF9020"))
 	_ui_callout.size = Vector2(960.0, 64.0)
 	_ui_callout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

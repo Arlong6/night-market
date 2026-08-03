@@ -25,6 +25,12 @@ func add_trauma(amt: float) -> void:
 	_trauma = minf(1.2, _trauma + amt)
 var _look_yaw: float = 0.0   ## camera look-around (, / .), recenters when released
 
+const GUN_RATE: float = 0.11   ## drive-by mounted gun cooldown (hold fire while driving)
+const GUN_RANGE: float = 55.0
+var _gun_cd: float = 0.0
+var _car_muzzle: MeshInstance3D = null
+var _car_muzzle_t: float = 0.0
+
 func _ready() -> void:
 	up_direction = Vector3.UP
 	var col := CollisionShape3D.new()
@@ -42,6 +48,21 @@ func _ready() -> void:
 	_cam.fov = BASE_FOV
 	_cam.current = true
 	add_child(_cam)
+	# Drive-by mounted gun: a muzzle flash at the car's nose, shown when firing.
+	_car_muzzle = MeshInstance3D.new()
+	var mm := SphereMesh.new()
+	mm.radius = 0.36
+	mm.height = 0.72
+	var mmat := StandardMaterial3D.new()
+	mmat.albedo_color = Color("#FFE070")
+	mmat.emission_enabled = true
+	mmat.emission = Color("#FFC030")
+	mmat.emission_energy_multiplier = 7.0
+	mm.material = mmat
+	_car_muzzle.mesh = mm
+	_car_muzzle.position = Vector3(0.0, 1.0, -3.6)   # at the front bumper
+	_car_muzzle.visible = false
+	add_child(_car_muzzle)
 	# Engine drone — pitch tracks speed; starts on first input (Web-safe gesture).
 	_engine = AudioStreamPlayer.new()
 	_engine.stream = RRAudio.make_engine_stream()
@@ -120,6 +141,86 @@ func focus_camera() -> void:
 		_cam.current = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE   # driving uses the keyboard; free the cursor
 
+## Fire the forward mounted gun: hitscan straight ahead from the car's nose.
+func _car_fire() -> void:
+	_gun_cd = GUN_RATE
+	if _car_muzzle != null:
+		_car_muzzle.visible = true
+	_car_muzzle_t = 0.05
+	RRAudio.gunshot(self, 1.05)
+	var dir: Vector3 = -global_transform.basis.z
+	var from: Vector3 = _car_muzzle.global_position if _car_muzzle != null else global_position + dir * 3.5 + Vector3(0.0, 0.95, 0.0)
+	var to: Vector3 = from + dir * GUN_RANGE
+	var space := get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(from, to)
+	q.collide_with_areas = true
+	q.collide_with_bodies = true
+	q.exclude = [get_rid()]
+	var hit := space.intersect_ray(q)
+	var endp: Vector3 = to
+	if hit.has("collider"):
+		endp = hit["position"]
+		var c = hit["collider"]
+		if c != null and c.has_method("shoot_hit"):
+			c.shoot_hit()
+		_car_spark(endp)
+	_car_tracer(from + dir * 1.5, endp)
+	var g: Node = get_parent()
+	if g != null and g.has_method("alarm_peds"):
+		g.alarm_peds(global_position, 20.0)
+
+func _car_tracer(a: Vector3, b: Vector3) -> void:
+	var host: Node = get_parent()
+	if host == null:
+		return
+	var dist: float = a.distance_to(b)
+	if dist < 0.3:
+		return
+	var beam := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.06, 0.06, dist)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color("#FFF0A0")
+	mat.emission_enabled = true
+	mat.emission = Color("#FFD84A")
+	mat.emission_energy_multiplier = 5.0
+	bm.material = mat
+	beam.mesh = bm
+	host.add_child(beam)
+	beam.global_position = (a + b) * 0.5
+	if absf((b - a).normalized().dot(Vector3.UP)) < 0.98:
+		beam.look_at(b, Vector3.UP)
+	get_tree().create_timer(0.05).timeout.connect(func() -> void:
+		if is_instance_valid(beam): beam.queue_free())
+
+func _car_spark(pos: Vector3) -> void:
+	var host: Node = get_parent()
+	if host == null:
+		return
+	var p := CPUParticles3D.new()
+	p.amount = 6
+	p.lifetime = 0.3
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.spread = 180.0
+	p.initial_velocity_min = 2.0
+	p.initial_velocity_max = 6.0
+	p.scale_amount_min = 0.2
+	p.scale_amount_max = 0.5
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color("#FFE080")
+	mat.emission_enabled = true
+	mat.emission = Color("#FFC040")
+	mat.emission_energy_multiplier = 3.0
+	var bm := BoxMesh.new()
+	bm.material = mat
+	p.mesh = bm
+	host.add_child(p)
+	p.global_position = pos
+	p.emitting = true
+	get_tree().create_timer(0.5).timeout.connect(func() -> void:
+		if is_instance_valid(p): p.queue_free())
+
 func speed() -> float:
 	return Vector3(velocity.x, 0.0, velocity.z).length()
 
@@ -161,6 +262,14 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.y -= GRAVITY * delta
 	move_and_slide()
+	# ── Drive-by mounted gun (hold fire while driving) ──
+	_gun_cd = maxf(0.0, _gun_cd - delta)
+	if _car_muzzle_t > 0.0:
+		_car_muzzle_t -= delta
+		if _car_muzzle_t <= 0.0 and _car_muzzle != null:
+			_car_muzzle.visible = false
+	if active and _gun_cd <= 0.0 and Input.is_action_pressed("fire"):
+		_car_fire()
 	# Smash through buildings when ramming them fast enough.
 	if speed() > 18.0:
 		for i in get_slide_collision_count():

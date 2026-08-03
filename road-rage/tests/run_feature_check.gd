@@ -125,5 +125,12 @@ func _process(_delta: float) -> bool:
 			pk += 1
 	out.append("weapon_pickups=%d" % pk)
 
+	# 12) Car mounted gun fires (drive-by shooting).
+	var carfire_ok: bool = false
+	if is_instance_valid(_m._car) and _m._car.has_method("_car_fire"):
+		_m._car._car_fire()
+		carfire_ok = _m._car._gun_cd > 0.0
+	out.append("car_gun=%s" % carfire_ok)
+
 	print("FEATURE_CHECK " + " ".join(out))
 	return true
