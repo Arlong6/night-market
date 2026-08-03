@@ -66,6 +66,16 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
   Node3D flying 48u/s with smoke trail, raycasting ahead; on impact/95u it spawns an
   FPExplosive + connects exploded->game._on_explosion + explode(), reusing the whole
   blast path. Feature check asserts rocket[ok].
+- CROSSHAIR + PICKUPS + DRIVE-BY (2026-08-04):
+  * Dynamic crosshair: 4 arms in _ch_arms, gap = 4 + FPWalker.current_spread()*520 each
+    frame (tight pistol, wide shotgun, blooms with SMG spray, 0 for rocket).
+  * Weapon pickups: ownership on FPMain._weapons_owned [pistol,SMG owned; shotgun,rocket
+    locked]; set_owned(arr,start) on _exit_car, _cur_weapon saved in _board_car.
+    FPWeaponPickup (scripts/fp_weapon_pickup.gd) crates unlock+equip on walk-over.
+    _spawn_weapon_pickups() = 2 shotgun + 2 rocket near spawn. grant_weapon() unlocks.
+  * Drive-by: fp_car mounted gun — _car_fire() hitscan from the nose while active+fire
+    held (GUN_RATE 0.11), tracer/spark/muzzle + alarm_peds. Feature check car_gun.
+  Feature check now 12 items: ...weapons[lock+grant], rocket[ok], weapon_pickups=4, car_gun.
 - Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
   looping pitch sound annoying).
 
