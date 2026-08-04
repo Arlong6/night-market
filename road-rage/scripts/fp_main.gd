@@ -69,6 +69,14 @@ var _dmg_t: float = 0.0                 ## indicator fade timer
 ## Start with pistol + SMG; shotgun + rocket are found as pickups in the city.
 var _weapons_owned: Array = [true, true, false, false]
 var _cur_weapon: int = 0                ## carries the on-foot weapon across car trips
+## Demolition missions: "level N buildings before the timer runs out", escalating.
+var _ui_mission: Label = null
+var _mission_active: bool = false
+var _mission_num: int = 0
+var _mission_target: int = 0
+var _mission_progress: int = 0
+var _mission_time: float = 0.0
+var _mission_cooldown: float = 5.0      ## first mission kicks in a few seconds after load
 
 func _ready() -> void:
 	_rng.randomize()
@@ -114,6 +122,7 @@ func _process(delta: float) -> void:
 		_ui_wanted.text = "通緝 " + "★".repeat(stars) + "☆".repeat(5 - stars)
 	_update_health(delta)
 	_update_dmg_indicator(delta)
+	_update_mission(delta)
 	if _flash > 0.0:
 		_flash = maxf(0.0, _flash - delta * 1.6)
 	if _ui_flash:
@@ -511,6 +520,10 @@ func _on_building_collapsed(pos: Vector3) -> void:
 		_best = _score.score
 		_score.submit()
 	_popup(pos + Vector3(0.0, 5.0, 0.0), "轟! +%d" % pts)
+	if _mission_active:
+		_mission_progress += 1
+		if _mission_progress >= _mission_target:
+			_mission_success()
 	_refresh()
 
 func _on_explosion(pos: Vector3) -> void:
@@ -553,6 +566,46 @@ func alarm_peds(at: Vector3, radius: float) -> void:
 		if is_instance_valid(ped) and ped.has_method("panic") \
 				and ped.global_position.distance_to(at) < radius:
 			ped.panic(at)
+
+# ── Demolition missions: level N buildings before the timer runs out ─────────
+func _update_mission(delta: float) -> void:
+	if _mission_active:
+		_mission_time -= delta
+		if _mission_time <= 0.0:
+			_mission_fail()
+		elif _ui_mission != null:
+			_ui_mission.text = "任務 %d：炸毀建築 %d/%d　·　剩 %d 秒" % [_mission_num, _mission_progress, _mission_target, int(ceil(_mission_time))]
+	else:
+		_mission_cooldown -= delta
+		if _ui_mission != null:
+			_ui_mission.text = "下個任務 %d 秒…" % int(ceil(maxf(_mission_cooldown, 0.0)))
+		if _mission_cooldown <= 0.0:
+			_start_mission()
+
+func _start_mission() -> void:
+	_mission_num += 1
+	_mission_target = mini(2 + (_mission_num - 1), 6)   # 2,3,4,... capped at 6
+	_mission_time = 30.0 + float(_mission_target) * 8.0
+	_mission_progress = 0
+	_mission_active = true
+	_popup(_player_pos() + Vector3(0.0, 4.0, 0.0), "任務 %d：限時炸 %d 棟!" % [_mission_num, _mission_target])
+
+func _mission_success() -> void:
+	_mission_active = false
+	_mission_cooldown = 6.0
+	var bonus: int = _mission_target * 200
+	_score.add(bonus, 0)
+	if _score.score > _best:
+		_best = _score.score
+		_score.submit()
+	_flash = 0.4
+	_popup(_player_pos() + Vector3(0.0, 4.5, 0.0), "任務完成! +%d" % bonus)
+	_refresh()
+
+func _mission_fail() -> void:
+	_mission_active = false
+	_mission_cooldown = 6.0
+	_popup(_player_pos() + Vector3(0.0, 4.0, 0.0), "任務失敗…")
 
 ## Scatter shotgun + rocket crates near the spawn ring so they're easy to find.
 func _spawn_weapon_pickups() -> void:
@@ -866,6 +919,12 @@ func _build_hud() -> void:
 	# Weapon + fire-mode readout, shown only on foot, under the crosshair.
 	_ui_firemode = _mk_label(ui, Vector2(360.0, 300.0), 18, Color("#FFD27A"))
 	_ui_firemode.visible = false
+	# Demolition-mission banner across the top centre.
+	_ui_mission = _mk_label(ui, Vector2(230.0, 14.0), 20, Color("#FFD24A"))
+	_ui_mission.size = Vector2(500.0, 30.0)
+	_ui_mission.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_ui_mission.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.7))
+	_ui_mission.add_theme_constant_override("outline_size", 5)
 	_refresh()
 
 ## One crosshair arm (white bar on a dark backing) pointing outward `dir`. Its
