@@ -76,11 +76,13 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
   * Drive-by: fp_car mounted gun — _car_fire() hitscan from the nose while active+fire
     held (GUN_RATE 0.11), tracer/spark/muzzle + alarm_peds. Feature check car_gun.
   Feature check now 12 items: ...weapons[lock+grant], rocket[ok], weapon_pickups=4, car_gun.
-- DEMOLITION MISSIONS (2026-08-04): timed objectives "level N buildings". fp_main
-  _update_mission/_start_mission/_mission_success/_mission_fail; escalating target
-  min(2+num-1,6), time 30+target*8s. _on_building_collapsed advances progress (any
-  cause counts). Top-centre HUD banner (_ui_mission). Success = score bonus target*200.
-  Feature check #13 mission[start,done]. Now 13 feature-check items.
+- MISSIONS + VARIETY (2026-08-04): timed objectives, random type each round, escalating.
+  4 types (const MTYPE_*): DEMOLISH/RAMPAGE/EXPLODE/COMBO. _mission_event(type) routed
+  from _on_building_collapsed/_on_smashed/_on_explosion; COMBO tracks _combo.multiplier()
+  live in _update_mission. Top-centre banner (_ui_mission); big _ui_callout on start
+  (blue) / success (green +bonus) / fail (red) — _maybe_callout resets modulate to white.
+  Reward: score target*150+num*50, heal 30, flash, RRAudio.fanfare(); fail RRAudio.buzz().
+  Cooldown banner shows '已完成 N'. Feature check #13 mission[start,done,rampage]. 13 items.
 - Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
   looping pitch sound annoying).
 
