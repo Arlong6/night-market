@@ -151,5 +151,15 @@ func _process(_delta: float) -> bool:
 	var rampage_ok: bool = _m._mission_progress == 1
 	out.append("mission[start=%s done=%s rampage=%s]" % [m_started, m_done, rampage_ok])
 
+	# 14) Gang enemies spawn and their shots damage the player.
+	_m._manage_gangs()
+	var gangs: Array = _m.get_tree().get_nodes_in_group("gang")
+	var gang_ok: bool = gangs.size() > 0
+	if gang_ok:
+		_m._hp = 100.0
+		gangs[0]._shoot()
+		gang_ok = _m._hp < 100.0
+	out.append("gang[spawn=%d hurt=%s]" % [gangs.size(), gang_ok])
+
 	print("FEATURE_CHECK " + " ".join(out))
 	return true

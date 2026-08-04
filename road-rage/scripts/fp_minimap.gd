@@ -26,6 +26,7 @@ func _draw() -> void:
 	draw_circle(c, 4.0, Color("#4ADE6A"))
 	_draw_blips(c, pp, game._police, Color("#4A78FF"))
 	_draw_blips(c, pp, game._footcops, Color("#FF5454"))
+	_draw_blips(c, pp, game._gangs, Color("#FF9020"))   # gang members = orange threats
 	_draw_blips(c, pp, game.get_tree().get_nodes_in_group("pickup"), Color("#3ADE5A"))
 	if is_instance_valid(game._heli):
 		var hr: Vector3 = game._heli.global_position - pp

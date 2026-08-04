@@ -93,7 +93,8 @@ func _spawn_flying_chunk(car: FPCar) -> void:
 		dir = -car.global_transform.basis.z
 	dir = dir.normalized()
 	var force: float = maxf(car.speed(), 8.0)
-	r.linear_velocity = dir * force * 0.7 + Vector3.UP * (2.6 + force * 0.14)
+	# Knocked away with only a small upward pop (props were flying too high).
+	r.linear_velocity = dir * force * 0.72 + Vector3.UP * (1.2 + force * 0.055)
 	r.angular_velocity = Vector3(randf_range(-6.0, 6.0), randf_range(-6.0, 6.0), randf_range(-6.0, 6.0))
 	var t := r.create_tween()
 	t.tween_interval(2.2)

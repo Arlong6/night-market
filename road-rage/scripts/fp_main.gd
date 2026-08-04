@@ -41,6 +41,7 @@ var _wanted_heat: float = 0.0
 var _police: Array = []
 var _footcops: Array = []
 var _heli = null
+var _gangs: Array = []      ## hostile gang members roaming the city (always active)
 var _pol_timer: float = 0.0
 var _ui_callout: Label = null
 var _callout_t: float = 0.0
@@ -94,6 +95,7 @@ func _ready() -> void:
 	_build_city()
 	_spawn_car()
 	_spawn_weapon_pickups()
+	_manage_gangs()   # seed a few roaming gang members right away
 	_build_hud()
 	# Force the game window to the front so it isn't hidden behind other windows.
 	var w := get_window()
@@ -124,6 +126,7 @@ func _process(delta: float) -> void:
 	if _pol_timer <= 0.0:
 		_pol_timer = 3.0
 		_manage_police()
+		_manage_gangs()
 	if _ui_wanted:
 		var stars: int = _wanted_stars()
 		_ui_wanted.text = "通緝 " + "★".repeat(stars) + "☆".repeat(5 - stars)
@@ -175,6 +178,13 @@ func _manage_police() -> void:
 	elif stars < 4 and is_instance_valid(_heli):
 		_heli.queue_free()
 		_heli = null
+
+## Keep a handful of hostile gang members roaming — respawn killed ones at a distance.
+func _manage_gangs() -> void:
+	_gangs = _gangs.filter(func(g): return is_instance_valid(g))
+	var pp: Vector3 = _player_pos()
+	while _gangs.size() < 5:
+		_gangs.append(FPGang.spawn(self, self, pp, 70.0))
 
 func _player_pos() -> Vector3:
 	if _mode == "foot" and is_instance_valid(_walker):
@@ -501,7 +511,7 @@ func _build_city() -> void:
 	FPDecor.add_curbs(self, RRTuning.CITY_COLS, RRTuning.CITY_ROWS, TILE3D)
 	_spawn_neon(16)
 	_build_test_track()
-	var barrels: Array = FPExplosive.scatter(self, 40, RRTuning.CITY_COLS * TILE3D, _rng)
+	var barrels: Array = FPExplosive.scatter(self, 60, RRTuning.CITY_COLS * TILE3D, _rng)
 	for b in barrels:
 		b.connect("exploded", _on_explosion)
 	FPDecor.add_crosswalks(self, RRTuning.CITY_COLS, RRTuning.CITY_ROWS, TILE3D)
@@ -613,8 +623,8 @@ func _start_mission() -> void:
 			_mission_target = 8 + n * 2
 			_mission_time = 34.0
 		MTYPE_EXPLODE:
-			_mission_target = 3 + n
-			_mission_time = 32.0
+			_mission_target = mini(2 + n / 2, 5)   # gentler ramp — explosions are scarce
+			_mission_time = 42.0
 		MTYPE_COMBO:
 			_mission_target = 5 + n
 			_mission_time = 30.0
@@ -665,10 +675,8 @@ func _mission_fail() -> void:
 ## Scatter shotgun + rocket crates near the spawn ring so they're easy to find.
 func _spawn_weapon_pickups() -> void:
 	var spots: Array = [
-		{"i": 2, "cell": Vector2i(10, 14)},
-		{"i": 2, "cell": Vector2i(19, 17)},
-		{"i": 3, "cell": Vector2i(14, 9)},
-		{"i": 3, "cell": Vector2i(8, 19)},
+		{"i": 2, "cell": Vector2i(10, 14)},   # one shotgun crate
+		{"i": 3, "cell": Vector2i(14, 9)},    # one rocket crate
 	]
 	for s in spots:
 		var p := FPWeaponPickup.new()
