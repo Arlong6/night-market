@@ -88,7 +88,12 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
   hp 3, group "gang"+"blastable", killable. _manage_gangs() keeps 5 (respawn at dist 70),
   seeded in _ready + on police timer. Minimap orange blips. Tuning: explode mission
   target mini(2+n/2,5)/42s + barrels 40->60; knockback UP halved (fp_ped/fp_target);
-  weapon pickups 4->2. Feature check #14 gang[spawn=5 hurt=true]. 14 items.
+  weapon pickups 4->2. Feature check #14 gang[spawn hurt kill_scores]. 14 items.
+- GANG REVIEW FIXES (2026-08-05, adversarial review workflow): 5 gangs -> 3, SHOOT_INTERVAL
+  1.3->1.8, SHOT_DMG 6->5 (five always-hostile gangs out-DPS'd regen = ~4s softlock).
+  FPGang now emits smashed(60,6,pos) on death (connected in _manage_gangs) so kills score +
+  count for rampage. FPGang preloaded to match convention. (Review's 'missing preload crash'
+  was a false positive — class_name = global; verified working.)
 - Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
   looping pitch sound annoying).
 
