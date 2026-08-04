@@ -132,17 +132,24 @@ func _process(_delta: float) -> bool:
 		carfire_ok = _m._car._gun_cd > 0.0
 	out.append("car_gun=%s" % carfire_ok)
 
-	# 13) Demolition mission: cooldown elapses -> starts; a collapse advances it;
-	#     reaching the target completes it.
+	# 13) Missions: cooldown -> start; the matching event advances it; hitting the
+	#     target completes it; a different type advances on its own event.
 	_m._mission_active = false
 	_m._mission_cooldown = 0.0
-	_m._update_mission(0.1)                 # cooldown gone -> mission starts
-	var m_started: bool = _m._mission_active and _m._mission_target >= 2
-	_m._mission_target = 1                  # shrink to a 1-building objective for the test
+	_m._update_mission(0.1)                 # cooldown gone -> a mission starts (random type)
+	var m_started: bool = _m._mission_active and _m._mission_target >= 1
+	_m._mission_type = 0                    # force DEMOLISH
+	_m._mission_target = 1
 	_m._mission_progress = 0
 	_m._on_building_collapsed(Vector3(60.0, 0.0, 60.0))
-	var m_done: bool = (not _m._mission_active) and _m._mission_progress >= 1
-	out.append("mission[start=%s done=%s]" % [m_started, m_done])
+	var m_done: bool = (not _m._mission_active) and _m._missions_done >= 1
+	_m._mission_active = true               # a RAMPAGE mission advances on a smash
+	_m._mission_type = 1
+	_m._mission_target = 3
+	_m._mission_progress = 0
+	_m._on_smashed(25, 10, Vector3(70.0, 0.0, 70.0))
+	var rampage_ok: bool = _m._mission_progress == 1
+	out.append("mission[start=%s done=%s rampage=%s]" % [m_started, m_done, rampage_ok])
 
 	print("FEATURE_CHECK " + " ".join(out))
 	return true

@@ -69,14 +69,21 @@ var _dmg_t: float = 0.0                 ## indicator fade timer
 ## Start with pistol + SMG; shotgun + rocket are found as pickups in the city.
 var _weapons_owned: Array = [true, true, false, false]
 var _cur_weapon: int = 0                ## carries the on-foot weapon across car trips
-## Demolition missions: "level N buildings before the timer runs out", escalating.
+## Timed missions of several kinds, escalating. Type constants double as the event
+## id passed to _mission_event() so a matching event advances the active mission.
+const MTYPE_DEMOLISH: int = 0   ## level N buildings
+const MTYPE_RAMPAGE: int = 1    ## smash N things (peds / cars / props / cops)
+const MTYPE_EXPLODE: int = 2    ## set off N explosions
+const MTYPE_COMBO: int = 3      ## reach a ×N combo multiplier
 var _ui_mission: Label = null
 var _mission_active: bool = false
+var _mission_type: int = 0
 var _mission_num: int = 0
 var _mission_target: int = 0
 var _mission_progress: int = 0
 var _mission_time: float = 0.0
 var _mission_cooldown: float = 5.0      ## first mission kicks in a few seconds after load
+var _missions_done: int = 0
 
 func _ready() -> void:
 	_rng.randomize()
@@ -520,10 +527,7 @@ func _on_building_collapsed(pos: Vector3) -> void:
 		_best = _score.score
 		_score.submit()
 	_popup(pos + Vector3(0.0, 5.0, 0.0), "轟! +%d" % pts)
-	if _mission_active:
-		_mission_progress += 1
-		if _mission_progress >= _mission_target:
-			_mission_success()
+	_mission_event(MTYPE_DEMOLISH)
 	_refresh()
 
 func _on_explosion(pos: Vector3) -> void:
@@ -540,6 +544,7 @@ func _on_explosion(pos: Vector3) -> void:
 	_smashed += 1
 	_wanted_heat += 22.0
 	_popup(pos + Vector3(0.0, 3.0, 0.0), "轟!")
+	_mission_event(MTYPE_EXPLODE)
 	_refresh()
 
 func _on_pickup(amount: float, pos: Vector3) -> void:
@@ -567,45 +572,95 @@ func alarm_peds(at: Vector3, radius: float) -> void:
 				and ped.global_position.distance_to(at) < radius:
 			ped.panic(at)
 
-# ── Demolition missions: level N buildings before the timer runs out ─────────
+# ── Timed missions: several kinds, escalating ────────────────────────────────
 func _update_mission(delta: float) -> void:
 	if _mission_active:
 		_mission_time -= delta
+		if _mission_type == MTYPE_COMBO:
+			_mission_progress = _combo.multiplier()   # tracks the live combo
+			if _mission_progress >= _mission_target:
+				_mission_success()
+				return
 		if _mission_time <= 0.0:
 			_mission_fail()
 		elif _ui_mission != null:
-			_ui_mission.text = "任務 %d：炸毀建築 %d/%d　·　剩 %d 秒" % [_mission_num, _mission_progress, _mission_target, int(ceil(_mission_time))]
+			_ui_mission.text = "任務 %d：%s %d/%d　·　剩 %d 秒" % [_mission_num, _mission_verb(), _mission_progress, _mission_target, int(ceil(_mission_time))]
 	else:
 		_mission_cooldown -= delta
 		if _ui_mission != null:
-			_ui_mission.text = "下個任務 %d 秒…" % int(ceil(maxf(_mission_cooldown, 0.0)))
+			var head: String = ("已完成 %d 個　·　" % _missions_done) if _missions_done > 0 else ""
+			_ui_mission.text = "%s下個任務 %d 秒…" % [head, int(ceil(maxf(_mission_cooldown, 0.0)))]
 		if _mission_cooldown <= 0.0:
 			_start_mission()
 
+func _mission_verb() -> String:
+	match _mission_type:
+		MTYPE_DEMOLISH: return "炸毀建築"
+		MTYPE_RAMPAGE: return "製造破壞"
+		MTYPE_EXPLODE: return "引爆目標"
+		MTYPE_COMBO: return "連擊倍率"
+	return "目標"
+
 func _start_mission() -> void:
 	_mission_num += 1
-	_mission_target = mini(2 + (_mission_num - 1), 6)   # 2,3,4,... capped at 6
-	_mission_time = 30.0 + float(_mission_target) * 8.0
+	_mission_type = _rng.randi() % 4
+	var n: int = _mission_num
+	match _mission_type:
+		MTYPE_DEMOLISH:
+			_mission_target = mini(2 + (n - 1), 5)
+			_mission_time = 34.0 + float(_mission_target) * 8.0
+		MTYPE_RAMPAGE:
+			_mission_target = 8 + n * 2
+			_mission_time = 34.0
+		MTYPE_EXPLODE:
+			_mission_target = 3 + n
+			_mission_time = 32.0
+		MTYPE_COMBO:
+			_mission_target = 5 + n
+			_mission_time = 30.0
 	_mission_progress = 0
 	_mission_active = true
-	_popup(_player_pos() + Vector3(0.0, 4.0, 0.0), "任務 %d：限時炸 %d 棟!" % [_mission_num, _mission_target])
+	_popup(_player_pos() + Vector3(0.0, 4.0, 0.0), "任務 %d：%s ×%d!" % [_mission_num, _mission_verb(), _mission_target])
+	if _ui_callout != null:
+		_ui_callout.text = "新任務：%s %d" % [_mission_verb(), _mission_target]
+		_ui_callout.modulate = Color("#7ED0FF")
+		_callout_t = 1.3
+
+## An event of `ev_type` (a mission type id) happened — advance a matching mission.
+func _mission_event(ev_type: int) -> void:
+	if _mission_active and _mission_type == ev_type:
+		_mission_progress += 1
+		if _mission_progress >= _mission_target:
+			_mission_success()
 
 func _mission_success() -> void:
 	_mission_active = false
 	_mission_cooldown = 6.0
-	var bonus: int = _mission_target * 200
+	_missions_done += 1
+	var bonus: int = _mission_target * 150 + _mission_num * 50
 	_score.add(bonus, 0)
 	if _score.score > _best:
 		_best = _score.score
 		_score.submit()
-	_flash = 0.4
+	_hp = minf(_max_hp, _hp + 30.0)   # reward: patch you up
+	_flash = 0.45
+	RRAudio.fanfare(self)
 	_popup(_player_pos() + Vector3(0.0, 4.5, 0.0), "任務完成! +%d" % bonus)
+	if _ui_callout != null:
+		_ui_callout.text = "任務完成!  +%d" % bonus
+		_ui_callout.modulate = Color("#6AE06A")
+		_callout_t = 1.7
 	_refresh()
 
 func _mission_fail() -> void:
 	_mission_active = false
 	_mission_cooldown = 6.0
+	RRAudio.buzz(self)
 	_popup(_player_pos() + Vector3(0.0, 4.0, 0.0), "任務失敗…")
+	if _ui_callout != null:
+		_ui_callout.text = "任務失敗…"
+		_ui_callout.modulate = Color("#FF6A6A")
+		_callout_t = 1.4
 
 ## Scatter shotgun + rocket crates near the spawn ring so they're easy to find.
 func _spawn_weapon_pickups() -> void:
@@ -823,6 +878,7 @@ func _on_smashed(value: int, heat: int, pos: Vector3) -> void:
 		_best = _score.score
 		_score.submit()
 	_popup(pos, "+%d" % pts)
+	_mission_event(MTYPE_RAMPAGE)
 	_maybe_callout()
 	_refresh()
 
@@ -840,6 +896,7 @@ func _maybe_callout() -> void:
 		text = "失控!"
 	if text != "" and _ui_callout:
 		_ui_callout.text = text
+		_ui_callout.modulate = Color(1.0, 1.0, 1.0)   # show the orange font (missions tint this)
 		_callout_t = 1.1
 
 func _popup(pos: Vector3, text: String) -> void:

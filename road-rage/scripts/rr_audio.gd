@@ -9,6 +9,8 @@ static var _explosion: AudioStreamWAV = null
 static var _siren: AudioStreamWAV = null
 static var _gunshot: AudioStreamWAV = null
 static var _scream: AudioStreamWAV = null
+static var _fanfare: AudioStreamWAV = null
+static var _buzz: AudioStreamWAV = null
 
 static func impact(parent: Node, force: float) -> void:
 	if _impact == null: _impact = _make_impact()
@@ -31,6 +33,16 @@ static func gunshot(parent: Node, pitch: float = 1.0) -> void:
 static func scream(parent: Node, pitch: float = 1.0) -> void:
 	if _scream == null: _scream = _make_scream()
 	_play(parent, _scream, -13.0, pitch)
+
+## Rising arpeggio — mission complete.
+static func fanfare(parent: Node) -> void:
+	if _fanfare == null: _fanfare = _make_fanfare()
+	_play(parent, _fanfare, -8.0)
+
+## Low descending double-buzz — mission failed.
+static func buzz(parent: Node) -> void:
+	if _buzz == null: _buzz = _make_buzz()
+	_play(parent, _buzz, -10.0)
 
 static func _play(parent: Node, stream: AudioStream, db: float, pitch: float = 1.0) -> void:
 	if parent == null or stream == null or not is_instance_valid(parent): return
@@ -104,6 +116,38 @@ static func make_engine_stream() -> AudioStreamWAV:
 	st.loop_begin = 0
 	st.loop_end = n
 	return st
+
+# A short rising arpeggio (C-E-G-C) with a bell envelope — success jingle.
+static func _make_fanfare() -> AudioStreamWAV:
+	var dur := 0.55
+	var n := int(SAMPLE_RATE * dur)
+	var data := PackedByteArray(); data.resize(n * 2)
+	var notes := [523.25, 659.25, 783.99, 1046.5]   # C5 E5 G5 C6
+	for i in n:
+		var t: float = float(i) / SAMPLE_RATE
+		var frac: float = t / dur
+		var idx: int = clampi(int(frac * 4.0), 0, 3)
+		var nf: float = notes[idx]
+		var local: float = frac * 4.0 - float(idx)
+		var env: float = pow(1.0 - local, 1.2) * (1.0 - frac * 0.2)
+		var s: float = sin(t * TAU * nf) + 0.4 * sin(t * TAU * nf * 2.0)
+		_w(data, i, s * env * 0.4)
+	return _wrap(data)
+
+# A low descending double-buzz — mission failed.
+static func _make_buzz() -> AudioStreamWAV:
+	var dur := 0.45
+	var n := int(SAMPLE_RATE * dur)
+	var data := PackedByteArray(); data.resize(n * 2)
+	for i in n:
+		var t: float = float(i) / SAMPLE_RATE
+		var frac: float = t / dur
+		var f: float = lerpf(200.0, 110.0, frac)
+		var gate: float = 1.0 if fmod(t, 0.22) < 0.16 else 0.0
+		var env: float = (1.0 - frac) * gate
+		var s: float = signf(sin(t * TAU * f)) * 0.5 + sin(t * TAU * f) * 0.5
+		_w(data, i, s * env * 0.4)
+	return _wrap(data)
 
 # A short startled yelp: pitch swoops up then sags, with vibrato + breath.
 static func _make_scream() -> AudioStreamWAV:
