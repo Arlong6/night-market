@@ -13,6 +13,7 @@ const FPPolice = preload("res://scripts/fp_police.gd")
 const FPDecor = preload("res://scripts/fp_decor.gd")
 const FPWalker = preload("res://scripts/fp_walker.gd")
 const FPFootCop = preload("res://scripts/fp_footcop.gd")
+const FPGang = preload("res://scripts/fp_gang.gd")
 const FPExplosive = preload("res://scripts/fp_explosive.gd")
 const FPMinimap = preload("res://scripts/fp_minimap.gd")
 const FPPickup = preload("res://scripts/fp_pickup.gd")
@@ -73,7 +74,7 @@ var _cur_weapon: int = 0                ## carries the on-foot weapon across car
 ## Timed missions of several kinds, escalating. Type constants double as the event
 ## id passed to _mission_event() so a matching event advances the active mission.
 const MTYPE_DEMOLISH: int = 0   ## level N buildings
-const MTYPE_RAMPAGE: int = 1    ## smash N things (peds / cars / props / cops)
+const MTYPE_RAMPAGE: int = 1    ## smash N things (peds / cars / props / cops / gangs)
 const MTYPE_EXPLODE: int = 2    ## set off N explosions
 const MTYPE_COMBO: int = 3      ## reach a ×N combo multiplier
 var _ui_mission: Label = null
@@ -183,8 +184,10 @@ func _manage_police() -> void:
 func _manage_gangs() -> void:
 	_gangs = _gangs.filter(func(g): return is_instance_valid(g))
 	var pp: Vector3 = _player_pos()
-	while _gangs.size() < 5:
-		_gangs.append(FPGang.spawn(self, self, pp, 70.0))
+	while _gangs.size() < 3:   # a few is threatening; five was an inescapable crossfire
+		var g = FPGang.spawn(self, self, pp, 70.0)
+		g.smashed.connect(_on_smashed)   # killing a gang scores + advances rampage missions
+		_gangs.append(g)
 
 func _player_pos() -> Vector3:
 	if _mode == "foot" and is_instance_valid(_walker):

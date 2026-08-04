@@ -5,12 +5,18 @@
 class_name FPGang
 extends CharacterBody3D
 
+## Emitted when killed — same contract as FPPed/FPTarget so FPMain._on_smashed
+## scores it and counts it toward 製造破壞 (rampage) missions.
+signal smashed(value: int, heat: int, pos: Vector3)
+
 const SPEED: float = 6.0
 const GRAVITY: float = 24.0
 const AGGRO_RANGE: float = 48.0     ## start hunting the player within this
 const SHOOT_RANGE: float = 28.0
-const SHOOT_INTERVAL: float = 1.3
-const SHOT_DMG: float = 6.0
+const SHOOT_INTERVAL: float = 1.8   ## slower fire so a few gangs aren't an inescapable wall
+const SHOT_DMG: float = 5.0
+const KILL_VALUE: int = 60          ## worth more than a ped (they shoot back)
+const KILL_HEAT: int = 6
 
 var game = null                     # FPMain — provides _player_pos() and _damage()
 var hp: int = 3
@@ -160,6 +166,7 @@ func _wreck() -> void:
 	if _wrecked:
 		return
 	_wrecked = true
+	smashed.emit(KILL_VALUE, KILL_HEAT, global_position)   # score + rampage-mission credit
 	var host := get_parent()
 	if host != null:
 		var p := CPUParticles3D.new()
