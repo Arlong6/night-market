@@ -83,6 +83,12 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
   (blue) / success (green +bonus) / fail (red) — _maybe_callout resets modulate to white.
   Reward: score target*150+num*50, heal 30, flash, RRAudio.fanfare(); fail RRAudio.buzz().
   Cooldown banner shows '已完成 N'. Feature check #13 mission[start,done,rampage]. 13 items.
+- GANG + TUNING (2026-08-05): FPGang (scripts/fp_gang.gd) — dark-hoodie + red-bandana
+  hostile enemies, roam then hunt+shoot within AGGRO_RANGE 48 (game._damage -> dir arc),
+  hp 3, group "gang"+"blastable", killable. _manage_gangs() keeps 5 (respawn at dist 70),
+  seeded in _ready + on police timer. Minimap orange blips. Tuning: explode mission
+  target mini(2+n/2,5)/42s + barrels 40->60; knockback UP halved (fp_ped/fp_target);
+  weapon pickups 4->2. Feature check #14 gang[spawn=5 hurt=true]. 14 items.
 - Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
   looping pitch sound annoying).
 
