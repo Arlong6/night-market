@@ -168,6 +168,40 @@ static func _make_scream() -> AudioStreamWAV:
 		_w(data, i, (tone * 0.85 + breath) * env * 0.5)
 	return _wrap(data)
 
+# Loopable driving background track: a minor-key bass groove with a kick pulse.
+# Length is a whole number of beats so it tiles seamlessly; bass roots are chosen so
+# each holds close to a whole cycle count over the loop to keep the seam quiet.
+static func make_music_stream() -> AudioStreamWAV:
+	var beat := 0.5
+	var beats := 8
+	var dur := beat * float(beats)          # 4.0s loop
+	var n := int(SAMPLE_RATE * dur)
+	var data := PackedByteArray(); data.resize(n * 2)
+	# A-minor-ish bassline over 8 beats (Hz, low octave).
+	var roots := [55.0, 55.0, 65.41, 55.0, 73.42, 73.42, 82.41, 65.41]  # A C A D D E C
+	for i in n:
+		var t: float = float(i) / SAMPLE_RATE
+		var bi: int = int(t / beat) % beats
+		var bt: float = fmod(t, beat) / beat            # 0..1 within the beat
+		# Kick — a quick pitch-dropping thump on every beat.
+		var kf: float = lerpf(130.0, 45.0, clampf(bt * 6.0, 0.0, 1.0))
+		var kenv: float = pow(1.0 - clampf(bt * 4.0, 0.0, 1.0), 2.0)
+		var kick: float = sin(t * TAU * kf) * kenv
+		# Bass — sustained root with a soft pluck decay.
+		var bf: float = roots[bi]
+		var benv: float = 0.55 + 0.45 * pow(1.0 - bt, 0.6)
+		var bass: float = (sin(t * TAU * bf) * 0.65 + sin(t * TAU * bf * 2.0) * 0.18) * benv
+		# A quiet off-beat tick for momentum.
+		var tick: float = 0.0
+		if bt > 0.5 and bt < 0.58:
+			tick = sin(t * TAU * 1200.0) * 0.15
+		_w(data, i, (kick * 0.55 + bass * 0.4 + tick) * 0.4)
+	var st := _wrap(data)
+	st.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	st.loop_begin = 0
+	st.loop_end = n
+	return st
+
 # Short sharp gunshot crack.
 static func _make_gunshot() -> AudioStreamWAV:
 	var dur := 0.12

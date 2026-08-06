@@ -86,6 +86,12 @@ var _mission_progress: int = 0
 var _mission_time: float = 0.0
 var _mission_cooldown: float = 5.0      ## first mission kicks in a few seconds after load
 var _missions_done: int = 0
+## Title / start gate — the game waits on a title screen; the first input starts it
+## (that gesture also unlocks Web audio) and kicks off the music + missions.
+var _started: bool = false
+var _ui_title: CanvasLayer = null
+var _music: AudioStreamPlayer = null
+var _music_on: bool = true
 
 func _ready() -> void:
 	_rng.randomize()
@@ -96,8 +102,8 @@ func _ready() -> void:
 	_build_city()
 	_spawn_car()
 	_spawn_weapon_pickups()
-	_manage_gangs()   # seed a few roaming gang members right away
 	_build_hud()
+	_build_title()   # the game waits here until the first input (also unlocks Web audio)
 	# Force the game window to the front so it isn't hidden behind other windows.
 	var w := get_window()
 	if w:
@@ -123,11 +129,12 @@ func _process(delta: float) -> void:
 			a["node"].position = Vector2(480.0, 270.0) + (a["dir"] as Vector2) * (gap + 6.0)
 	# Wanted heat decays; police escalate with the star level.
 	_wanted_heat = maxf(0.0, _wanted_heat - 6.0 * delta)
-	_pol_timer -= delta
-	if _pol_timer <= 0.0:
-		_pol_timer = 3.0
-		_manage_police()
-		_manage_gangs()
+	if _started:
+		_pol_timer -= delta
+		if _pol_timer <= 0.0:
+			_pol_timer = 3.0
+			_manage_police()
+			_manage_gangs()
 	if _ui_wanted:
 		var stars: int = _wanted_stars()
 		_ui_wanted.text = "通緝 " + "★".repeat(stars) + "☆".repeat(5 - stars)
@@ -587,6 +594,8 @@ func alarm_peds(at: Vector3, radius: float) -> void:
 
 # ── Timed missions: several kinds, escalating ────────────────────────────────
 func _update_mission(delta: float) -> void:
+	if not _started:
+		return
 	if _mission_active:
 		_mission_time -= delta
 		if _mission_type == MTYPE_COMBO:
@@ -1028,3 +1037,66 @@ func _mk_label(ui: CanvasLayer, pos: Vector2, size: int, col: Color) -> Label:
 	l.add_theme_color_override("font_color", col)
 	ui.add_child(l)
 	return l
+
+# ── Title screen + music ─────────────────────────────────────────────────────
+func _build_title() -> void:
+	_ui_title = CanvasLayer.new()
+	_ui_title.layer = 10   # above the HUD
+	add_child(_ui_title)
+	var bg := ColorRect.new()
+	bg.color = Color(0.03, 0.03, 0.06, 0.6)
+	bg.size = Vector2(960, 540)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ui_title.add_child(bg)
+	_mk_title_label("橫衝直撞", Vector2(0.0, 150.0), 90, Color("#FFD24A"))
+	_mk_title_label("R O A D   R A G E", Vector2(0.0, 262.0), 34, Color("#7ED0FF"))
+	_mk_title_label("按任意鍵 / 點擊開始", Vector2(0.0, 344.0), 30, Color("#F2F2F2"))
+	_mk_title_label("車:WASD 開・左鍵掃射　　步行:E 下車・滑鼠瞄準・左鍵射擊・1/2/3/4 換槍・M 音樂", Vector2(0.0, 402.0), 16, Color("#B8C0CC"))
+	# Music player — ready but silent until the start gesture (Web-audio safe).
+	_music = AudioStreamPlayer.new()
+	_music.stream = RRAudio.make_music_stream()
+	_music.volume_db = -16.0
+	add_child(_music)
+
+func _mk_title_label(text: String, pos: Vector2, size: int, col: Color) -> void:
+	var l := Label.new()
+	l.text = text
+	l.position = pos
+	l.size = Vector2(960.0, 110.0)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", col)
+	l.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.85))
+	l.add_theme_constant_override("outline_size", 6)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ui_title.add_child(l)
+
+func _input(event: InputEvent) -> void:
+	if not _started:
+		var go: bool = (event is InputEventKey and event.pressed and not event.echo) \
+			or (event is InputEventMouseButton and event.pressed) \
+			or (event is InputEventScreenTouch and event.pressed)
+		if go:
+			_start_game()
+		return
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_M:
+		_toggle_music()
+
+func _start_game() -> void:
+	if _started:
+		return
+	_started = true
+	if is_instance_valid(_ui_title):
+		_ui_title.queue_free()
+		_ui_title = null
+	if _music_on and _music != null:
+		_music.play()
+
+func _toggle_music() -> void:
+	_music_on = not _music_on
+	if _music == null:
+		return
+	if _music_on:
+		_music.play()
+	else:
+		_music.stop()

@@ -134,6 +134,7 @@ func _process(_delta: float) -> bool:
 
 	# 13) Missions: cooldown -> start; the matching event advances it; hitting the
 	#     target completes it; a different type advances on its own event.
+	_m._started = true                      # missions only run once the game has started
 	_m._mission_active = false
 	_m._mission_cooldown = 0.0
 	_m._update_mission(0.1)                 # cooldown gone -> a mission starts (random type)
@@ -166,6 +167,11 @@ func _process(_delta: float) -> bool:
 		gangs[0].shoot_hit()   # hp 3 -> killed -> emits smashed
 		gang_scores = _m._smashed > before_smashed
 	out.append("gang[spawn=%d hurt=%s kill_scores=%s]" % [gangs.size(), gang_hurt, gang_scores])
+
+	# 15) Title/music: a looping music stream is built; _start_game is idempotent.
+	var music_ok: bool = _m._music != null and _m._music.stream != null
+	_m._start_game()   # already started earlier; must be a safe no-op
+	out.append("title[music=%s]" % music_ok)
 
 	print("FEATURE_CHECK " + " ".join(out))
 	return true
