@@ -94,6 +94,13 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
   FPGang now emits smashed(60,6,pos) on death (connected in _manage_gangs) so kills score +
   count for rampage. FPGang preloaded to match convention. (Review's 'missing preload crash'
   was a false positive — class_name = global; verified working.)
+- ROADMAP (user wants 1->2->3->4 + 手機版本): #1 title+music DONE, #2 mobile (touch+web/GL)
+  NEXT, #3 more content, #4 gang territory. Tasks #8-11 track these.
+- TITLE + MUSIC (2026-08-06, step 1/4): _build_title() CanvasLayer(layer 10) title overlay
+  over live city; _input() starts on first key/mouse/TOUCH (Web-audio gesture); _start_game
+  hides title + plays music; missions + enemy spawns gated on _started. RRAudio.make_music_stream
+  (4s loop bass+kick), AudioStreamPlayer -16dB, M toggles (_toggle_music). Feature check #15
+  title[music]. 15 items. NOTE: music unauditioned headlessly — user judges sound.
 - Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
   looping pitch sound annoying).
 
