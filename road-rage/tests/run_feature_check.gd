@@ -173,5 +173,21 @@ func _process(_delta: float) -> bool:
 	_m._start_game()   # already started earlier; must be a safe no-op
 	out.append("title[music=%s]" % music_ok)
 
+	# 16) Touch controls: layer built; touch_look aims; cycle_weapon switches owned.
+	var touch_built: bool = _m._ui_touch != null
+	_m._exit_car()                       # on foot so touch_look/cycle target the walker
+	var look_ok: bool = false
+	var cyc_ok: bool = false
+	if is_instance_valid(_m._walker):
+		_m._weapons_owned = [true, true, true, false]
+		_m._walker.set_owned(_m._weapons_owned, 0)
+		var y0: float = _m._walker._cam_yaw
+		_m.touch_look(Vector2(0.3, 0.1))
+		look_ok = _m._walker._cam_yaw != y0
+		var w0: int = _m._walker._weapon
+		_m.cycle_weapon()
+		cyc_ok = _m._walker._weapon != w0
+	out.append("touch[built=%s look=%s cycle=%s]" % [touch_built, look_ok, cyc_ok])
+
 	print("FEATURE_CHECK " + " ".join(out))
 	return true

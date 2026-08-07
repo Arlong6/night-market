@@ -1,2 +1,5 @@
 .godot/
 *.translation
+
+# exported builds (generated)
+build/

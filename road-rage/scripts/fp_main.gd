@@ -14,6 +14,7 @@ const FPDecor = preload("res://scripts/fp_decor.gd")
 const FPWalker = preload("res://scripts/fp_walker.gd")
 const FPFootCop = preload("res://scripts/fp_footcop.gd")
 const FPGang = preload("res://scripts/fp_gang.gd")
+const FPTouch = preload("res://scripts/fp_touch.gd")
 const FPExplosive = preload("res://scripts/fp_explosive.gd")
 const FPMinimap = preload("res://scripts/fp_minimap.gd")
 const FPPickup = preload("res://scripts/fp_pickup.gd")
@@ -92,10 +93,15 @@ var _started: bool = false
 var _ui_title: CanvasLayer = null
 var _music: AudioStreamPlayer = null
 var _music_on: bool = true
+var _ui_touch: FPTouch = null       ## on-screen controls (touch/web); inert on desktop
+var _force_touch: bool = false      ## debug: show touch UI on desktop for screenshots
+
+var _lite: bool = false   ## reduced effects + entity counts for web / mobile GPUs
 
 func _ready() -> void:
 	_rng.randomize()
 	_best = _score.load_best()
+	_lite = _is_touch()   # web / mobile: cut the expensive post FX and thin the crowd
 	_build_environment()
 	_build_ground()
 	_build_bounds()
@@ -103,6 +109,7 @@ func _ready() -> void:
 	_spawn_car()
 	_spawn_weapon_pickups()
 	_build_hud()
+	_build_touch()   # on-screen controls for touch / web builds
 	_build_title()   # the game waits here until the first input (also unlocks Web audio)
 	# Force the game window to the front so it isn't hidden behind other windows.
 	var w := get_window()
@@ -377,6 +384,12 @@ func _build_environment() -> void:
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	env.tonemap_exposure = 1.0
+	if _lite:
+		# Web / mobile GPUs: drop the screen-space effects (SSR is very expensive)
+		# and glow so WebGL2 holds a steady framerate. Sky + fog + sun stay.
+		env.ssr_enabled = false
+		env.ssao_enabled = false
+		env.glow_enabled = false
 	we.environment = env
 	add_child(we)   # CRITICAL: without this the WorldEnvironment is orphaned and
 	                # the whole sky/ambient/fog/bloom/tonemap pipeline never renders.
@@ -386,7 +399,7 @@ func _build_environment() -> void:
 	sun.light_energy = 1.35
 	# Forward+ on Apple Silicon handles real-time shadows fine — re-enabled for depth.
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 180.0
+	sun.directional_shadow_max_distance = 80.0 if _lite else 180.0
 	sun.shadow_bias = 0.04
 	add_child(sun)
 	_env = env
@@ -515,13 +528,13 @@ func _build_city() -> void:
 		_add_building(cell)
 	for p in layout["props"]:
 		_add_target(p["cell"], p["kind"], Vector3.ZERO)
-	_spawn_traffic(12)
-	_spawn_crowds(16)   # more pedestrians on the streets
+	_spawn_traffic(6 if _lite else 12)
+	_spawn_crowds(8 if _lite else 16)   # more pedestrians on the streets
 	_spawn_trees(34)
 	FPDecor.add_curbs(self, RRTuning.CITY_COLS, RRTuning.CITY_ROWS, TILE3D)
 	_spawn_neon(16)
 	_build_test_track()
-	var barrels: Array = FPExplosive.scatter(self, 60, RRTuning.CITY_COLS * TILE3D, _rng)
+	var barrels: Array = FPExplosive.scatter(self, 30 if _lite else 60, RRTuning.CITY_COLS * TILE3D, _rng)
 	for b in barrels:
 		b.connect("exploded", _on_explosion)
 	FPDecor.add_crosswalks(self, RRTuning.CITY_COLS, RRTuning.CITY_ROWS, TILE3D)
@@ -1100,3 +1113,36 @@ func _toggle_music() -> void:
 		_music.play()
 	else:
 		_music.stop()
+
+# ── Touch controls (mobile / web) ────────────────────────────────────────────
+func _is_touch() -> bool:
+	return DisplayServer.is_touchscreen_available() or OS.has_feature("web") or OS.has_feature("mobile")
+
+func _build_touch() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 5   # above the HUD, below the title
+	add_child(layer)
+	_ui_touch = FPTouch.new()
+	_ui_touch.game = self
+	layer.add_child(_ui_touch)
+	# Inert on desktop (no touch events fire there); shown on touch/web or when forced.
+	_ui_touch.visible = _is_touch() or _force_touch
+
+## Aim from a touch drag (delta already in radians): yaw+pitch on foot, look in car.
+func touch_look(delta: Vector2) -> void:
+	if _mode == "foot" and is_instance_valid(_walker):
+		_walker._cam_yaw -= delta.x
+		_walker._cam_pitch = clampf(_walker._cam_pitch - delta.y, -1.35, 1.35)
+	elif is_instance_valid(_car):
+		_car._look_yaw = clampf(_car._look_yaw - delta.x, -PI, PI)
+
+## Cycle to the next owned weapon (touch 換槍 button).
+func cycle_weapon() -> void:
+	if _mode != "foot" or not is_instance_valid(_walker):
+		return
+	var n: int = _walker._weapons.size()
+	for step in range(1, n + 1):
+		var i: int = (_walker._weapon + step) % n
+		if i < _weapons_owned.size() and _weapons_owned[i]:
+			_walker._set_weapon(i)
+			return
