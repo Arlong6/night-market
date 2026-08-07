@@ -101,6 +101,17 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
   hides title + plays music; missions + enemy spawns gated on _started. RRAudio.make_music_stream
   (4s loop bass+kick), AudioStreamPlayer -16dB, M toggles (_toggle_music). Feature check #15
   title[music]. 15 items. NOTE: music unauditioned headlessly — user judges sound.
+- MOBILE GROUNDWORK (2026-08-06, step 2/4): renderer override project.godot
+  renderer/rendering_method.web + .mobile = gl_compatibility (desktop stays forward_plus;
+  web=WebGL2 != desktop ANGLE that crashed on M3). export_presets.cfg (Web, nothreads,
+  excludes addons/gut+tests). Web export works (pck 3.6MB, wasm 37MB). FPTouch
+  (scripts/fp_touch.gd): left joystick->move actions, right drag->touch_look, buttons
+  射擊/上下車/氮氣/跳-煞/換槍; shown on _is_touch()/web/_force_touch. fp_main.touch_look/
+  cycle_weapon. _lite (=touch/web) drops SSR/SSAO/glow + shadow dist + thins entities.
+  Feature check #16 touch[built,look,cycle]. 16 items. build/ gitignored.
+  PENDING: runtime browser test (Chrome remote-debug was blocked here) — user opens
+  http://localhost:8777 (desktop) or http://192.168.68.54:8777 (phone, same WiFi);
+  python3 -m http.server 8777 runs from road-rage/build/web. Confirms WebGL2 renders.
 - Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
   looping pitch sound annoying).
 
