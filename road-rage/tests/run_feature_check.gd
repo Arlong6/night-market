@@ -189,5 +189,17 @@ func _process(_delta: float) -> bool:
 		cyc_ok = _m._walker._weapon != w0
 	out.append("touch[built=%s look=%s cycle=%s]" % [touch_built, look_ok, cyc_ok])
 
+	# 17) Ramps spawned + car.launch() arms an upward kick (stunt jumps).
+	var ramp_count: int = 0
+	for c in _m.get_children():
+		if c is FPRamp:
+			ramp_count += 1
+	var launch_ok: bool = false
+	if is_instance_valid(_m._car):
+		_m._car._launch = 0.0
+		_m._car.launch(15.0)
+		launch_ok = _m._car._launch >= 15.0
+	out.append("ramps[count=%d launch=%s]" % [ramp_count, launch_ok])
+
 	print("FEATURE_CHECK " + " ".join(out))
 	return true

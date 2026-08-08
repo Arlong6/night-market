@@ -15,6 +15,7 @@ const FPWalker = preload("res://scripts/fp_walker.gd")
 const FPFootCop = preload("res://scripts/fp_footcop.gd")
 const FPGang = preload("res://scripts/fp_gang.gd")
 const FPTouch = preload("res://scripts/fp_touch.gd")
+const FPRamp = preload("res://scripts/fp_ramp.gd")
 const FPExplosive = preload("res://scripts/fp_explosive.gd")
 const FPMinimap = preload("res://scripts/fp_minimap.gd")
 const FPPickup = preload("res://scripts/fp_pickup.gd")
@@ -97,6 +98,7 @@ var _ui_touch: FPTouch = null       ## on-screen controls (touch/web); inert on 
 var _force_touch: bool = false      ## debug: show touch UI on desktop for screenshots
 
 var _lite: bool = false   ## reduced effects + entity counts for web / mobile GPUs
+var _air_t: float = 0.0   ## time the car has been airborne (for stunt bonuses)
 
 func _ready() -> void:
 	_rng.randomize()
@@ -108,6 +110,7 @@ func _ready() -> void:
 	_build_city()
 	_spawn_car()
 	_spawn_weapon_pickups()
+	_spawn_ramps()
 	_build_hud()
 	_build_touch()   # on-screen controls for touch / web builds
 	_build_title()   # the game waits here until the first input (also unlocks Web audio)
@@ -148,6 +151,24 @@ func _process(delta: float) -> void:
 	_update_health(delta)
 	_update_dmg_indicator(delta)
 	_update_mission(delta)
+	# Stunt air-time bonus: reward big ramp jumps on landing.
+	if _mode == "car" and is_instance_valid(_car):
+		if not _car.is_on_floor():
+			_air_t += delta
+		elif _air_t > 0.0:
+			if _air_t > 0.6:
+				var bonus: int = int(_air_t * 260.0)
+				_score.add(bonus, 0)
+				if _score.score > _best:
+					_best = _score.score
+					_score.submit()
+				_popup(_player_pos() + Vector3(0.0, 3.0, 0.0), "空中特技! +%d" % bonus)
+				if _ui_callout:
+					_ui_callout.text = "空中特技!  +%d" % bonus
+					_ui_callout.modulate = Color("#7ED0FF")
+					_callout_t = 1.4
+				_refresh()
+			_air_t = 0.0
 	if _flash > 0.0:
 		_flash = maxf(0.0, _flash - delta * 1.6)
 	if _ui_flash:
@@ -696,6 +717,20 @@ func _mission_fail() -> void:
 		_ui_callout.text = "任務失敗…"
 		_ui_callout.modulate = Color("#FF6A6A")
 		_callout_t = 1.4
+
+## A few stunt ramps on road stretches, each facing a different way.
+func _spawn_ramps() -> void:
+	var specs: Array = [
+		{"cell": Vector2i(12, 8), "yaw": 0.0},
+		{"cell": Vector2i(8, 16), "yaw": PI * 0.5},
+		{"cell": Vector2i(18, 14), "yaw": PI},
+		{"cell": Vector2i(16, 20), "yaw": PI * 1.5},
+	]
+	for s in specs:
+		var r := FPRamp.new()
+		add_child(r)
+		r.global_position = _world_pos(s["cell"])
+		r.rotation.y = float(s["yaw"])
 
 ## Scatter shotgun + rocket crates near the spawn ring so they're easy to find.
 func _spawn_weapon_pickups() -> void:

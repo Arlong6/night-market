@@ -30,6 +30,11 @@ const GUN_RANGE: float = 55.0
 var _gun_cd: float = 0.0
 var _car_muzzle: MeshInstance3D = null
 var _car_muzzle_t: float = 0.0
+var _launch: float = 0.0   ## pending upward kick from a ramp (applied next physics frame)
+
+## Kick the car into the air (used by ramps). Keeps the strongest pending launch.
+func launch(v: float) -> void:
+	_launch = maxf(_launch, v)
 
 func _ready() -> void:
 	up_direction = Vector3.UP
@@ -261,6 +266,9 @@ func _physics_process(delta: float) -> void:
 		velocity.y = 0.0
 	else:
 		velocity.y -= GRAVITY * delta
+	if _launch > 0.0:
+		velocity.y = _launch   # ramp kick — overrides the floor-zeroing this frame
+		_launch = 0.0
 	move_and_slide()
 	# ── Drive-by mounted gun (hold fire while driving) ──
 	_gun_cd = maxf(0.0, _gun_cd - delta)
