@@ -112,6 +112,13 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
   PENDING: runtime browser test (Chrome remote-debug was blocked here) — user opens
   http://localhost:8777 (desktop) or http://192.168.68.54:8777 (phone, same WiFi);
   python3 -m http.server 8777 runs from road-rage/build/web. Confirms WebGL2 renders.
+  >>> USER CONFIRMED 2026-08-08: web build RUNS in the browser. Mobile path is viable.
+- RAMPS (2026-08-08, step 3 more-content): FPRamp (scripts/fp_ramp.gd) visual tilted slab
+  (NO blocking collision — CharacterBody can't climb) + ground launch Area over footprint;
+  fast car -> FPCar.launch(speed*0.7+8, cap 26), applied after on-floor zeroing. 4 ramps
+  (_spawn_ramps). Air-time stunt bonus in _process (car): land after >0.6s -> int(air*260)
+  + '空中特技!' callout. Feature check #17 ramps[count=4 launch=true]. 17 items.
+  step 3 remaining options: weather, more vehicle types. step 4 = gang territory.
 - Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
   looping pitch sound annoying).
 
