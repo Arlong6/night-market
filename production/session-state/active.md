@@ -119,6 +119,11 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
   (_spawn_ramps). Air-time stunt bonus in _process (car): land after >0.6s -> int(air*260)
   + '空中特技!' callout. Feature check #17 ramps[count=4 launch=true]. 17 items.
   step 3 remaining options: weather, more vehicle types. step 4 = gang territory.
+- WEATHER (2026-08-09, step 3 #2): V cycles clear/rain. _cycle_weather/_apply_weather/
+  _start_rain/_stop_rain in fp_main. Rain = player-following CPUParticles3D downpour
+  (800/300 lite) + sun 1.35->0.7 + fog 0.0016->0.007 grey. _process repositions rain
+  above player. Feature check #18 weather[rain,clear]. 18 items. Roadmap step 3 DONE
+  (ramps+weather; more vehicle types optional). NEXT = step 4 gang territory.
 - Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
   looping pitch sound annoying).
 
