@@ -99,6 +99,8 @@ var _force_touch: bool = false      ## debug: show touch UI on desktop for scree
 
 var _lite: bool = false   ## reduced effects + entity counts for web / mobile GPUs
 var _air_t: float = 0.0   ## time the car has been airborne (for stunt bonuses)
+var _weather: int = 0     ## 0 clear, 1 rain (cycle with V)
+var _rain: CPUParticles3D = null
 
 func _ready() -> void:
 	_rng.randomize()
@@ -151,6 +153,8 @@ func _process(delta: float) -> void:
 	_update_health(delta)
 	_update_dmg_indicator(delta)
 	_update_mission(delta)
+	if _rain != null:
+		_rain.global_position = _player_pos() + Vector3(0.0, 22.0, 0.0)   # rain follows you
 	# Stunt air-time bonus: reward big ramp jumps on landing.
 	if _mode == "car" and is_instance_valid(_car):
 		if not _car.is_on_floor():
@@ -294,6 +298,59 @@ func _cycle_time() -> void:
 	_tod = (_tod + 1) % _TOD_NAMES.size()
 	if _env != null and _sun != null:
 		FPDecor.apply_time_of_day(_env, _sun, _TOD_NAMES[_tod])
+
+# ── Weather (V toggles clear / rain) ─────────────────────────────────────────
+func _cycle_weather() -> void:
+	_weather = (_weather + 1) % 2
+	_apply_weather()
+
+func _apply_weather() -> void:
+	if _weather == 1:
+		if _sun != null:
+			_sun.light_energy = 0.7          # overcast
+		if _env != null:
+			_env.fog_density = 0.007
+			_env.fog_light_color = Color("#8A92A2")
+		_start_rain()
+	else:
+		if _sun != null:
+			_sun.light_energy = 1.35
+		if _env != null:
+			_env.fog_density = 0.0016
+			_env.fog_light_color = Color("#C6D8EC")
+		_stop_rain()
+
+func _start_rain() -> void:
+	if _rain != null:
+		return
+	_rain = CPUParticles3D.new()
+	_rain.amount = 300 if _lite else 800
+	_rain.lifetime = 1.1
+	_rain.preprocess = 1.0
+	_rain.local_coords = false
+	_rain.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	_rain.emission_box_extents = Vector3(42.0, 0.5, 42.0)
+	_rain.direction = Vector3(0.0, -1.0, 0.0)
+	_rain.spread = 0.0
+	_rain.gravity = Vector3(0.0, -70.0, 0.0)
+	_rain.initial_velocity_min = 32.0
+	_rain.initial_velocity_max = 42.0
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.72, 0.8, 0.92, 0.5)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(0.035, 0.55, 0.035)   # thin vertical streak
+	mesh.material = m
+	_rain.mesh = mesh
+	add_child(_rain)
+	_rain.global_position = _player_pos() + Vector3(0.0, 22.0, 0.0)
+	_rain.emitting = true
+
+func _stop_rain() -> void:
+	if _rain != null:
+		_rain.queue_free()
+		_rain = null
 
 # ── On foot: get in/out of the car + shooting ────────────────────────────────
 # Left-click firing is handled by the "fire" input action (which now includes the
@@ -1016,7 +1073,7 @@ func _build_hud() -> void:
 	ui.add_child(_ui_hp_fill)
 	_ui_speed = _mk_label(ui, Vector2(740, 500), 22, Color("#A0D0FF"))
 	var hint := _mk_label(ui, Vector2(20, 508), 15, Color("#B8C0CC"))
-	hint.text = "車:WASD 開 Shift 氮氣 空白 手煞 J/左鍵 掃射 · E 上下車 · 步行:WASD 移動 滑鼠 瞄準 J/左鍵 射擊 1/2/3/4 換槍(需撿) F 單發連發 Shift 衝刺 空白 跳 · T 日夜"
+	hint.text = "車:WASD 開 Shift 氮氣 空白 手煞 J/左鍵 掃射 · E 上下車 · 步行:WASD 移動 滑鼠 瞄準 J/左鍵 射擊 1/2/3/4 換槍(需撿) F 單發連發 Shift 衝刺 空白 跳 · T 日夜 · V 天氣"
 	_ui_callout = _mk_label(ui, Vector2(0.0, 188.0), 46, Color("#FF9020"))
 	_ui_callout.size = Vector2(960.0, 64.0)
 	_ui_callout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1127,8 +1184,11 @@ func _input(event: InputEvent) -> void:
 		if go:
 			_start_game()
 		return
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_M:
-		_toggle_music()
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_M:
+			_toggle_music()
+		elif event.keycode == KEY_V:
+			_cycle_weather()
 
 func _start_game() -> void:
 	if _started:

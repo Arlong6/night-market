@@ -201,5 +201,13 @@ func _process(_delta: float) -> bool:
 		launch_ok = _m._car._launch >= 15.0
 	out.append("ramps[count=%d launch=%s]" % [ramp_count, launch_ok])
 
+	# 18) Weather: cycling to rain spawns the downpour + dims the sun; back to clear removes it.
+	_m._weather = 0
+	_m._cycle_weather()                       # -> rain
+	var rain_on: bool = _m._rain != null and _m._weather == 1
+	_m._cycle_weather()                       # -> clear
+	var rain_off: bool = _m._rain == null and _m._weather == 0
+	out.append("weather[rain=%s clear=%s]" % [rain_on, rain_off])
+
 	print("FEATURE_CHECK " + " ".join(out))
 	return true
