@@ -11,6 +11,9 @@ const ANGLE_DEG: float = 22.0
 const LAUNCH_MIN: float = 8.0
 const LAUNCH_SCALE: float = 0.7    ## upward kick per unit of car speed
 const LAUNCH_MAX: float = 26.0
+const RETRIGGER_CD: float = 1.2    ## ignore re-entries for this long (no launch stacking)
+
+var _cd: float = 0.0
 
 func _ready() -> void:
 	var ang: float = deg_to_rad(ANGLE_DEG)
@@ -53,8 +56,15 @@ func _ready() -> void:
 	add_child(area)
 	area.body_entered.connect(_on_body_entered)
 
+func _process(delta: float) -> void:
+	if _cd > 0.0:
+		_cd = maxf(0.0, _cd - delta)
+
 func _on_body_entered(body: Node) -> void:
+	if _cd > 0.0:
+		return   # still cooling down from the last launch — don't re-fling
 	if body is FPCar:
 		var sp: float = body.speed()
 		if sp > 4.0:
 			body.launch(clampf(sp * LAUNCH_SCALE + LAUNCH_MIN, LAUNCH_MIN, LAUNCH_MAX))
+			_cd = RETRIGGER_CD

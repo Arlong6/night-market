@@ -279,10 +279,9 @@ func set_owned(arr: Array, start_weapon: int = 0) -> void:
 
 ## Unlock weapon `i` (from a pickup) and switch to it.
 func grant_weapon(i: int) -> void:
-	if i < 0 or i >= _weapons.size():
-		return
-	if i < _owned.size():
-		_owned[i] = true
+	if i < 0 or i >= _weapons.size() or i >= _owned.size():
+		return   # only equip a weapon we can actually mark as owned (keep them in sync)
+	_owned[i] = true
 	_weapon = i
 	_spread = 0.0
 	_apply_weapon_visual()

@@ -405,8 +405,8 @@ func _enter_car() -> void:
 			if d < nd:
 				nd = d
 				nearest = v
-	if own_d <= 8.0 and own_d <= nd:
-		_board_car()
+	if own_d <= 8.0 and own_d <= nd and _car.global_position.y < 3.0:
+		_board_car()   # don't board a car that's mid-air (would strand the walker)
 	elif nearest != null and nd <= 8.0:
 		# Hijack: move our car onto that car's spot and remove it.
 		var pos: Vector3 = nearest.global_position
@@ -486,7 +486,7 @@ func _build_environment() -> void:
 	sun.light_energy = 1.35
 	# Forward+ on Apple Silicon handles real-time shadows fine — re-enabled for depth.
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 80.0 if _lite else 180.0
+	sun.directional_shadow_max_distance = 55.0 if _lite else 180.0
 	sun.shadow_bias = 0.04
 	add_child(sun)
 	_env = env

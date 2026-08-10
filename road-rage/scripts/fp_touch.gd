@@ -37,6 +37,23 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	queue_redraw()
 
+## Release every touch-held action — used when the app loses focus (backgrounded),
+## which otherwise leaves fire/nitro/etc. stuck down with no release event coming.
+func _release_all() -> void:
+	for i in _buttons.size():
+		if _btn_idx[i] != -1:
+			_btn_idx[i] = -1
+			_release_action(String(_buttons[i]["act"]))
+	if _move_idx != -1:
+		_move_idx = -1
+		_move_vec = Vector2.ZERO
+		_apply_move(Vector2.ZERO)
+	_look_idx = -1
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
+		_release_all()
+
 # ── Touch handling ───────────────────────────────────────────────────────────
 func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
@@ -48,6 +65,9 @@ func _input(event: InputEvent) -> void:
 		_on_drag(event.index, event.position, event.relative)
 
 func _on_press(idx: int, pos: Vector2) -> void:
+	# Safety: if this finger index is still bound (its release event was dropped by the
+	# OS), release it first so actions can't get stuck held down.
+	_on_release(idx)
 	var p := _to_ui(pos)
 	# Buttons first.
 	for i in _buttons.size():
