@@ -101,6 +101,10 @@ var _lite: bool = false   ## reduced effects + entity counts for web / mobile GP
 var _air_t: float = 0.0   ## time the car has been airborne (for stunt bonuses)
 var _weather: int = 0     ## 0 clear, 1 rain (cycle with V)
 var _rain: CPUParticles3D = null
+## Gang turf: marked zones where gangs swarm the player. See _spawn_turf/_update_turf.
+var _turf: Array = []     ## [{pos: Vector3, r: float, name: String}]
+var _in_turf: bool = false
+var _ui_turf: Label = null
 
 func _ready() -> void:
 	_rng.randomize()
@@ -113,6 +117,7 @@ func _ready() -> void:
 	_spawn_car()
 	_spawn_weapon_pickups()
 	_spawn_ramps()
+	_spawn_turf()
 	_build_hud()
 	_build_touch()   # on-screen controls for touch / web builds
 	_build_title()   # the game waits here until the first input (also unlocks Web audio)
@@ -155,6 +160,8 @@ func _process(delta: float) -> void:
 	_update_mission(delta)
 	if _rain != null:
 		_rain.global_position = _player_pos() + Vector3(0.0, 22.0, 0.0)   # rain follows you
+	if _started:
+		_update_turf()
 	# Stunt air-time bonus: reward big ramp jumps on landing.
 	if _mode == "car" and is_instance_valid(_car):
 		if not _car.is_on_floor():
@@ -223,8 +230,10 @@ func _manage_police() -> void:
 func _manage_gangs() -> void:
 	_gangs = _gangs.filter(func(g): return is_instance_valid(g))
 	var pp: Vector3 = _player_pos()
-	while _gangs.size() < 3:   # a few is threatening; five was an inescapable crossfire
-		var g = FPGang.spawn(self, self, pp, 70.0)
+	var target: int = 6 if _in_turf else 3     # turf = swarm; open city = a few
+	var dist: float = 40.0 if _in_turf else 70.0  # ambush closer inside enemy turf
+	while _gangs.size() < target:
+		var g = FPGang.spawn(self, self, pp, dist)
 		g.smashed.connect(_on_smashed)   # killing a gang scores + advances rampage missions
 		_gangs.append(g)
 
@@ -775,6 +784,56 @@ func _mission_fail() -> void:
 		_ui_callout.modulate = Color("#FF6A6A")
 		_callout_t = 1.4
 
+## Mark a couple of gang turf zones — ground disc + floating name. Driving into one
+## makes gangs swarm (see _manage_gangs); _update_turf tracks the player being inside.
+func _spawn_turf() -> void:
+	var specs: Array = [
+		{"cell": Vector2i(21, 21), "r": 34.0, "name": "紅蛇幫地盤", "col": Color("#D23A3A")},
+		{"cell": Vector2i(6, 7), "r": 32.0, "name": "黑爪幫地盤", "col": Color("#9A46D2")},
+	]
+	for s in specs:
+		var c: Vector3 = _world_pos(s["cell"])
+		var col: Color = s["col"]
+		_turf.append({"pos": c, "r": float(s["r"]), "name": String(s["name"])})
+		var disc := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = float(s["r"])
+		cm.bottom_radius = float(s["r"])
+		cm.height = 0.12
+		var m := StandardMaterial3D.new()
+		m.albedo_color = Color(col.r, col.g, col.b, 0.16)
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.emission_enabled = true
+		m.emission = col
+		m.emission_energy_multiplier = 0.28
+		cm.material = m
+		disc.mesh = cm
+		disc.position = c + Vector3(0.0, 0.13, 0.0)
+		add_child(disc)
+		var lbl := Label3D.new()
+		lbl.text = String(s["name"])
+		lbl.position = c + Vector3(0.0, 6.0, 0.0)
+		lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		lbl.font_size = 80
+		lbl.modulate = col
+		lbl.outline_size = 10
+		add_child(lbl)
+
+## Track whether the player is standing in a gang turf zone (drives the swarm + HUD).
+func _update_turf() -> void:
+	var was_in: bool = _in_turf
+	_in_turf = false
+	var pp: Vector3 = _player_pos()
+	for z in _turf:
+		var d: float = Vector2(pp.x - z["pos"].x, pp.z - z["pos"].z).length()
+		if d < float(z["r"]):
+			_in_turf = true
+			break
+	if _ui_turf != null:
+		_ui_turf.visible = _in_turf
+		if _in_turf and not was_in:
+			_ui_turf.text = "危險：幫派地盤"
+
 ## A few stunt ramps on road stretches, each facing a different way.
 func _spawn_ramps() -> void:
 	var specs: Array = [
@@ -1107,6 +1166,13 @@ func _build_hud() -> void:
 	_ui_mission.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_ui_mission.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.7))
 	_ui_mission.add_theme_constant_override("outline_size", 5)
+	# Gang-turf warning, just under the mission banner.
+	_ui_turf = _mk_label(ui, Vector2(280.0, 46.0), 22, Color("#FF5A5A"))
+	_ui_turf.size = Vector2(400.0, 30.0)
+	_ui_turf.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_ui_turf.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.7))
+	_ui_turf.add_theme_constant_override("outline_size", 5)
+	_ui_turf.visible = false
 	_refresh()
 
 ## One crosshair arm (white bar on a dark backing) pointing outward `dir`. Its

@@ -209,5 +209,21 @@ func _process(_delta: float) -> bool:
 	var rain_off: bool = _m._rain == null and _m._weather == 0
 	out.append("weather[rain=%s clear=%s]" % [rain_on, rain_off])
 
+	# 19) Gang turf: standing in a zone flags in-turf and swells the gang count to 6.
+	var turf_ok: bool = false
+	if _m._turf.size() > 0 and is_instance_valid(_m._car):
+		_m._started = true
+		_m._mode = "car"
+		_m._car.global_position = _m._turf[0]["pos"] + Vector3(0.0, 1.0, 0.0)
+		_m._update_turf()
+		var flagged: bool = _m._in_turf
+		for g in _m.get_tree().get_nodes_in_group("gang"):
+			if is_instance_valid(g):
+				g.queue_free()
+		_m._gangs.clear()
+		_m._manage_gangs()
+		turf_ok = flagged and _m._gangs.size() == 6
+	out.append("turf[swarm6=%s]" % turf_ok)
+
 	print("FEATURE_CHECK " + " ".join(out))
 	return true
