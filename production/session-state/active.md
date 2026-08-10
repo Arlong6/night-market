@@ -124,6 +124,11 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
   (800/300 lite) + sun 1.35->0.7 + fog 0.0016->0.007 grey. _process repositions rain
   above player. Feature check #18 weather[rain,clear]. 18 items. Roadmap step 3 DONE
   (ramps+weather; more vehicle types optional). NEXT = step 4 gang territory.
+- GANG TERRITORY (2026-08-10, step 4): _spawn_turf() 2 turf zones (紅蛇幫/黑爪幫) = emissive
+  ground disc + floating name; _update_turf() flags _in_turf + red HUD '危險：幫派地盤';
+  _manage_gangs swells 3->6 + spawns closer (40u) in turf. Feature check #19 turf[swarm6].
+  19 items. >>> ROADMAP 1-2-3-4 ALL COMPLETE. Web build needs RE-EXPORT (was pre ramps/
+  weather/turf). Next options: game-over/run summary, QA review pass, deploy to shareable host.
 - Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
   looping pitch sound annoying).
 
