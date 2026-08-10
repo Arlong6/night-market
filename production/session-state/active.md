@@ -127,8 +127,15 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
 - GANG TERRITORY (2026-08-10, step 4): _spawn_turf() 2 turf zones (紅蛇幫/黑爪幫) = emissive
   ground disc + floating name; _update_turf() flags _in_turf + red HUD '危險：幫派地盤';
   _manage_gangs swells 3->6 + spawns closer (40u) in turf. Feature check #19 turf[swarm6].
-  19 items. >>> ROADMAP 1-2-3-4 ALL COMPLETE. Web build needs RE-EXPORT (was pre ramps/
-  weather/turf). Next options: game-over/run summary, QA review pass, deploy to shareable host.
+  19 items. >>> ROADMAP 1-2-3-4 ALL COMPLETE.
+- QA PASS (2026-08-10): full adversarial review workflow (5 lenses x verify, 16 raised /
+  7 confirmed). Fixed: touch-stuck (FPTouch._on_press releases stale finger + _release_all
+  on FOCUS_OUT), ramp retrigger (1.2s cooldown), board-airborne-car (_enter_car guard
+  global_position.y<3.0 — is_on_floor was too strict, broke foot check), grant_weapon
+  ownership guard, lite shadow dist 80->55. Skipped ACES-on-web (gl_compat supports it;
+  confirmed running) + combo-callout tint (cosmetic). All 19 checks green. Web re-exported
+  with all features + fixes (pck ~3.6MB). Server http://192.168.68.54:8777 (phone).
+  Next options: deploy to shareable host, run summary/game-loop, more content.
 - Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
   looping pitch sound annoying).
 
