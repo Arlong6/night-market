@@ -136,6 +136,13 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
   confirmed running) + combo-callout tint (cosmetic). All 19 checks green. Web re-exported
   with all features + fixes (pck ~3.6MB). Server http://192.168.68.54:8777 (phone).
   Next options: deploy to shareable host, run summary/game-loop, more content.
+- CITY UPGRADE (2026-08-11): varied skyline — fp_buildings.make storeys now 8% skyscraper
+  (16-28), 20% mid (8-15), rest low (1-6); tall ones taper 80%. Palette 6->10 tones. Grid
+  30->34, BUILDING_CHANCE 0.28->0.36. _lite skips ~28% buildings. All 19 checks green.
+- DEPLOY: web re-exported with new city (pck 3.6MB). Package ready: build/web/ folder +
+  build/road-rage-web.zip (13MB, nothreads = any static host, no COOP/COEP). Publish needs
+  USER's account: recommend itch.io (upload zip, tick 'play in browser') or Netlify Drop
+  (drag build/web). Server still at http://192.168.68.54:8777 for LAN phone testing.
 - Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
   looping pitch sound annoying).
 
