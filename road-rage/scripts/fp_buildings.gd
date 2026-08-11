@@ -15,14 +15,14 @@ extends RefCounted
 
 const STOREY_H: float = 3.0          ## World height of one storey.
 const MIN_STOREYS: int = 1
-const MAX_STOREYS: int = 6
+const MAX_STOREYS: int = 28           ## skyscrapers reach this; most buildings are far lower
 const SETBACK_CHANCE: float = 0.40   ## Probability a building tiers inward as it rises.
 const SETBACK_FACTOR: float = 0.74   ## Each setback tier shrinks footprint to this fraction.
 const WINDOW_LIT_CHANCE: float = 0.62 ## Fraction of windows that glow warm at night.
 const MAX_WINDOW_COLS: int = 3        ## Cap window grid density (node-count budget).
 const MAX_WINDOW_ROWS_PER_TIER: int = 2
 
-## Body palette — concrete greys, brick reds, teal, tan.
+## Body palette — concrete greys, brick reds, teal, tan, plus modern glass/steel tones.
 const PALETTE: Array[Color] = [
 	Color("#5B5E66"),  # concrete grey
 	Color("#6E7178"),  # light concrete
@@ -30,6 +30,10 @@ const PALETTE: Array[Color] = [
 	Color("#A8533C"),  # terracotta
 	Color("#2F6E6A"),  # teal
 	Color("#B79B6A"),  # tan / sandstone
+	Color("#3A5A78"),  # glass blue (modern tower)
+	Color("#45484F"),  # dark steel
+	Color("#C8BCA6"),  # cream stone
+	Color("#4A5560"),  # blue-grey glass
 ]
 ## Contrasting trim-band colors keyed loosely off the body (cool vs warm).
 const TRIM_PALETTE: Array[Color] = [
@@ -50,11 +54,21 @@ const GLOW_DARK: Color = Color("#1A1C22")  ## Unlit window — dark glass.
 ## Build a finished building node. `footprint` is the ground width/depth
 ## (~TILE3D*0.82 ≈ 9.8). `rng` drives all variation deterministically.
 static func make(footprint: float, rng: RandomNumberGenerator) -> StaticBody3D:
-	var storeys: int = rng.randi_range(MIN_STOREYS, MAX_STOREYS)
+	# Varied skyline: mostly low blocks, a fifth mid-rise, a few skyscrapers.
+	var storeys: int
+	var tall_roll: float = rng.randf()
+	if tall_roll < 0.08:
+		storeys = rng.randi_range(16, MAX_STOREYS)   # skyscraper
+	elif tall_roll < 0.28:
+		storeys = rng.randi_range(8, 15)             # mid-rise tower
+	else:
+		storeys = rng.randi_range(MIN_STOREYS, 6)    # low block
 	var total_h: float = float(storeys) * STOREY_H
 	var body_color: Color = PALETTE[rng.randi_range(0, PALETTE.size() - 1)]
 	var trim_color: Color = TRIM_PALETTE[rng.randi_range(0, TRIM_PALETTE.size() - 1)]
-	var tiered: bool = storeys >= 3 and rng.randf() < SETBACK_CHANCE
+	# Taller buildings taper into iconic towers far more often.
+	var setback_p: float = 0.8 if storeys >= 8 else SETBACK_CHANCE
+	var tiered: bool = storeys >= 3 and rng.randf() < setback_p
 
 	var root := FPBuildingBody.new()   # collapsible on hard impact
 

@@ -612,6 +612,8 @@ func _add_streetlight(pos: Vector3) -> void:
 func _build_city() -> void:
 	var layout: Dictionary = CityGen.new().generate(_rng.randi())
 	for cell in layout["buildings"]:
+		if _lite and _rng.randf() < 0.28:
+			continue   # thin the skyline on web / mobile to hold framerate
 		_add_building(cell)
 	for p in layout["props"]:
 		_add_target(p["cell"], p["kind"], Vector3.ZERO)

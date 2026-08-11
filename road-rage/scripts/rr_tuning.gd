@@ -44,7 +44,7 @@ const POLICE_PER_STAR: int = 2             ## desired live cops = stars * this
 
 # City
 const TILE: int = 64                ## world units per grid cell
-const CITY_COLS: int = 30           ## bigger world
-const CITY_ROWS: int = 30
-const BUILDING_CHANCE: float = 0.28
+const CITY_COLS: int = 34           ## bigger world — larger urban sprawl
+const CITY_ROWS: int = 34
+const BUILDING_CHANCE: float = 0.36 ## denser blocks so it reads as a real city
 const PROP_CHANCE: float = 0.30     ## chance a non-building cell gets a prop
