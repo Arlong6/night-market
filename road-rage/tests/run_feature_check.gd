@@ -92,16 +92,15 @@ func _process(_delta: float) -> bool:
 		fire_ok = _m._walker._auto_fire != was
 	out.append("fire_mode_toggle=%s" % fire_ok)
 
-	# 9) Weapon ownership: shotgun is locked by default; a grant unlocks + switches.
+	# 9) All 4 weapons available from the start; switching works + stats differ.
 	var weap_ok: bool = false
 	if is_instance_valid(_m._walker):
-		_m._walker._set_weapon(2)               # locked -> should be ignored
-		var blocked: bool = _m._walker._weapon != 2
-		_m._walker.grant_weapon(2)              # pickup unlocks the shotgun
+		_m._walker.set_owned(_m._weapons_owned, 0)   # game grants all 4 by default
+		_m._walker._set_weapon(2)                    # shotgun
 		var wd = _m._walker._weapons[_m._walker._weapon]
-		weap_ok = blocked and _m._walker._weapon == 2 and int(wd["pellets"]) == 8
+		weap_ok = _m._walker._weapon == 2 and int(wd["pellets"]) == 8
 		_m._walker._set_weapon(0)
-	out.append("weapons[lock+grant=%s]" % weap_ok)
+	out.append("weapons[switch=%s]" % weap_ok)
 
 	# 10) Rocket launcher: once granted, firing spawns an FPRocket projectile.
 	var rocket_ok: bool = false
