@@ -600,6 +600,9 @@ func _add_streetlight(pos: Vector3) -> void:
 	head.mesh = hm
 	head.position = pos + Vector3(0.0, pole_height, 0.0)
 	add_child(head)
+	if _lite:
+		return   # web/mobile (gl_compatibility): skip the real light; the emissive head
+		         # still glows, and this frees the light budget so blasts can't overrun it
 	var light := OmniLight3D.new()
 	light.light_color = Color("#FFC062")
 	light.light_energy = 2.0
@@ -1229,7 +1232,7 @@ func _build_title() -> void:
 	# Music player — ready but silent until the start gesture (Web-audio safe).
 	_music = AudioStreamPlayer.new()
 	_music.stream = RRAudio.make_music_stream()
-	_music.volume_db = -16.0
+	_music.volume_db = -22.0   # quiet background pad; M toggles it off entirely
 	add_child(_music)
 
 func _mk_title_label(text: String, pos: Vector2, size: int, col: Color) -> void:

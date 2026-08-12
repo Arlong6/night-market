@@ -78,9 +78,12 @@ func explode() -> void:
 	queue_free()
 
 func _blast_fx(host: Node, at: Vector3) -> void:
+	# Web / mobile (gl_compatibility) chokes on extra dynamic lights + heavy particles —
+	# a point-blank blast could glitch or crash the WebGL context. Trim FX there.
+	var lite: bool = OS.has_feature("web") or OS.has_feature("mobile") or DisplayServer.is_touchscreen_available()
 	# Fireball particles.
 	var p := CPUParticles3D.new()
-	p.amount = 40
+	p.amount = 16 if lite else 40
 	p.lifetime = 0.8
 	p.one_shot = true
 	p.explosiveness = 1.0
@@ -102,17 +105,19 @@ func _blast_fx(host: Node, at: Vector3) -> void:
 	host.add_child(p)
 	p.global_position = at
 	p.emitting = true
-	# A brief flash light.
-	var light := OmniLight3D.new()
-	light.light_color = Color("#FFB060")
-	light.light_energy = 8.0
-	light.omni_range = RADIUS * 1.5
-	host.add_child(light)
-	light.global_position = at
-	var lt := light.create_tween()
-	lt.tween_property(light, "light_energy", 0.0, 0.35)
-	lt.tween_callback(func() -> void:
-		if is_instance_valid(light): light.queue_free())
+	# A brief flash light — skipped on gl_compatibility (web/mobile) where an extra
+	# dynamic light at point-blank can blow the light budget and crash the context.
+	if not lite:
+		var light := OmniLight3D.new()
+		light.light_color = Color("#FFB060")
+		light.light_energy = 8.0
+		light.omni_range = RADIUS * 1.5
+		host.add_child(light)
+		light.global_position = at
+		var lt := light.create_tween()
+		lt.tween_property(light, "light_energy", 0.0, 0.35)
+		lt.tween_callback(func() -> void:
+			if is_instance_valid(light): light.queue_free())
 	# Expanding shockwave ring on the ground — reads as a physical blast wave.
 	var ring := MeshInstance3D.new()
 	var torus := TorusMesh.new()
@@ -138,7 +143,7 @@ func _blast_fx(host: Node, at: Vector3) -> void:
 		if is_instance_valid(ring): ring.queue_free())
 	# Dark debris chunks flung outward and tumbling.
 	var d := CPUParticles3D.new()
-	d.amount = 26
+	d.amount = 10 if lite else 26
 	d.lifetime = 1.1
 	d.one_shot = true
 	d.explosiveness = 1.0

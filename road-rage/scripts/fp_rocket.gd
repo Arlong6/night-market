@@ -43,13 +43,15 @@ func _ready() -> void:
 	tip.mesh = tm
 	tip.position = Vector3(0.0, 0.0, -0.4)
 	add_child(tip)
-	# Glowing exhaust + smoke trail out the back (+Z local).
-	var glow := OmniLight3D.new()
-	glow.light_color = Color("#FFB060")
-	glow.light_energy = 2.4
-	glow.omni_range = 5.0
-	glow.position = Vector3(0.0, 0.0, 0.45)
-	add_child(glow)
+	# Glowing exhaust + smoke trail out the back (+Z local). The real light is skipped on
+	# web/mobile (gl_compatibility light budget) — the emissive tip + trail still glow.
+	if not (OS.has_feature("web") or OS.has_feature("mobile") or DisplayServer.is_touchscreen_available()):
+		var glow := OmniLight3D.new()
+		glow.light_color = Color("#FFB060")
+		glow.light_energy = 2.4
+		glow.omni_range = 5.0
+		glow.position = Vector3(0.0, 0.0, 0.45)
+		add_child(glow)
 	var trail := CPUParticles3D.new()
 	trail.amount = 22
 	trail.lifetime = 0.5
