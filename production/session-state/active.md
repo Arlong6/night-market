@@ -143,6 +143,13 @@ no HTML5/web export in this mode; a GL-compat-lite variant would be needed for w
   build/road-rage-web.zip (13MB, nothreads = any static host, no COOP/COEP). Publish needs
   USER's account: recommend itch.io (upload zip, tick 'play in browser') or Netlify Drop
   (drag build/web). Server still at http://192.168.68.54:8777 for LAN phone testing.
+- WEAPONS UNLOCKED + FIXES (2026-08-11/12): all 4 weapons owned from start (_weapons_owned
+  all true) — 3/4 were gated behind crates + gave no feedback (user confused). Blast-death
+  'crash/跳掉' = web gl_compat light budget: on _lite, explosions skip OmniLight + fewer
+  particles, streetlights skip OmniLight (emissive still glows), rocket glow skipped —
+  desktop was fine (repro respawns clean). Music: percussive loop -> calm ambient sine pad,
+  vol -16->-22, M toggles. All 19 checks green. Web re-exported. UNVERIFIED: on-device web
+  blast-death (can't run web here) — user must re-confirm on phone; music can't be auditioned.
 - Audio: procedural impact/explosion/gunshot. Engine drone DISABLED (user found the
   looping pitch sound annoying).
 
