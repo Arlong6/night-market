@@ -135,7 +135,9 @@ func _process(delta: float) -> void:
 		_ui_combo.visible = _combo.is_active() and _combo.multiplier() > 1
 		_ui_combo.text = "×%d 連擊!" % _combo.multiplier()
 	if _ui_speed and is_instance_valid(_car):
-		_ui_speed.text = "%d km/h" % int(_car.speed() * 3.6)
+		var vn: String = _car.kind_name()
+		_ui_speed.text = ("%s · %d km/h" % [vn, int(_car.speed() * 3.6)]) if vn != "" \
+				else "%d km/h" % int(_car.speed() * 3.6)
 	if _ui_firemode and _ui_firemode.visible and is_instance_valid(_walker):
 		var fm: String = "連發" if _walker._auto_fire else "單發"
 		_ui_firemode.text = "%s · %s  [1/2/3/4 換槍 · F]" % [_walker.weapon_name(), fm]
@@ -409,8 +411,12 @@ func _enter_car() -> void:
 	if own_d <= 8.0 and own_d <= nd and _car.global_position.y < 3.0:
 		_board_car()   # don't board a car that's mid-air (would strand the walker)
 	elif nearest != null and nd <= 8.0:
-		# Hijack: move our car onto that car's spot and remove it.
+		# Hijack: move our car onto that car's spot and remove it. The stolen
+		# vehicle's profile comes with it, so a bus drives like a bus from here on.
 		var pos: Vector3 = nearest.global_position
+		if nearest is FPTarget and not nearest.kind.is_empty():
+			_car.apply_kind(nearest.kind, nearest.box_color)
+			_callout("開走 %s！" % String(nearest.kind["name"]), Color("#7FD8FF"))
 		nearest.queue_free()
 		_car.global_position = pos + Vector3(0.0, 0.6, 0.0)
 		_car.velocity = Vector3.ZERO
@@ -924,12 +930,19 @@ func _spawn_landmarks() -> void:
 		sb.global_position = _world_pos(cells[i])
 		sb.connect("collapsed", _on_building_collapsed)
 
-func _add_target(cell: Vector2i, kind: String, drift: Vector3) -> void:
+func _add_target(cell: Vector2i, kind: String, drift: Vector3, veh: Dictionary = {}) -> void:
 	var t := FPTarget.new()
 	match kind:
 		"car":
-			t.value = RRTuning.SCORE_CAR; t.heat = RRTuning.HEAT_CAR
-			t.box_color = Color("#4A7AC8"); t.size = Vector3(2.4, 1.6, 4.2); t.min_speed = 4.0
+			# Every street vehicle is a row from FPVehicleKinds — a bus is worth more
+			# than a hatchback and hands the player very different handling if stolen.
+			var vk: Dictionary = veh if not veh.is_empty() else FPVehicleKinds.by_id("sedan")
+			var cols: Array = vk["colors"]
+			t.kind = vk
+			t.value = int(vk["value"]); t.heat = int(vk["heat"])
+			t.box_color = Color(String(cols[_rng.randi_range(0, cols.size() - 1)]))
+			t.size = vk["chassis"]; t.min_speed = 4.0
+			t.draw_box = false   # the catalogue draws the whole body, chassis included
 		"ped":
 			t.value = RRTuning.SCORE_PED; t.heat = RRTuning.HEAT_PED
 			t.box_color = Color("#E0B0A0"); t.size = Vector3(1.0, 2.0, 1.0); t.min_speed = 2.0
@@ -941,7 +954,7 @@ func _add_target(cell: Vector2i, kind: String, drift: Vector3) -> void:
 	add_child(t)
 	t.global_position = _world_pos(cell)
 	if kind == "car":
-		FPDecor.make_car_body(t, t.size, t.box_color)
+		FPVehicleKinds.build(t, t.kind, t.box_color)
 		t.add_to_group("vehicle")
 
 func _spawn_traffic(count: int) -> void:
@@ -950,8 +963,11 @@ func _spawn_traffic(count: int) -> void:
 		var lane: int = (_rng.randi_range(0, RRTuning.CITY_COLS / 4)) * 4
 		var along: int = _rng.randi_range(1, RRTuning.CITY_ROWS - 2)
 		var cell := Vector2i(lane, along) if on_x else Vector2i(along, lane)
-		var dir := Vector3(0, 0, _rng.randf_range(8.0, 16.0)) if on_x else Vector3(_rng.randf_range(8.0, 16.0), 0, 0)
-		_add_target(cell, "car", dir)
+		var vk: Dictionary = FPVehicleKinds.pick(_rng)
+		var sp: Array = vk["speed"]
+		var v: float = _rng.randf_range(float(sp[0]), float(sp[1]))   # buses crawl, sports cars fly
+		var dir := Vector3(0, 0, v) if on_x else Vector3(v, 0, 0)
+		_add_target(cell, "car", dir, vk)
 
 func _spawn_crowds(clusters: int) -> void:
 	for i in clusters:
@@ -1072,6 +1088,15 @@ func _on_smashed(value: int, heat: int, pos: Vector3) -> void:
 	_maybe_callout()
 	_refresh()
 
+## Flash a line of big centre-screen text. The mission/stunt sites set the same
+## three fields by hand; new callers should use this.
+func _callout(text: String, col: Color, dur: float = 1.3) -> void:
+	if _ui_callout == null:
+		return
+	_ui_callout.text = text
+	_ui_callout.modulate = col
+	_callout_t = dur
+
 func _maybe_callout() -> void:
 	var m: int = _combo.multiplier()
 	if m == _last_callout_mult:
@@ -1136,7 +1161,7 @@ func _build_hud() -> void:
 	_ui_hp_fill.size = Vector2(200, 16)
 	_ui_hp_fill.color = Color("#4ADE6A")
 	ui.add_child(_ui_hp_fill)
-	_ui_speed = _mk_label(ui, Vector2(740, 500), 22, Color("#A0D0FF"))
+	_ui_speed = _mk_label(ui, Vector2(700, 472), 22, Color("#A0D0FF"))   # clear of the hint line
 	var hint := _mk_label(ui, Vector2(20, 508), 15, Color("#B8C0CC"))
 	hint.text = "車:WASD 開 Shift 氮氣 空白 手煞 J/左鍵 掃射 · E 上下車 · 步行:WASD 移動 滑鼠 瞄準 J/左鍵 射擊 1/2/3/4 換槍 F 單發連發 Shift 衝刺 空白 跳 · T 日夜 · V 天氣"
 	_ui_callout = _mk_label(ui, Vector2(0.0, 188.0), 46, Color("#FF9020"))
@@ -1282,8 +1307,17 @@ func _toggle_music() -> void:
 		_music.stop()
 
 # ── Touch controls (mobile / web) ────────────────────────────────────────────
+## True for targets that need the cheap render path: any browser (WebGL2 is far
+## weaker than native Metal) and any mobile build. Drives `_lite`, NOT the on-screen
+## controls — a desktop browser is "lite" but has a keyboard.
 func _is_touch() -> bool:
 	return DisplayServer.is_touchscreen_available() or OS.has_feature("web") or OS.has_feature("mobile")
+
+## True only where fingers are the actual input. Desktop Chrome reports no
+## touchscreen, so the joystick and buttons stay off the screen there instead of
+## covering a third of the view for a player who is using WASD.
+func _has_touchscreen() -> bool:
+	return DisplayServer.is_touchscreen_available() or OS.has_feature("mobile")
 
 func _build_touch() -> void:
 	var layer := CanvasLayer.new()
@@ -1292,8 +1326,9 @@ func _build_touch() -> void:
 	_ui_touch = FPTouch.new()
 	_ui_touch.game = self
 	layer.add_child(_ui_touch)
-	# Inert on desktop (no touch events fire there); shown on touch/web or when forced.
-	_ui_touch.visible = _is_touch() or _force_touch
+	# Built everywhere, but only shown where fingers are the input. FPTouch also
+	# reveals itself if a real touch event turns up on a device that under-reported.
+	_ui_touch.visible = _has_touchscreen() or _force_touch
 
 ## Aim from a touch drag (delta already in radians): yaw+pitch on foot, look in car.
 func touch_look(delta: Vector2) -> void:

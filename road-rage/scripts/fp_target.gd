@@ -13,6 +13,10 @@ signal smashed(value: int, heat: int, pos: Vector3)
 ## Non-zero for "traffic" — the box drifts and ping-pongs over this travel range.
 @export var drift: Vector3 = Vector3.ZERO
 @export var drift_range: float = 60.0
+## Vehicles draw their own chassis via FPVehicleKinds.build(), so the plain box is
+## suppressed for them; `kind` is the catalogue row the player inherits on a carjack.
+@export var draw_box: bool = true
+var kind: Dictionary = {}
 
 var _broke: bool = false
 var _mesh: MeshInstance3D = null
@@ -26,15 +30,16 @@ func _ready() -> void:
 	shape.size = size
 	col.shape = shape
 	add_child(col)
-	_mesh = MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = size
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = box_color
-	bm.material = mat
-	_mesh.mesh = bm
-	_mesh.position = Vector3(0.0, size.y * 0.5, 0.0)  # sit on the ground
-	add_child(_mesh)
+	if draw_box:
+		_mesh = MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = size
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = box_color
+		bm.material = mat
+		_mesh.mesh = bm
+		_mesh.position = Vector3(0.0, size.y * 0.5, 0.0)  # sit on the ground
+		add_child(_mesh)
 	_origin = global_position
 	add_to_group("blastable")
 	body_entered.connect(_on_body_entered)

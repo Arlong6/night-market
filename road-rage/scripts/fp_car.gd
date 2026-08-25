@@ -20,6 +20,43 @@ var _engine_started: bool = false
 var _trauma: float = 0.0   ## impact/explosion camera-shake energy (decays each frame)
 var active: bool = true   ## false when the player has stepped out (car parks)
 
+## The vehicle currently being driven (a row from FPVehicleKinds). Carjacking swaps
+## this, which is the whole point of the vehicle catalogue: a stolen bus is slow to
+## wind up and hopeless in a corner, a stolen sports car is neither.
+var kind: Dictionary = {}
+var _visual: Node3D = null      ## holder for the body meshes — freed wholesale on a swap
+var _body_color: Color = Color(0.0, 0.0, 0.0, 0.0)   ## transparent = use the kind's own paint
+var _col: CollisionShape3D = null
+var _accel_mul: float = 1.0
+var _top_mul: float = 1.0
+var _turn_mul: float = 1.0
+var _grip_mul: float = 1.0
+var _mass_mul: float = 1.0      ## heavier = brakes worse, but shrugs through buildings
+
+## Top speed of the vehicle currently being driven.
+func max_speed() -> float:
+	return MAX_SPEED * _top_mul
+
+## The name shown on the HUD ("轎車", "公車", ...).
+func kind_name() -> String:
+	return String(kind.get("name", "")) if not kind.is_empty() else ""
+
+## Take on a vehicle from the catalogue: its handling, its body, its footprint.
+## Safe to call before the camera and muzzle exist (during _ready).
+## `body_color` paints the body; leave it transparent to use the kind's own first
+## colour. Carjacking passes the stolen car's paint so the swap reads instantly.
+func apply_kind(k: Dictionary, body_color: Color = Color(0.0, 0.0, 0.0, 0.0)) -> void:
+	kind = k
+	_body_color = body_color
+	var d: Dictionary = k.get("drive", {})
+	_accel_mul = float(d.get("accel", 1.0))
+	_top_mul = float(d.get("top", 1.0))
+	_turn_mul = float(d.get("turn", 1.0))
+	_grip_mul = float(d.get("grip", 1.0))
+	_mass_mul = float(d.get("mass", 1.0))
+	_rebuild_visual()
+	_fit_body()
+
 ## Feed camera-shake energy in (0..1 range per hit). Used for crashes/explosions.
 func add_trauma(amt: float) -> void:
 	_trauma = minf(1.2, _trauma + amt)
@@ -38,13 +75,9 @@ func launch(v: float) -> void:
 
 func _ready() -> void:
 	up_direction = Vector3.UP
-	var col := CollisionShape3D.new()
-	var box := BoxShape3D.new()
-	box.size = Vector3(3.2, 1.7, 6.6)
-	col.shape = box
-	col.position = Vector3(0.0, 0.85, 0.0)
-	add_child(col)
-	_build_car_visual()
+	_col = CollisionShape3D.new()
+	_col.shape = BoxShape3D.new()
+	add_child(_col)
 	# Third-person chase camera: behind (+Z, since the car faces -Z) and above,
 	# pulled back, with a slight downward tilt. Rigidly parented so it follows turns.
 	_cam = Camera3D.new()
@@ -73,73 +106,39 @@ func _ready() -> void:
 	_engine.stream = RRAudio.make_engine_stream()
 	_engine.volume_db = -24.0   ## much quieter — engine drone was too loud
 	add_child(_engine)
+	# Everything the body/camera/collider depend on now exists, so take the wheel.
+	apply_kind(FPVehicleKinds.player_default())
 
-func _build_car_visual() -> void:
-	var body_mat := StandardMaterial3D.new()
-	body_mat.albedo_color = Color("#D8482A")
-	body_mat.metallic = 0.35
-	body_mat.roughness = 0.45
-	var chassis := MeshInstance3D.new()
-	var cm := BoxMesh.new()
-	cm.size = Vector3(3.2, 1.0, 6.6)
-	cm.material = body_mat
-	chassis.mesh = cm
-	chassis.position = Vector3(0.0, 0.68, 0.0)
-	add_child(chassis)
-	# Cabin
-	var cabin := MeshInstance3D.new()
-	var cab := BoxMesh.new()
-	cab.size = Vector3(2.7, 1.0, 3.0)
-	var cab_mat := StandardMaterial3D.new()
-	cab_mat.albedo_color = Color("#BE3C20")
-	cab_mat.metallic = 0.35
-	cab_mat.roughness = 0.45
-	cab.material = cab_mat
-	cabin.mesh = cab
-	cabin.position = Vector3(0.0, 1.7, 0.45)
-	add_child(cabin)
-	# Windshield (front = -Z)
-	var glass := MeshInstance3D.new()
-	var gm := BoxMesh.new()
-	gm.size = Vector3(2.5, 0.85, 0.2)
-	var gmat := StandardMaterial3D.new()
-	gmat.albedo_color = Color("#243040")
-	gmat.metallic = 0.7
-	gmat.roughness = 0.1
-	gm.material = gmat
-	glass.mesh = gm
-	glass.position = Vector3(0.0, 1.7, -1.1)
-	add_child(glass)
-	# Headlights (front), emissive
-	var hl_mat := StandardMaterial3D.new()
-	hl_mat.albedo_color = Color("#FFF6C0")
-	hl_mat.emission_enabled = true
-	hl_mat.emission = Color("#FFE890")
-	hl_mat.emission_energy_multiplier = 2.0
-	for sx in [-1.05, 1.05]:
-		var hl := MeshInstance3D.new()
-		var hm := BoxMesh.new()
-		hm.size = Vector3(0.6, 0.35, 0.2)
-		hm.material = hl_mat
-		hl.mesh = hm
-		hl.position = Vector3(sx, 0.7, -3.35)
-		add_child(hl)
-	# Wheels (cylinders laid on their side — axis along X)
-	var wheel_mat := StandardMaterial3D.new()
-	wheel_mat.albedo_color = Color("#18181C")
-	wheel_mat.roughness = 0.9
-	for wx in [-1.7, 1.7]:
-		for wz in [-2.2, 2.2]:
-			var w := MeshInstance3D.new()
-			var wm := CylinderMesh.new()
-			wm.top_radius = 0.72
-			wm.bottom_radius = 0.72
-			wm.height = 0.5
-			wm.material = wheel_mat
-			w.mesh = wm
-			w.rotation_degrees = Vector3(0.0, 0.0, 90.0)
-			w.position = Vector3(wx, 0.6, wz)
-			add_child(w)
+## Rebuild the body from `kind`. Everything lives under one holder so swapping
+## vehicles is "free the holder, build again" rather than hunting loose meshes.
+func _rebuild_visual() -> void:
+	if _visual != null and is_instance_valid(_visual):
+		_visual.queue_free()
+	_visual = Node3D.new()
+	add_child(_visual)
+	var cols: Array = kind.get("colors", ["#D8482A"])
+	var col: Color = _body_color if _body_color.a > 0.0 else Color(String(cols[0]))
+	FPVehicleKinds.build(_visual, kind, col)
+
+## Resize the collision box, pull the chase camera back and lift the mounted gun
+## to match the vehicle's footprint — otherwise a bus swallows the camera and a
+## sports car is viewed from orbit.
+func _fit_body() -> void:
+	var size: Vector3 = kind.get("chassis", Vector3(3.2, 1.0, 6.6))
+	var cab_h: float = float((kind.get("cabin", [0.84, 1.0, 0.45, 0.07]))[1])
+	var h: float = (size.y + cab_h) * 0.85
+	if _col != null:
+		var box := _col.shape as BoxShape3D
+		if box != null:
+			box.size = Vector3(size.x, h, size.z)
+		_col.position = Vector3(0.0, h * 0.5, 0.0)
+	if _cam != null:
+		# Longer vehicle -> further back and a touch higher, clamped so a compact
+		# does not glue the camera to the bumper.
+		var d: float = clampf((size.z - 6.6) * 0.9, -2.5, 3.5)
+		_cam.position = Vector3(0.0, 8.0 + maxf(0.0, d) * 0.38, 16.5 + d)
+	if _car_muzzle != null:
+		_car_muzzle.position = Vector3(0.0, h * 0.5, -size.z * 0.545)
 
 func focus_camera() -> void:
 	if _cam:
@@ -236,16 +235,16 @@ func _physics_process(delta: float) -> void:
 	# Invert steering while reversing so it feels natural (like backing up looking over your shoulder).
 	var steer_input: float = (-steer if throttle < 0.0 else steer)
 	if sp > 0.5:
-		rotate_y(-steer_input * TURN_RATE * delta * clampf(sp / MAX_SPEED, 0.25, 1.0))
+		rotate_y(-steer_input * TURN_RATE * _turn_mul * delta * clampf(sp / max_speed(), 0.25, 1.0))
 	var forward: Vector3 = -global_transform.basis.z
 	var h := Vector3(velocity.x, 0.0, velocity.z)
 	var boosting: bool = Input.is_action_pressed("nitro") and throttle > 0.0
 	if Input.is_action_pressed("handbrake"):
-		h = h.move_toward(Vector3.ZERO, BRAKE_DECEL * delta)
+		h = h.move_toward(Vector3.ZERO, BRAKE_DECEL / _mass_mul * delta)   # weight fights the brakes
 	elif throttle > 0.0:
-		h += forward * ACCEL * (2.0 if boosting else 1.0) * delta
+		h += forward * ACCEL * _accel_mul * (2.0 if boosting else 1.0) * delta
 	elif throttle < 0.0:
-		h += -forward * REVERSE_SPEED * delta
+		h += -forward * REVERSE_SPEED * _top_mul * delta
 	else:
 		var fr: float = FRICTION * delta
 		if h.length() <= fr:
@@ -258,8 +257,8 @@ func _physics_process(delta: float) -> void:
 		# Grip toward the car's travel axis — forward OR backward, whichever it's
 		# actually moving — so it stays planted without fighting reverse.
 		var travel_sign: float = (1.0 if h.dot(forward) >= 0.0 else -1.0)
-		h = h.lerp(forward * travel_sign * h.length(), clampf(GRIP * delta, 0.0, 1.0))
-	h = h.limit_length(MAX_SPEED * (1.55 if boosting else 1.0))
+		h = h.lerp(forward * travel_sign * h.length(), clampf(GRIP * _grip_mul * delta, 0.0, 1.0))
+	h = h.limit_length(max_speed() * (1.55 if boosting else 1.0))
 	velocity.x = h.x
 	velocity.z = h.z
 	if is_on_floor():
@@ -279,7 +278,8 @@ func _physics_process(delta: float) -> void:
 	if active and _gun_cd <= 0.0 and Input.is_action_pressed("fire"):
 		_car_fire()
 	# Smash through buildings when ramming them fast enough.
-	if speed() > 18.0:
+	# A heavier vehicle shoulders through a wall at a speed a hatchback would bounce off.
+	if speed() > 18.0 / _mass_mul:
 		for i in get_slide_collision_count():
 			var other := get_slide_collision(i).get_collider()
 			if other != null:
@@ -288,7 +288,7 @@ func _physics_process(delta: float) -> void:
 				elif other.has_method("ram_wreck"):
 					other.ram_wreck()
 	# ── Speed feel ──
-	var frac: float = clampf(speed() / MAX_SPEED, 0.0, 1.0)
+	var frac: float = clampf(speed() / max_speed(), 0.0, 1.0)
 	_trauma = maxf(0.0, _trauma - delta * 1.8)   # shake energy bleeds off fast
 	if _cam != null:
 		var t2: float = _trauma * _trauma        # quadratic: sharp on impact, calm tail

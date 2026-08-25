@@ -57,6 +57,8 @@ func _notification(what: int) -> void:
 # ── Touch handling ───────────────────────────────────────────────────────────
 func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
+		if not visible:
+			visible = true   # a real finger arrived on a device that under-reported touch
 		if event.pressed:
 			_on_press(event.index, event.position)
 		else:
@@ -154,7 +156,10 @@ func _draw() -> void:
 		draw_circle(b["pos"], float(b["r"]), col)
 		draw_arc(b["pos"], float(b["r"]), 0.0, TAU, 28, Color(1, 1, 1, 0.4), 2.0)
 		var lbl := String(b["label"])
-		var fnt := ThemeDB.fallback_font
+		# NOT ThemeDB.fallback_font: on Web that font carries no CJK glyphs, so every
+		# label rendered as tofu boxes. get_theme_default_font() resolves through the
+		# project theme, which bundles jf-openhuninn (the same font the HUD uses).
+		var fnt := get_theme_default_font()
 		var fs := 20
 		var w := fnt.get_string_size(lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		draw_string(fnt, b["pos"] + Vector2(-w * 0.5, 7.0), lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1, 1, 1, 0.92))

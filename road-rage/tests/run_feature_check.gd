@@ -186,7 +186,17 @@ func _process(_delta: float) -> bool:
 		var w0: int = _m._walker._weapon
 		_m.cycle_weapon()
 		cyc_ok = _m._walker._weapon != w0
-	out.append("touch[built=%s look=%s cycle=%s]" % [touch_built, look_ok, cyc_ok])
+	# The button labels are drawn manually, so prove the font they draw with actually
+	# has CJK glyphs (ThemeDB.fallback_font does not on Web — it rendered tofu boxes),
+	# and that the overlay stays off a desktop screen where the player has a keyboard.
+	var font_cjk: bool = false
+	if _m._ui_touch != null:
+		var f: Font = _m._ui_touch.get_theme_default_font()
+		font_cjk = f != null and f.has_char("射".unicode_at(0)) and f.has_char("換".unicode_at(0))
+	var desktop_hidden: bool = (_m._ui_touch != null) and (not _m._ui_touch.visible) \
+			and (not DisplayServer.is_touchscreen_available())
+	out.append("touch[built=%s look=%s cycle=%s font_cjk=%s desktop_hidden=%s]"
+			% [touch_built, look_ok, cyc_ok, font_cjk, desktop_hidden])
 
 	# 17) Ramps spawned + car.launch() arms an upward kick (stunt jumps).
 	var ramp_count: int = 0
@@ -223,6 +233,37 @@ func _process(_delta: float) -> bool:
 		_m._manage_gangs()
 		turf_ok = flagged and _m._gangs.size() == 6
 	out.append("turf[swarm6=%s]" % turf_ok)
+
+	# 20) Vehicle kinds: the street runs a mix, and carjacking one hands the player
+	#     that vehicle's handling — a stolen bus must be slower and clumsier than the
+	#     car we started in, not a reskin.
+	var kinds_n: int = FPVehicleKinds.traffic_kind_count()
+	var seen: Dictionary = {}
+	for v in _m.get_tree().get_nodes_in_group("vehicle"):
+		if is_instance_valid(v) and v is FPTarget and not v.kind.is_empty():
+			seen[String(v.kind["id"])] = true
+	var base_top: float = _m._car.max_speed()
+	var base_turn: float = _m._car._turn_mul
+	# Park a bus next to the player on foot, then take it.
+	_m._board_car()
+	_m._exit_car()
+	var bus: Dictionary = FPVehicleKinds.by_id("bus")
+	_m._add_target(Vector2i(9, 9), "car", Vector3.ZERO, bus)
+	var bus_node = null
+	for v in _m.get_tree().get_nodes_in_group("vehicle"):
+		if is_instance_valid(v) and v is FPTarget and String(v.kind.get("id", "")) == "bus":
+			bus_node = v
+	var jack_ok: bool = false
+	var bus_name: String = ""
+	if bus_node != null and is_instance_valid(_m._walker):
+		_m._walker.global_position = bus_node.global_position + Vector3(2.0, 0.0, 0.0)
+		_m._car.global_position = bus_node.global_position + Vector3(500.0, 0.0, 0.0)
+		_m._enter_car()
+		bus_name = _m._car.kind_name()
+		jack_ok = _m._car.max_speed() < base_top and _m._car._turn_mul < base_turn \
+				and bus_name == "公車"
+	out.append("vehicles[kinds=%d on_street=%d jacked=%s name=%s top=%.1f->%.1f]"
+			% [kinds_n, seen.size(), jack_ok, bus_name, base_top, _m._car.max_speed()])
 
 	print("FEATURE_CHECK " + " ".join(out))
 	return true
