@@ -11,7 +11,7 @@ Hooks are configured in `.claude/settings.json` and fire automatically:
 | `detect-gaps.sh` | SessionStart | Session begins | Detects fresh projects (suggests /start) and missing documentation when code/prototypes exist, suggests /reverse-document or /project-stage-detect |
 | `pre-compact.sh` | PreCompact | Context compression | Dumps session state (active.md, modified files, WIP design docs) into conversation before compaction so it survives summarization |
 | `post-compact.sh` | PostCompact | After compaction | Reminds Claude to restore session state from `active.md` checkpoint |
-| `notify.sh` | Notification | Notification event | Shows Windows toast notification via PowerShell |
+| `notify.sh` | Notification | Notification event | Shows a native desktop notification (macOS via osascript; Windows via PowerShell; no-op elsewhere) |
 | `session-stop.sh` | Stop | Session ends | Summarizes accomplishments and updates session log |
 | `log-agent.sh` | SubagentStart | Agent spawned | Audit trail start — logs subagent invocation with timestamp |
 | `log-agent-stop.sh` | SubagentStop | Agent stops | Audit trail stop — completes subagent record |
