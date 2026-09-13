@@ -224,6 +224,422 @@ constants:
     added: 2026-05-29
     revised: ""
 
+  # ── 大夜班 (Night Shift) ──
+  - name: reconnect_window_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 大廳 UI GDD (倒數顯示), HUD GDD (隊友名牌灰化)
+    value: 30
+    unit: seconds
+    notes: "斷線後保留 slot 的窗口；逾時或班次結束先到者釋放。Tuning range 10-90。邊界 t≤W 視為窗口內。POST-MVP（斷線基本保障才是 MVP）。**約束④（r4 修正）：reconnect_window_sec + heartbeat_timeout_sec ≤ Relay allocation idle timeout**（原約束漏計 T_detect——拔線情境下服務端會比 W 早 8s 釋放；預設需 idle timeout ≥38s）。假設 P-2／P-9 未驗證。"
+    added: 2026-09-04
+    revised: ""
+
+  - name: max_players
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 波次導演 GDD (縮放), 大廳 UI GDD, 客人系統 GDD
+    value: 4
+    unit: players
+    notes: "**MVP=2、VS 起=4，其餘鎖定**（r4 修正語義：原標「鎖定」但實際在里程碑間取兩個值，與 AC8 的分層、公式④的 online_player_count 1-4 矛盾）。改動需重新平衡波次密度與店內空間（支柱 3）。**r4 釐清：本值的執行點是 MPS join（服務端 SessionOptions.MaxPlayers），在 NGO connection approval 之前**，判定依據是 session_member_count 而非 online_player_count——兩者在斷線期間本來就不相等。斷線者的名額須由 Host 主動呼叫 host-side 成員移除 API 釋放（#24a，假設 P-10），否則 AC33／AC36 會撞 AC8。"
+    added: 2026-09-04
+    revised: 2026-09-06
+
+  - name: join_time_budget_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 大廳 UI GDD, /ux-design lobby flow
+    value: 60
+    unit: seconds
+    notes: "支柱「開連結就開玩」硬標（冷啟動→可操作）。設計目標 45s（load≤25+lobby≤10+spawn≤10；r3 重算：標準網路 20Mbps 下 50MB 多資源載入需 20s 以上）。每分段須單獨量測（AC7a）。"
+    added: 2026-09-04
+    revised: 2026-09-06
+
+  - name: interact_rtt_p95_ms
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 機台互動組 GDD (手感預算), 攜帶與交付 GDD
+    value: 300
+    unit: milliseconds
+    notes: "按下互動→收到成功/撲空結果的 P95 上限；逾時須顯示等待狀態。"
+    added: 2026-09-04
+    revised: ""
+
+  - name: player_count_sampling
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 波次導演 GDD (必須遵守), 客人系統 GDD
+    value: wave_boundary_join_immediate_leave
+    unit: rule
+    notes: "非對稱取樣：加入走波次邊界（不中途變難）；離線立即重新取樣並降載（保護留守者）。僅計在線玩家，重連保留中的 slot 不計入。"
+    added: 2026-09-04
+    revised: 2026-09-05
+
+  - name: grace_window_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 波次導演 GDD (必須實作), 客人系統 GDD (耐心倍率)
+    value: 15
+    unit: seconds
+    notes: "玩家離線後的寬限期：不生成新客人、場上客人耐心 ×patience_mult。Tuning **= heartbeat_timeout_sec 到 30**（下界隨 timeout 浮動，不是固定的 8）（r4 修正：原 0-30，但約束⑥要求嚴格 >0，且新約束⑩要求 ≥ heartbeat_timeout_sec——拔線後 Host 要 6-8s 才判定，留守者在判定前完全沒有保護，若 grace < timeout 則裸撐窗口會佔滿整個寬限期）。支柱「沒有人在等」對留守者的保障。r3：寬限期內任一玩家加入完成即立即結束（堵退出→重連刷寬限漏洞）。**r4 新增 #15a**：同一玩家同一班次內第 2 次起的離線仍即時降載，但**不再觸發寬限期**（arlong 裁決，防「用 alt-tab 調低難度」）。"
+    added: 2026-09-05
+    revised: 2026-09-06
+
+  - name: patience_mult
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 客人系統 GDD (耐心倍率套用), 波次導演 GDD
+    value: 1.5
+    unit: multiplier
+    notes: "寬限期內場上客人耐心倍率。Tuning **1.01-2.0**（r4 修正：原 1.0-2.0，而約束⑥要求**嚴格** >1.0——1.0 是關閉旗標，不該列在安全範圍內）。固定不疊乘。#15a 抑制生效時不套用。"
+    added: 2026-09-06
+    revised: ""
+
+  - name: settlement_timeout_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 結算畫面 GDD
+    value: 20
+    unit: seconds
+    notes: "Settlement 畫面全員未確認時的自動放行秒數，到期視為全員確認進 Lobby。Tuning 10-60。"
+    added: 2026-09-06
+    revised: ""
+
+  - name: claim_lock_timeout_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 機台互動組 GDD
+    value: 5
+    unit: seconds
+    notes: "互動 claim 未獲 Host 回應的強制解鎖時限；逾時後抵達的原請求以 lock 世代編號拒絕。Tuning 2-10。"
+    added: 2026-09-05
+    revised: ""
+
+  - name: late_join_cutoff_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 大廳 UI GDD, 波次導演 GDD
+    value: 30
+    unit: seconds
+    notes: "班次剩餘 ≤此值即鎖 join，加入者導向 Lobby*（前一班進行中）。Tuning **20-60**（r4 修正：原 0-60，而約束⑦要求 ≥ 更衣室上限(5) + min_meaningful_play_sec(15)＝20；原約束只寫 ≥5 是必要非充分）。**r4：判定的唯一執行點＝Host 的 ConnectionApprovalCallback**（server-authoritative，讀 Host 權威的 shift_end_ts）——原寫「client 點擊瞬間判一次」不可實作，當下 client 尚無 session 也無 NGO 連線。假設 P-17。"
+    added: 2026-09-05
+    revised: ""
+
+  - name: heartbeat_interval_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: HUD GDD (ping 顯示), /create-architecture (session 層 ADR)
+    value: 2
+    unit: seconds
+    notes: "app-level 心跳，Host↔client 雙向每 2s 一拍。Tuning 1-5。逾時須為間隔整數倍。"
+    added: 2026-09-05
+    revised: ""
+
+  - name: heartbeat_timeout_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 波次導演 GDD (留守者降載起算點), 機台互動組 GDD (站台解鎖起算點)
+    value: 8
+    unit: seconds
+    notes: "連續 8s 未收到心跳即判定斷線＝公式① t_disconnect。必須 > background_disconnect_threshold_sec(5)，否則 catch-up 分支走不到。Tuning **= k × heartbeat_interval_sec，k 為整數 ≥3，且 > background_disconnect_threshold_sec + heartbeat_interval_sec，且 ≤30**（r4 修正：原寫連續區間 6-15，但該區間內 6/7/9/11/13/15 在預設 interval=2 下全部不可用——安全範圍必須是公式而非固定區間）。新約束⑩：grace_window_sec ≥ 本值（否則留守者在判定前完全沒有保護）。r4：心跳運行範圍改為「NGO 連線存在期間」（含 Onboarding／Settlement），非僅 InShift。假設 P-9：NGO/Relay 內建逾時須 ≥ 此值。"
+    added: 2026-09-05
+    revised: ""
+
+  - name: background_disconnect_threshold_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 遊戲時鐘 GDD
+    value: 5
+    unit: seconds
+    notes: "分頁背景（visibilitychange 量測，時間源為 .jslib 的 performance.now()）時長 ≤此值（含端點）走顯示層 catch-up，>此值視同斷線（client 依 #17a 主動 teardown）。僅 InShift 適用。Tuning 2-5（r4 修正：原 2-10，但 threshold=10 代入公式③得 rate=6.0×，違反「不瞬移」鐵律，見約束⑪）。約束②③：必須 < heartbeat_timeout_sec − heartbeat_interval_sec。假設 P-7。"
+    added: 2026-09-05
+    revised: 2026-09-13
+
+  # ── r4 新增常數（2026-09-13）──
+  - name: shift_length_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 遊戲時鐘 GDD (最終值), 波次導演 GDD, 結算畫面 GDD
+    value: 480
+    unit: seconds
+    notes: "一個班次的長度，shift_end_ts 的初值（shift_end_ts = 建立時刻 + 本值）。r4 新增：此常數先前不存在，但 #9／#21／公式①／AC5／AC13a／AC19／AC35 全部依賴它。暫定 480s（8 分鐘，concept 寫 8-10 分鐘）；**最終值歸遊戲時鐘＋波次導演 GDD**（見 netcode GDD 交棒事項）。注意：end_shift_early 直接改寫 shift_end_ts，因此真相是 shift_end_ts 而非本值加總。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: relay_disconnect_propagation_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+    value: 2
+    unit: seconds
+    notes: "Relay 偵測到某端 socket 斷開並傳播給其餘 client 的延遲上限。r4 新增：同一機制先前在全文以 1s／2s／5s／10s 四種數字現形（AC16／公式①＋P-8／AC6a／AC6b＋AC28），從未具名。公式①的 T_detect 下界＝本值（**不是 0**——Relay 架構下 client 與 Host 之間沒有直接 socket）。假設 P-8，原型回填。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: disconnect_cleanup_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 機台互動組 GDD, 攜帶與交付 GDD, 波次導演 GDD
+    value: 2
+    unit: seconds
+    notes: "Host 判定斷線後完成 #24 全序列（凍結輸入→掉落→解鎖→roster→despawn avatar→釋放 MPS 名額→重取樣）的 SLA，自**判定時刻**起算。r4 新增：被 AC10／AC11／AC13a／AC27 引用卻從未登錄。Tuning 1-3。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: ui_feedback_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 大廳 UI GDD, HUD GDD
+    value: 1
+    unit: seconds
+    notes: "玩家操作到畫面回饋的上限。r4 新增：被 AC2／AC13a／AC37a 引用卻從未登錄。Tuning 0.5-2。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: session_end_graceful_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+    value: 5
+    unit: seconds
+    notes: "Host 優雅關閉（close frame 送達）時全員收到局終的上限，AC6a。假設 P-13：若 close frame 不可靠，AC6a 降為 Nice-to-have，session_end_worstcase_sec 成為唯一硬指標。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: session_end_worstcase_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+    value: 12
+    unit: seconds
+    notes: "Host 以任何路徑離開時全員收到局終的保底上限（AC6b／AC13b／AC28，MVP 必達）。= heartbeat_timeout_sec(8) + heartbeat_interval_sec(2) + relay_disconnect_propagation_sec(2)。r4 修正：原寫 10s，餘裕為 0，加上 AC27 自己的判定區間即破。假設 P-14。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: load_stall_timeout_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: /ux-design cold-start template
+    value: 10
+    unit: seconds
+    notes: "冷啟動時「下載位元組數無增長」達此秒數即判定 stall，進 LoadFailed（#27／AC48）。**不是總時長逾時**——節流網路下 T_load≈80s 是公式⑤自承的預期常態，總時長逾時會誤判正常的慢速下載。Tuning 5-20。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: min_meaningful_play_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+    value: 15
+    unit: seconds
+    notes: "「進場後至少還能玩多久才值得進場」。約束⑦的組成：late_join_cutoff_sec ≥ 更衣室上限(5) + 本值。r4 新增理由：原約束只寫 ≥5s 是必要非充分——取 cutoff=5 時剩 5.1s 點擊仍會「進場即結算」。Tuning 10-30。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: catchup_duration_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 遊戲時鐘 GDD
+    value: 2
+    unit: seconds
+    notes: "顯示層 catch-up 的線性追平時長，公式③的分母（rate = 1 + T_bg / 本值）。r4 新增：被 AC15／AC29 直接驗收卻從未登錄。Tuning 1-3。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: npc_event_min_interval_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 客人系統 GDD
+    value: 0.2
+    unit: seconds
+    notes: "同一 NPC 兩次 milestone 事件的最小間隔（頻寬保護）。AC25。Tuning 0.1-0.5。約束⑨：npc_milestone_catchup_sec 必須 ≤ 本值。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: npc_milestone_catchup_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 客人系統 GDD
+    value: 0.2
+    unit: seconds
+    notes: "client 收到堆積 milestone 時只套用最新一筆並於本秒數內內插補位。r4 修正：原 0.3s > npc_event_min_interval_sec(0.2)，補位永遠被下一筆事件打斷，兩常數互斥（約束⑨）。AC15／AC24。假設 P-12。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: network_tick_rate
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+    value: 10
+    unit: hz
+    notes: "玩家 NetworkTransform 同步頻率。Tuning 10-30。**約束⑧**：2 × (1/本值) + RTT + 處理時間 ≤ interact_rtt_p95_ms。假設 P-3：若證實為 NetworkManager 全域 tick，RPC/NetworkVariable 按 tick 批次，往返多 200ms → AC22（300ms）立刻不可達，須拉高本值。r4：原三欄表宣稱由 AC23 驗收為假引用（AC23 測插值平滑度），已新增 AC46。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: interpolation_buffer_ms
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 第一人稱控制器 GDD
+    value: 150
+    unit: milliseconds
+    notes: "NetworkTransform 插值緩衝時長，建議 ≥1.5 × tick 間隔。AC23。r4 新增：AC23 的判準先前缺此常數而無法執行。Tuning 100-300。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: clock_display_interval_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: HUD GDD, 遊戲時鐘 GDD
+    value: 1
+    unit: seconds
+    notes: "班次倒數的**本地顯示**更新節奏，**不產生網路流量**。r4 更名（原「時鐘同步間隔」）：r3 的三處數字衝突（總表 1s／旋鈕 1s／Interactions 表 60s resync）是命名碰撞——前兩者指本地顯示，後者指網路校時。網路校時通道已刪除，offset 改掛在 2s 心跳上。AC45。Tuning 0.5-5。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: clock_offset_tolerance_ms
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 遊戲時鐘 GDD
+    value: 100
+    unit: milliseconds
+    notes: "client↔Host 時鐘 offset 的收斂精度目標（由 2s 心跳的 payload 估計，offset = host_value − (local_value + RTT/2)）。r4 新增：WebGL 下 C# 的 wall-clock 即使用者系統時鐘，偏差可達數分鐘，先前完全沒有 offset 協定。AC45。Tuning 50-500。"
+    added: 2026-09-13
+    revised: ""
+
+  # ── r4 二次修訂新增（2026-09-13，機械檢查找出的未登錄值）──
+  - name: onboarding_duration_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: /ux-design 更衣室畫面
+    value: "[3.0, 5.0]"
+    unit: seconds
+    notes: "更衣室過場的定長情緒節拍區間，不可調。r4 二次修訂登錄：**約束⑦直接引用它的上限（5.0）**，而該值先前只存在於 Tuning Knobs 的「預設」欄——一個被約束式引用的值必須是登錄常數。AC4。下限 3.0 的理由是推門進店的動作節奏，上限 5.0 是「開始像在等」。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: optimistic_anim_max_ms
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 機台互動組 GDD (手感), 攜帶與交付 GDD
+    value: 100
+    unit: milliseconds
+    notes: "Core Rule #3：client 端樂觀動畫的最大播放時長，超過即須等 Host 裁決結果。決定互動手感。r4 二次修訂登錄：先前無常數、無 AC 覆蓋。⚠ 與 AC4 的『單幀 >100ms』同數字但**完全不同概念**（那是 frame time 尖峰），實作時勿混。Tuning 50-150。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: disconnect_notice_dwell_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: /ux-design 斷線畫面
+    value: 2
+    unit: seconds
+    notes: "MVP 的 Disconnected 為瞬時狀態：店語訊息停留本秒數後回 Idle。r4 二次修訂登錄。⚠ 與 disconnect_cleanup_sec 同值但**不同義**——本值是 UI 停留時長，那個是 Host 端清理 SLA。Tuning 1-4。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: state_convergence_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 客人系統 GDD, 機台互動組 GDD
+    value: 1
+    unit: seconds
+    notes: "跨 client 狀態收斂上限：AC24（全 client 顯示相同 NPC 狀態）與 AC32（遲加入者取得 NetworkVariable 現值）共用。r4 二次修訂登錄：先前只存在於 AC，違反 GDD 自訂的三欄規則。Tuning 0.5-2。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: host_return_cleanup_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+    value: 5
+    unit: seconds
+    notes: "Host 背景化被判局終後，回到前景起算至完成 session 關閉與 Relay 釋放的上限（AC28a）。r4 二次修訂登錄。⚠ 與 session_end_graceful_sec 同值但**起算點不同**（本值自 Host 回前景起算，那個自 close frame 送達起算）。Tuning 3-10。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: lobby_bg_safety_factor
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+    value: 0.5
+    unit: ratio
+    notes: "Lobby 階段『Host 可離開分頁的最長秒數』＝ 實測服務端／transport 逾時 × 本值（#23b、AC34b）。r4 二次修訂登錄：是設計旋鈕不是導出值，由 #23b 於 r4 引入卻未登錄。Tuning 0.3-0.8。依賴 [P-10] 回填實測 TTL 後才有絕對值。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: join_phase_budgets_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 大廳 UI GDD, /ux-design
+    value: "T_load=25, T_lobby=10, T_spawn=10"
+    unit: seconds
+    notes: "進房三分段的**各自獨立硬閘門**（AC7a 明令「不得以總和抵銷」）。r4 新增為獨立常數——先前只存在於公式②與 join_time_budget_sec 的 notes 字串裡，等於未登錄。合計 45s 對 join_time_budget_sec(60) 留 25% 餘裕。T_load 的餘裕實際為 0（50MB ÷ 20Mbps = 20s + TTFB 5s），故公式⑤的體積槓桿不得少列（含 WebAssembly 2023 開關）。"
+    added: 2026-09-13
+    revised: ""
+
 # Example:
 #
 # constants:

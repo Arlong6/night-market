@@ -1,0 +1,1 @@
+- [Night Shift netcode project](project_night_shift.md) — 大夜班 co-op netcode facts + recurring AC gap categories (throttle/RPC/smoothness/RTT/NPC sync/settlement redirect)
