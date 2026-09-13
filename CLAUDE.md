@@ -5,14 +5,18 @@ Each agent owns a specific domain, enforcing separation of concerns and quality.
 
 ## Technology Stack
 
-- **Engine**: Godot 4.6
-- **Language**: GDScript
+- **Engine**: Unity 6.3 LTS
+- **Language**: C#
 - **Version Control**: Git with trunk-based development
-- **Build System**: SCons (engine), Godot Export Templates
-- **Asset Pipeline**: Godot Import System + custom resource pipeline
+- **Build System**: Unity Build Pipeline
+- **Asset Pipeline**: Unity Asset Import Pipeline + Addressables
 
 > **Note**: Engine-specialist agents exist for Godot, Unity, and Unreal with
 > dedicated sub-specialists. Use the set matching your engine.
+>
+> **Legacy Godot projects**: 夜市 (`src/`), word-suika, and road-rage (`road-rage/`)
+> remain Godot 4.6. When maintaining them, use `.claude/docs/technical-preferences-godot.md`
+> and `docs/engine-reference/godot/`. The active project (大夜班 / Night Shift) is Unity.
 
 ## Project Structure
 
@@ -20,7 +24,7 @@ Each agent owns a specific domain, enforcing separation of concerns and quality.
 
 ## Engine Version Reference
 
-@docs/engine-reference/godot/VERSION.md
+@docs/engine-reference/unity/VERSION.md
 
 ## Technical Preferences
 

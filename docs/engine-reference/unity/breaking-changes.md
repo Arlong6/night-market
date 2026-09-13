@@ -1,154 +1,48 @@
-# Unity 6.3 LTS — Breaking Changes
+# Unity — Breaking Changes (6.0 → 6.3 LTS)
 
-**Last verified:** 2026-02-13
+> Last verified: 2026-09-03
+> Sources: official upgrade guides
+> 6.1: https://docs.unity3d.com/6000.1/Documentation/Manual/UpgradeGuideUnity61.html
+> 6.2: https://docs.unity3d.com/6000.2/Documentation/Manual/UpgradeGuideUnity62.html
+> 6.3: https://docs.unity3d.com/6000.3/Documentation/Manual/UpgradeGuideUnity63.html
 
-This document tracks breaking API changes and behavioral differences between Unity 2022 LTS
-(likely in model training) and Unity 6.3 LTS (current version). Organized by risk level.
+## 6.0 → 6.1 (2025-04)
 
-## HIGH RISK — Will Break Existing Code
+- Windows 新專案預設圖形 API 改為 **DirectX 12**（升級專案維持原設定）
+- URP shader keyword `_FORWARD_PLUS` → `_CLUSTER_LIGHT_LOOP`（自訂 shader 需改）
+- URP 17.1：ScriptableRendererFeature 不得在 `AddRenderPasses` 碰 render targets；
+  `ClearFlag.Depth` 不再隱式清 stencil（需 `ClearFlag.Stencil`）
+- `Rigidbody.SetDensity()` 棄用 → `Rigidbody.mass`
+- PVRTC 壓縮棄用 → ASTC/ETC
+- Android：Gradle 8.11 / AGP 8.7.2 / NDK r27c（自訂 Gradle 模板可能要重建）
+- 編輯器選單重組（Package Manager 等移入子選單，自訂快捷鍵失效）
 
-### Entities/DOTS API Complete Overhaul
-**Versions:** Entities 1.0+ (Unity 6.0+)
+## 6.1 → 6.2 (2025-08)
 
-```csharp
-// ❌ OLD (pre-Unity 6, GameObjectEntity pattern)
-public class HealthComponent : ComponentData {
-    public float Value;
-}
+- **URP 行為變更**：`RenderPassEvent.AfterRendering` 現在永遠在最終 blit 之後執行；
+  要舊行為改用 `AfterRenderingPostProcessing`（可回溯相容 6.0+）
+- URP `SetupRenderPasses`（6.1 才加的）在 6.2 棄用 → 直接寫 render graph
+- UI Toolkit `VisualElement.transform` 棄用 → 寫入用 `style.translate/rotate/scale`、
+  讀取用 `resolvedStyle.*`
+- 一批 shader API 棄用（完整清單在 6.2 release notes）
 
-// ✅ NEW (Unity 6+, IComponentData)
-public struct HealthComponent : IComponentData {
-    public float Value;
-}
+## 6.2 → 6.3 LTS (2025-12) — 本專案版本
 
-// ❌ OLD: ComponentSystem
-public class DamageSystem : ComponentSystem { }
-
-// ✅ NEW: ISystem (unmanaged, Burst-compatible)
-public partial struct DamageSystem : ISystem {
-    public void OnCreate(ref SystemState state) { }
-    public void OnUpdate(ref SystemState state) { }
-}
-```
-
-**Migration:** Follow Unity's ECS migration guide. Major architectural changes required.
-
----
-
-### Input System — Legacy Input Deprecated
-**Versions:** Unity 6.0+
-
-```csharp
-// ❌ OLD: Input class (deprecated)
-if (Input.GetKeyDown(KeyCode.Space)) { }
-
-// ✅ NEW: Input System package
-using UnityEngine.InputSystem;
-if (Keyboard.current.spaceKey.wasPressedThisFrame) { }
-```
-
-**Migration:** Install Input System package, replace all `Input.*` calls with new API.
-
----
-
-### URP/HDRP Renderer Feature API Changes
-**Versions:** Unity 6.0+
-
-```csharp
-// ❌ OLD: ScriptableRenderPass.Execute signature
-public override void Execute(ScriptableRenderContext context, ref RenderingData data)
-
-// ✅ NEW: Uses RenderGraph API
-public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
-```
-
-**Migration:** Update custom render passes to use RenderGraph API.
-
----
-
-## MEDIUM RISK — Behavioral Changes
-
-### Addressables — Asset Loading Returns
-**Versions:** Unity 6.2+
-
-Asset loading failures now throw exceptions by default instead of returning null.
-Add proper exception handling or use `TryLoad` variants.
-
-```csharp
-// ❌ OLD: Silent null on failure
-var handle = Addressables.LoadAssetAsync<Sprite>("key");
-var sprite = handle.Result; // null if failed
-
-// ✅ NEW: Throws on failure, use try/catch or TryLoad
-try {
-    var handle = Addressables.LoadAssetAsync<Sprite>("key");
-    var sprite = await handle.Task;
-} catch (Exception e) {
-    Debug.LogError($"Failed to load: {e}");
-}
-```
-
----
-
-### Physics — Default Solver Iterations Changed
-**Versions:** Unity 6.0+
-
-Default solver iterations increased for better stability.
-Check `Physics.defaultSolverIterations` if you rely on old behavior.
-
----
-
-## LOW RISK — Deprecations (Still Functional)
-
-### UGUI (Legacy UI)
-**Status:** Deprecated but supported
-**Replacement:** UI Toolkit
-
-UGUI still works but UI Toolkit is recommended for new projects.
-
----
-
-### Legacy Particle System
-**Status:** Deprecated
-**Replacement:** Visual Effect Graph (VFX Graph)
-
----
-
-### Old Animation System
-**Status:** Deprecated
-**Replacement:** Animator Controller (Mecanim)
-
----
-
-## Platform-Specific Breaking Changes
-
-### WebGL
-- **Unity 6.0+**: WebGPU is now the default (WebGL 2.0 fallback available)
-- Update shaders for WebGPU compatibility
-
-### Android
-- **Unity 6.0+**: Minimum API level raised to 24 (Android 7.0)
-
-### iOS
-- **Unity 6.0+**: Minimum deployment target raised to iOS 13
-
----
-
-## Migration Checklist
-
-When upgrading from 2022 LTS to Unity 6.3 LTS:
-
-- [ ] Audit all DOTS/ECS code (complete rewrite likely needed)
-- [ ] Replace `Input` class with Input System package
-- [ ] Update custom render passes to RenderGraph API
-- [ ] Add exception handling to Addressables calls
-- [ ] Test physics behavior (solver iterations changed)
-- [ ] Consider migrating UGUI to UI Toolkit for new UI
-- [ ] Update WebGL shaders for WebGPU
-- [ ] Verify minimum platform versions (Android/iOS)
-
----
-
-**Sources:**
-- https://docs.unity3d.com/6000.0/Documentation/Manual/upgrade-guides.html
-- https://docs.unity3d.com/Packages/com.unity.entities@1.3/manual/upgrade-guide.html
+- **`[SerializeField]` 只能用在欄位**——用在屬性/方法/型別是編譯錯誤；
+  auto-property 用 `[field: SerializeField]`（最常見升級地雷）
+- **URP Compatibility Mode（非 render graph 路徑）移除**——6.0 棄用、6.3 刪除。
+  所有自訂 pass/Renderer Feature 必須是 render graph 寫法
+- **USS 解析器變嚴**——以前容忍的錯誤 selector/括號/分號現在報錯
+  （可用 "Unsupported Selector Action" 設定調整）
+- `AccessibilityRole` 由 flags enum 改為一般 enum（bitwise 組合會爆）；底層型別 int→byte
+- `Scene.handle` int→`SceneHandle`；GI 的 `instanceID` 欄位改 `entityID`（`EntityId` 型別）
+  ——C# 原始碼隱式轉換可過，**預編譯 DLL 必須重編**
+- Netcode：`NetworkTransform.Update` 不可 override → 用 `NetworkTransform.OnUpdate` /
+  `INetworkUpdateSystem`
+- Multiplay Hosting 自編輯器/runtime 移除（服務 2026-03-31 終止）
+- Legacy ETC 壓縮器移除（自動轉換，貼圖外觀可能變）
+- Legacy Unity Ads 棄用 → Unity LevelPlay
+- Web：Facebook Instant Games build target 棄用（6.1 加入的）→ 用一般 Web platform
+- Android：Gradle 9.1 / AGP 9.0；round/legacy icon 棄用（用 adaptive）
+- `UPM_NPM_CACHE_PATH` 環境變數移除 → `UPM_CACHE_ROOT`
+- Adaptive Performance 由套件併入核心模組

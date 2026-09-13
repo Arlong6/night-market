@@ -1,156 +1,29 @@
-# Unity 6.3 LTS — Deprecated APIs
+# Unity — Deprecated APIs (訓練資料截止後的「別用 X → 改用 Y」)
 
-**Last verified:** 2026-02-13
+> Last verified: 2026-09-03
+> 適用版本：Unity 6.3 LTS (6000.3)
 
-Quick lookup table for deprecated APIs and their replacements.
-Format: **Don't use X** → **Use Y instead**
+| 別用（Deprecated） | 改用（Replacement） | 自版本 |
+|---|---|---|
+| `Rigidbody.SetDensity()` | `Rigidbody.mass` | 6.1 |
+| `_FORWARD_PLUS` shader keyword (URP) | `_CLUSTER_LIGHT_LOOP` | 6.1 |
+| PVRTC 貼圖壓縮 | ASTC 或 ETC | 6.1 |
+| URP `ScriptableRendererFeature.SetupRenderPasses` | render graph 路徑（`AddRenderPasses` 內走 render graph API） | 6.2 |
+| UI Toolkit `VisualElement.transform` | 寫：`style.translate/rotate/scale`；讀：`resolvedStyle.*` | 6.2 |
+| `RenderPassEvent.AfterRendering`（要在 blit 前跑的 pass） | `AfterRenderingPostProcessing` | 6.2（行為變更） |
+| `[SerializeField]` 用在屬性/方法 | 只准欄位；auto-property 用 `[field: SerializeField]` | 6.3（編譯錯誤） |
+| URP Compatibility Mode | render graph（6.3 已移除，非棄用） | 6.3 |
+| `NetworkTransform.Update` override | `NetworkTransform.OnUpdate` / `INetworkUpdateSystem` | NGO 2.x/6.3 |
+| `[ServerRpc]` / `[ClientRpc]`（NGO 1.x 風格） | 通用 `[Rpc]` attribute（NGO 2.0+，可指定目標含 client-to-client） | NGO 2.0 |
+| 獨立 Lobby / Relay 套件 API | Multiplayer Services SDK (`com.unity.services.multiplayer`) 的 **Sessions** API | MPS 1.0+ |
+| `AccessibilityNode.selected` | `AccessibilityNode.invoked` | 6.3 |
+| Legacy Unity Ads SDK | Unity LevelPlay（Ads Mediation） | 6.3 |
+| Facebook Instant Games build target | Web platform | 6.3 |
+| `UPM_NPM_CACHE_PATH` | `UPM_CACHE_ROOT` | 6.3 |
+| Android round/legacy icons | Adaptive icons | 6.3 |
 
----
+## 語言層警告
 
-## Input
-
-| Deprecated | Replacement | Notes |
-|------------|-------------|-------|
-| `Input.GetKey()` | `Keyboard.current[Key.X].isPressed` | New Input System |
-| `Input.GetKeyDown()` | `Keyboard.current[Key.X].wasPressedThisFrame` | New Input System |
-| `Input.GetMouseButton()` | `Mouse.current.leftButton.isPressed` | New Input System |
-| `Input.GetAxis()` | `InputAction` callbacks | New Input System |
-| `Input.mousePosition` | `Mouse.current.position.ReadValue()` | New Input System |
-
-**Migration:** Install `com.unity.inputsystem` package.
-
----
-
-## UI
-
-| Deprecated | Replacement | Notes |
-|------------|-------------|-------|
-| `Canvas` (UGUI) | `UIDocument` (UI Toolkit) | UI Toolkit is now production-ready |
-| `Text` component | `TextMeshPro` or UI Toolkit `Label` | Better rendering, fewer draw calls |
-| `Image` component | UI Toolkit `VisualElement` with background | More flexible styling |
-
-**Migration:** UGUI still works, but UI Toolkit is recommended for new projects.
-
----
-
-## DOTS/Entities
-
-| Deprecated | Replacement | Notes |
-|------------|-------------|-------|
-| `ComponentSystem` | `ISystem` (unmanaged) | Entities 1.0+ complete rewrite |
-| `JobComponentSystem` | `ISystem` with `IJobEntity` | Burst-compatible |
-| `GameObjectEntity` | Pure ECS workflow | No GameObject conversion |
-| `EntityManager.CreateEntity()` (old signature) | `EntityManager.CreateEntity(EntityArchetype)` | Explicit archetype |
-| `ComponentDataFromEntity<T>` | `ComponentLookup<T>` | Entities 1.0+ rename |
-
-**Migration:** See Entities package migration guide. Major refactor required.
-
----
-
-## Rendering
-
-| Deprecated | Replacement | Notes |
-|------------|-------------|-------|
-| `CommandBuffer.DrawMesh()` | RenderGraph API | URP/HDRP render passes |
-| `OnPreRender()` / `OnPostRender()` | `RenderPipelineManager` callbacks | SRP compatibility |
-| `Camera.SetReplacementShader()` | Custom render pass | Not supported in SRP |
-
----
-
-## Physics
-
-| Deprecated | Replacement | Notes |
-|------------|-------------|-------|
-| `Physics.RaycastAll()` | `Physics.RaycastNonAlloc()` | Avoid GC allocations |
-| `Rigidbody.velocity` (direct write) | `Rigidbody.AddForce()` | Better physics stability |
-
----
-
-## Asset Loading
-
-| Deprecated | Replacement | Notes |
-|------------|-------------|-------|
-| `Resources.Load()` | Addressables | Better memory control, async loading |
-| Synchronous asset loading | `Addressables.LoadAssetAsync()` | Non-blocking |
-
----
-
-## Animation
-
-| Deprecated | Replacement | Notes |
-|------------|-------------|-------|
-| Legacy Animation component | Animator Controller | Mecanim system |
-| `Animation.Play()` | `Animator.Play()` | State machine control |
-
----
-
-## Particles
-
-| Deprecated | Replacement | Notes |
-|------------|-------------|-------|
-| Legacy Particle System | Visual Effect Graph | GPU-accelerated, more performant |
-
----
-
-## Scripting
-
-| Deprecated | Replacement | Notes |
-|------------|-------------|-------|
-| `WWW` class | `UnityWebRequest` | Modern async networking |
-| `Application.LoadLevel()` | `SceneManager.LoadScene()` | Scene management |
-
----
-
-## Platform-Specific
-
-### WebGL
-| Deprecated | Replacement | Notes |
-|------------|-------------|-------|
-| WebGL 1.0 | WebGL 2.0 or WebGPU | Unity 6+ defaults to WebGPU |
-
----
-
-## Quick Migration Patterns
-
-### Input Example
-```csharp
-// ❌ Deprecated
-if (Input.GetKeyDown(KeyCode.Space)) {
-    Jump();
-}
-
-// ✅ New Input System
-using UnityEngine.InputSystem;
-if (Keyboard.current.spaceKey.wasPressedThisFrame) {
-    Jump();
-}
-```
-
-### Asset Loading Example
-```csharp
-// ❌ Deprecated
-var prefab = Resources.Load<GameObject>("Enemies/Goblin");
-
-// ✅ Addressables
-var handle = Addressables.LoadAssetAsync<GameObject>("Enemies/Goblin");
-await handle.Task;
-var prefab = handle.Result;
-```
-
-### UI Example
-```csharp
-// ❌ Deprecated (UGUI)
-GetComponent<Text>().text = "Score: 100";
-
-// ✅ TextMeshPro
-GetComponent<TextMeshProUGUI>().text = "Score: 100";
-
-// ✅ UI Toolkit
-rootVisualElement.Q<Label>("score-label").text = "Score: 100";
-```
-
----
-
-**Sources:**
-- https://docs.unity3d.com/6000.0/Documentation/Manual/deprecated-features.html
-- https://docs.unity3d.com/Packages/com.unity.inputsystem@1.11/manual/Migration.html
+Unity 6.3 LTS 是 **C# 9.0**（Mono/IL2CPP，無 CoreCLR）。別寫：
+file-scoped namespace（C# 10）、`required` 成員（C# 11）、primary constructor（C# 12）、
+collection expressions `[..]`（C# 12）。
