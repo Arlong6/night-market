@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="8" result="Passed" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-13 15:52:41Z" end-time="2026-09-13 15:52:41Z" duration="0.0898755">
+  <test-suite type="TestSuite" id="1000" name="w1-netcode" fullname="w1-netcode" runstate="Runnable" testcasecount="8" result="Passed" start-time="2026-09-13 15:52:41Z" end-time="2026-09-13 15:52:41Z" duration="0.089876" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1012" name="W1.Tests.EditMode.dll" fullname="/Users/arlong/Projects/Claude-Code-Game-Studios/prototypes/w1-netcode/Library/ScriptAssemblies/W1.Tests.EditMode.dll" runstate="Runnable" testcasecount="8" result="Passed" start-time="2026-09-13 15:52:41Z" end-time="2026-09-13 15:52:41Z" duration="0.083304" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="39159" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1013" name="W1" fullname="W1" runstate="Runnable" testcasecount="8" result="Passed" start-time="2026-09-13 15:52:41Z" end-time="2026-09-13 15:52:41Z" duration="0.082982" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1014" name="Tests" fullname="W1.Tests" runstate="Runnable" testcasecount="8" result="Passed" start-time="2026-09-13 15:52:41Z" end-time="2026-09-13 15:52:41Z" duration="0.082868" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1015" name="EditMode" fullname="W1.Tests.EditMode" runstate="Runnable" testcasecount="8" result="Passed" start-time="2026-09-13 15:52:41Z" end-time="2026-09-13 15:52:41Z" duration="0.082729" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1003" name="EngineFactProbeTests" fullname="W1.Tests.EditMode.EngineFactProbeTests" classname="W1.Tests.EditMode.EngineFactProbeTests" runstate="Runnable" testcasecount="8" result="Passed" start-time="2026-09-13 15:52:41Z" end-time="2026-09-13 15:52:41Z" duration="0.081366" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1009" name="CoreRule2_NetworkTransform_AuthorityMode_預設應為Server" fullname="W1.Tests.EditMode.EngineFactProbeTests.CoreRule2_NetworkTransform_AuthorityMode_預設應為Server" methodname="CoreRule2_NetworkTransform_AuthorityMode_預設應為Server" classname="W1.Tests.EditMode.EngineFactProbeTests" runstate="Runnable" seed="1928982223" result="Passed" start-time="2026-09-13 15:52:41Z" end-time="2026-09-13 15:52:41Z" duration="0.049318" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[W1][#2] NetworkTransform.AuthorityMode 預設 = Server
+]]></output>
+              </test-case>
+              <test-case id="1010" name="CoreRule2_NetworkTransform_Interpolate_預設應為true" fullname="W1.Tests.EditMode.EngineFactProbeTests.CoreRule2_NetworkTransform_Interpolate_預設應為true" methodname="CoreRule2_NetworkTransform_Interpolate_預設應為true" classname="W1.Tests.EditMode.EngineFactProbeTests" runstate="Runnable" seed="452084718" result="Passed" start-time="2026-09-13 15:52:41Z" end-time="2026-09-13 15:52:41Z" duration="0.001981" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[W1][#2] NetworkTransform.Interpolate 預設 = True
+]]></output>
+              </test-case>
+              <test-case id="1008" name="P20a_NetworkObject_DontDestroyWithOwner_預設應為false" fullname="W1.Tests.EditMode.EngineFactProbeTests.P20a_NetworkObject_DontDestroyWithOwner_預設應為false" methodname="P20a_NetworkObject_DontDestroyWithOwner_預設應為false" classname="W1.Tests.EditMode.EngineFactProbeTests" runstate="Runnable" seed="1169958463" result="Passed" start-time="2026-09-13 15:52:41Z" end-time="2026-09-13 15:52:41Z" duration="0.002854" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[W1][P-20a] DontDestroyWithOwner 預設 = False
+]]></output>
+              </test-case>
+              <test-case id="1007" name="P3_NetworkConfig_TickRate_預設應為30" fullname="W1.Tests.EditMode.EngineFactProbeTests.P3_NetworkConfig_TickRate_預設應為30" methodname="P3_NetworkConfig_TickRate_預設應為30" classname="W1.Tests.EditMode.EngineFactProbeTests" runstate="Runnable" seed="1120016647" result="Passed" start-time="2026-09-13 15:52:41Z" end-time="2026-09-13 15:52:41Z" duration="0.002440" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[W1][P-3] NetworkConfig.TickRate 預設 = 30
+]]></output>
+              </test-case>
+              <test-case id="1006" name="P9_HeartbeatTimeout_預設應為500ms_且身兼RelayPING間隔" fullname="W1.Tests.EditMode.EngineFactProbeTests.P9_HeartbeatTimeout_預設應為500ms_且身兼RelayPING間隔" methodname="P9_HeartbeatTimeout_預設應為500ms_且身兼RelayPING間隔" classname="W1.Tests.EditMode.EngineFactProbeTests" runstate="Runnable" seed="361152967" result="Passed" start-time="2026-09-13 15:52:41Z" end-time="2026-09-13 15:52:41Z" duration="0.004414" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[W1][P-9] HeartbeatTimeoutMS = 500
+]]></output>
+              </test-case>
+              <test-case id="1004" name="P9_UnityTransport_DisconnectTimeout_預設應為30000ms" fullname="W1.Tests.EditMode.EngineFactProbeTests.P9_UnityTransport_DisconnectTimeout_預設應為30000ms" methodname="P9_UnityTransport_DisconnectTimeout_預設應為30000ms" classname="W1.Tests.EditMode.EngineFactProbeTests" runstate="Runnable" seed="1695303146" result="Passed" start-time="2026-09-13 15:52:41Z" end-time="2026-09-13 15:52:41Z" duration="0.000981" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[W1][P-9] DisconnectTimeoutMS = 30000
+]]></output>
+              </test-case>
+              <test-case id="1005" name="P9_內建逾時必須大於app心跳逾時_約束5" fullname="W1.Tests.EditMode.EngineFactProbeTests.P9_內建逾時必須大於app心跳逾時_約束5" methodname="P9_內建逾時必須大於app心跳逾時_約束5" classname="W1.Tests.EditMode.EngineFactProbeTests" runstate="Runnable" seed="1712428230" result="Passed" start-time="2026-09-13 15:52:41Z" end-time="2026-09-13 15:52:41Z" duration="0.001456" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[W1][P-9] 內建 30s vs app 心跳 8s
+]]></output>
+              </test-case>
+              <test-case id="1011" name="記錄實機套件版本落差" fullname="W1.Tests.EditMode.EngineFactProbeTests.記錄實機套件版本落差" methodname="記錄實機套件版本落差" classname="W1.Tests.EditMode.EngineFactProbeTests" runstate="Runnable" seed="60739074" result="Passed" start-time="2026-09-13 15:52:41Z" end-time="2026-09-13 15:52:41Z" duration="0.004571" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <reason>
+                  <message><![CDATA[僅記錄，不斷言。]]></message>
+                </reason>
+                <output><![CDATA[[W1][版本] 第 0 批查證依 NGO 相依宣告記為 com.unity.transport 2.6.0，但本機解析結果為 2.7.4。上列逾時斷言即為此落差而存在。
+Saving results to: /Users/arlong/Library/Application Support/DefaultCompany/w1-netcode/TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

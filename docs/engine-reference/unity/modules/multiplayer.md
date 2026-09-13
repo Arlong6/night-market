@@ -16,7 +16,7 @@
 |---|---|---|
 | Netcode for GameObjects (`com.unity.netcode.gameobjects`) | **2.13.2** | 2.x 是快速釋出線；官方標示 for 6000.3 |
 | Multiplayer Services (`com.unity.services.multiplayer`) | **2.3.1** | Lobby/Relay/Matchmaker 統一於此，**別用舊的獨立 Lobby/Relay 套件** |
-| Unity Transport (UTP) | 2.x（隨 NGO） | Web 用 WebSocket 介面 |
+| Unity Transport (UTP) | **2.7.4**（實機解析值，2026-09-13） | Web 用 WebSocket 介面。⚠ NGO 2.13.2 的相依宣告寫 2.6.0，但實際解析為 2.7.4——逾時常數已於 `prototypes/w1-netcode` 以 EditMode 測試在 2.7.4 上複驗通過 |
 
 ## NGO 2.x 與訓練資料（1.x）的關鍵差異
 

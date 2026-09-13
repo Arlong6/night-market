@@ -257,3 +257,46 @@ GDD 1303 → 1364 行；registry 40 → 42 常數；`modules/multiplayer.md` 76 
 
 **Next**：第 1 批（同一次 Sessions API 建連 ＋ Host 消失實驗）——`P-10`(a)(b)(c)(d) ＋ `P-17`
 ＋ `P-14` ＋ `P-2(b)`。其中 P-10(b) 現已是整條 Lobby 設計的存亡問題。
+
+### 第 0 批的實機複驗（同日，Unity 專案建立後）
+
+第 0 批的結論原本只來自官方文件與 NGO 原始碼。專案建立後發現一個落差：
+本機解析出的 `com.unity.transport` 是 **2.7.4**，而第 0 批依 NGO 2.13.2 的相依宣告記為 **2.6.0**——
+逾時常數正是從 2.6 的文件查來的。
+
+因此把結論降落到實際安裝的套件上，寫成 EditMode 測試（`prototypes/w1-netcode/Assets/Tests/EditMode/EngineFactProbeTests.cs`）：
+
+```
+total=8 passed=8 failed=0 result=Passed
+```
+
+| 複驗項 | 結果 |
+|---|---|
+| `UnityTransport.DisconnectTimeoutMS` ＝ 30000 | PASS |
+| 內建逾時 > app 心跳 8s（**約束⑤**） | PASS |
+| `UnityTransport.HeartbeatTimeoutMS` ＝ 500，且 < 10000（Relay TTL） | PASS |
+| `NetworkConfig.TickRate` ＝ 30 | PASS |
+| `NetworkObject.DontDestroyWithOwner` ＝ false | PASS |
+| **`NetworkTransform.AuthorityMode` ＝ Server** | PASS |
+| `NetworkTransform.Interpolate` ＝ true | PASS |
+
+**最後一項的意義**：它確認了 r4 對 Core Rule #2 下的更正是對的——原文「Owner 權威是
+NetworkTransform 預設，不改寫」確為錯誤，實機預設就是 `Server`。這條若當初沒查，
+實作出來會是 server 權威的移動，而本地 host 測試永遠看不出來。
+
+該測試**刻意寫成斷言查到的值**：任一條 fail 即代表 GDD 回填的引擎事實與實機不符，
+屆時該改的是 GDD，不是測試的期望值。它同時是一組回歸測試——**套件或編輯器升級後應重跑**。
+
+`[P-3]`／`[P-9]`／`[P-20a]` 的狀態因此從「已回填（文件）」升級為「已回填並實機複驗通過」；
+`[P-20b]`（ownership transfer 的 pending 語義）仍為原始碼層級結論，需第 1 批實機連線驗證。
+
+### 環境就緒狀態（2026-09-13）
+
+| 項目 | 狀態 |
+|---|---|
+| Unity 編輯器 | 6000.3.24f1（＝GDD 釘選的 6.3 LTS），Web Build Support 4.9GB 已裝 |
+| 授權 | Personal，已以 headless 啟動確認 `Successfully resolved entitlement details` |
+| 原型專案 | `prototypes/w1-netcode/`（throwaway，與 `src/` 隔離；`.gitignore` 既有 Unity 規則已涵蓋） |
+| 套件 | NGO **2.13.2**、Multiplayer Services **2.3.1**、UTP **2.7.4**、Authentication 3.7.4、Core 1.18.0 |
+| 編譯 | 零錯誤 |
+| **尚缺** | **UGS Project ID**——Relay 與 Sessions 沒有它無法連線，第 1 批因此卡住 |
