@@ -517,7 +517,7 @@ constants:
       - design/gdd/netcode-session.md
     value: 10
     unit: hz
-    notes: "玩家 NetworkTransform 同步頻率。Tuning 10-30。**約束⑧**：2 × (1/本值) + RTT + 處理時間 ≤ interact_rtt_p95_ms。假設 P-3：若證實為 NetworkManager 全域 tick，RPC/NetworkVariable 按 tick 批次，往返多 200ms → AC22（300ms）立刻不可達，須拉高本值。r4：原三欄表宣稱由 AC23 驗收為假引用（AC23 測插值平滑度），已新增 AC46。"
+    notes: "＝ NetworkConfig.TickRate。引擎預設 30，本專案設 10。Tuning 10-30。✅ **[P-3] 已於 2026-09-13 回填（NGO 2.13.2 原始碼）**：本值**同時**決定 NetworkTransform 與 NetworkVariable 的送出節奏（兩者皆每 tick 收集送出），**但完全不影響 RPC**——RPC 每『幀』於 PostLateUpdate 批次送出，非 tick-gated。因此先前『10Hz 會讓互動往返 +200ms 而使 AC22 不可達』的判斷**解除**；約束⑧已重寫為『RTT + 2 幀 + 處理 ≤ interact_rtt_p95_ms，且互動結果一律走 RPC 不得用 NetworkVariable 承載』。⚠ NetworkTransform **無 per-instance 頻率設定**（可調的只有 PositionThreshold 等門檻）。⚠ 設為 10 等於把所有 NetworkVariable 也從引擎預設的 30Hz 降到 10Hz。AC46。"
     added: 2026-09-13
     revised: ""
 
@@ -625,6 +625,30 @@ constants:
     value: 0.5
     unit: ratio
     notes: "Lobby 階段『Host 可離開分頁的最長秒數』＝ 實測服務端／transport 逾時 × 本值（#23b、AC34b）。r4 二次修訂登錄：是設計旋鈕不是導出值，由 #23b 於 r4 引入卻未登錄。Tuning 0.3-0.8。依賴 [P-10] 回填實測 TTL 後才有絕對值。"
+    added: 2026-09-13
+    revised: ""
+
+  # ── W1 第 0 批原始碼查證後新增／回填（2026-09-13）──
+  - name: ownership_change_cooldown_ticks
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 攜帶與交付 GDD (交接冷卻), 機台互動組 GDD
+    value: 6
+    unit: network_ticks
+    notes: "同一 NetworkObject 兩次 ownership 變更之間的最小間隔。**引擎硬下限**：NGO 2.13.2 原始碼 k_MaximumTickOwnershipChangeMultiplier = 6，低於此值會 LogWarningServer「[Rapid Ownership Change Detected][Potential Loss in State]」且 owner-write 的 NetworkVariable 更新可能遺失。道具快速互相拋接的玩法必須受此限制。W1 第 0 批查證（NGO 原始碼）新增。"
+    added: 2026-09-13
+    revised: ""
+
+  - name: relay_client_connection_ttl_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+    value: 10
+    unit: seconds
+    notes: "**引擎/服務事實，非可調旋鈕**。Relay 對每個 client 連線的存活時限；host 在 BIND 後尚無 peer 連入時為 60s。任何經過該 client 的訊息都會重置。NGO 自動送 PING 維持（間隔＝UnityTransport.HeartbeatTimeoutMS＝500ms）。⚠ 官方文件未記載任何設定方式，**不得寫成可調**。⚠ 瀏覽器節流背景分頁 timer 會使 PING 停送 → 背景 10s 即被踢，這是 Core Rule #23（Lobby 延後建連）從優化升格為必需的直接原因，見 #23c。W1 第 0 批查證（Relay 官方文件）新增。"
     added: 2026-09-13
     revised: ""
 

@@ -1,6 +1,6 @@
 # Active Session State
 
-> Last Updated: 2026-09-13 (大夜班 netcode GDD **r4 修訂完成，散文評審結束，下一步＝W1 原型**；Road Rage 段落為歷史紀錄)
+> Last Updated: 2026-09-13 (大夜班 **W1 原型第 0 批完成**，三條假設已回填；下一步＝第 1 批 Sessions API 建連；Road Rage 段落為歷史紀錄)
 > Purpose: Living checkpoint. Read this first after compaction or new session.
 
 ## Active build: 橫衝直撞 (Road Rage) — standalone `road-rage/`, Godot 4.6
@@ -345,7 +345,45 @@ fallback 不可行; 優先序新增**第 0 批 (零成本文件查詢)**, **P-17
 修訂協定新增兩條: (A) 影響欄須**反向掃描機械產生**不得手填; (B) fallback 寫「可行」前**須代入數字驗算**.
 約束驗算實跑: 14 條 **PASS 10 / FAIL 0 / 待原型或非數值 4**.
 
-NEXT: **直接開 W1 原型** (不開 r5), 依新分批: 第0批文件查詢(P-9前半/P-20/P-3前半) →
+W1 第 0 批 DONE (2026-09-13, 純文件查詢零成本): 三條假設查證完畢, 全部對照 NGO 2.13.2
+**實際原始碼** + 官方文件, 附 URL 與原文.
+
+**三個改變設計的發現**:
+1. **AC22 的「不可達」解除 —— 約束⑧的前提是錯的**. `RPC 完全不受 network tick 影響`
+   (每『幀』於 PostLateUpdate 批次送出, 非 tick-gated); 受 tick 影響的是 NetworkVariable
+   與 NetworkTransform. 新預算 ~235-250ms <= 300ms, 餘裕 50-65ms. 約束⑧已重寫 + 追加硬規則:
+   **互動結果一律走 RPC, 不得用 NetworkVariable 承載** (後者 10Hz 下單邊 +100ms 即超標).
+2. **GDD 的權威模型寫錯了**. #2 原文「Owner 權威(NGO NetworkTransform 預設, 不改寫)」——
+   client-server 下 AuthorityMode **預設是 Server**, 只有 DA 才強制 owner.
+   **不是「不改寫」而是「必須改寫」**. 引擎參考 modules/multiplayer.md 同句錯誤也已更正.
+3. **#24 斷線序列第 2 步隱含為假的假設**. DontDestroyWithOwner **預設 false = 預設銷毀**,
+   且銷毀在 OnClientDisconnectCallback **之前**同一 call stack → 第 2 步「掉落」時物件已不存在.
+   已補前置條件 (prefab 須先勾選). ⚠ RemoveOwnership() **不做 unparent**,「掉落在原地」須自行實作.
+
+**一個讓 #23 升格的發現**: Relay 對每個 client 連線 TTL = **10 秒** (無 allocation idle timeout
+這種東西), 靠 NGO 自動 PING 重置. **瀏覽器節流背景分頁 → PING 停送 → 背景 10s 即被踢**.
+若 Lobby 已建 Relay 連線, AC34a(30s)/AC34b(120s) **必然失敗**, 且失敗在 Relay 層(比 MPS 服務層更早).
+→ **P-10(b)「能否拆分 Relay」不是效能優化, 是整條 Lobby 設計成立與否的問題**. 新增 #23c.
+
+其他寫進文件的引擎事實: DisconnectTimeoutMS 預設 30s >> 8s (約束⑤成立, 欄位名無更名);
+HeartbeatTimeoutMS **雙重用途不得調動**; ClientConnectionBufferTimeout=10s 影響 #9 閘門;
+ChangeOwnership 回傳 void **失敗靜默** → #6a 須回讀 OwnerClientId; 兩次 ownership 變更需隔
+**6 tick** → 新常數, **10Hz 下即 600ms** 對快節奏交接可感知 → 新增 OQ#17 (是否把 tick 提到 20-30Hz);
+OwnershipStatus 那套**只在 DA 有效**; DontDestroyWithOwner 在 2.4.0 前是壞的(2.13.2 已修);
+docs-multiplayer.unity3d.com **已全數 301 轉址**.
+
+新增 AC56(MVP-必達, 斷線後道具須存活+已 unparent, **唯一能在 CI 擋住手持物蒸發的測試**,
+本地 host 模式測不出來) 與 AC57(交接冷卻).
+
+檔案: GDD 1303 → **1364 行**; registry 40 → **42 常數**; modules/multiplayer.md 76 → **171 行**.
+回填後驗算: ④分情境成立 / ⑤ PASS(8s<=30s) / ⑧ PASS(250ms<=300ms, 餘裕 50ms).
+
+NEXT: **W1 第 1 批** (同一次 Sessions API 建連 + Host 消失實驗): P-10(a)(b)(c)(d) + P-17
++ P-14 + P-2(b). 其中 **P-10(b) 現已是整條 Lobby 設計的存亡問題**.
+之後: 第2批 itch.io 部署(P-4+P-6+P-19) → 第3批 Release build(P-7+P-18) →
+第4批 P-3後半+OQ#1+AC22聯測 → 第5批 P-13+P-15.
+
+(原分批規劃): 依新分批: 第0批文件查詢(P-9前半/P-20/P-3前半) →
 第1批 Sessions API 建連(P-10全部+P-17+P-14+P-2b) → 第2批 itch.io 部署(P-4+P-6+P-19) →
 第3批 Release build(P-7+P-18) → 第4批 P-3後半+OQ#1+AC22聯測 → 第5批 P-13+P-15 → 之後 /design-system 商品資料庫 (順位2).
 未 commit: 這幾天全部 pre-production 產出 (engine ref/art bible/index/GDD/registry/review log).
@@ -354,7 +392,7 @@ NEXT: **直接開 W1 原型** (不開 r5), 依新分批: 第0批文件查詢(P-9
 <!-- STATUS -->
 Epic: 大夜班 Pre-production
 Feature: Systems Design
-Task: netcode GDD r4 修訂完成 (散文評審結束) → 機械檢查複驗 → W1 技術原型
+Task: W1 原型第 0 批完成 (3 假設回填) → 第 1 批 Sessions API 建連
 <!-- /STATUS --> KEY FACTS: C# 9.0 only;
 [SerializeField] fields-only; URP render-graph only; NGO 2.13.2 + Multiplayer Services
 2.3.1 (Sessions API: CreateSessionAsync + session.Code = room codes built-in); Web needs

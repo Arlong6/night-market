@@ -188,3 +188,72 @@ Next: 重跑三張機械檢查（AC 時間算術、常數雙向、[P]→影響�
 檔案 1224 → **1291 行**。
 
 Next: **直接開 W1 原型**，依新的分批優先序（第 0 批是零成本的文件查詢，先跑完可能直接消掉數條假設）。
+
+---
+
+## W1 原型 — 第 0 批（純文件查詢，零原型成本）— 2026-09-13
+
+三條假設查證完畢，全部對照 **NGO 2.13.2 實際原始碼**與官方文件，附 URL 與原文。
+
+| 假設 | 結果 |
+|---|---|
+| `[P-3]` NetworkTransform 頻率可否獨立於全域 tick | **假設為假，但後果與預期相反** |
+| `[P-9]` 內建逾時是否 ≥8s、Relay idle timeout | **前半成立；後半的前提不存在** |
+| `[P-20]` ownership 預設值與 transfer 限制 | **(a) 擔憂證實；(b) 設計成立** |
+
+### 三個改變設計的發現
+
+**1. AC22 的「不可達」判斷解除，因為約束⑧的前提是錯的。**
+`RPC 完全不受 network tick 影響`——每**幀**於 `PostLateUpdate` 批次送出
+（`MessageManager.ProcessSendQueues()` 非 tick-gated），受 tick 影響的是 NetworkVariable
+與 NetworkTransform。新預算 ≈235-250ms ≤ 300ms，餘裕 50-65ms。
+約束⑧已重寫，並追加硬規則：**互動結果一律走 RPC，不得以 NetworkVariable 承載**
+（後者 10Hz 下單邊 +100ms 即超標）。
+
+**2. GDD 的權威模型寫錯了。** Core Rule #2 原文「Owner 權威：玩家移動（NGO NetworkTransform
+預設，不改寫）」——查證結果 client-server 拓撲下 `AuthorityMode` **預設是 `Server`**，
+只有 distributed authority 才強制 owner authority。**不是「不改寫」而是「必須改寫」**。
+照原文實作會讓玩家移動變成 server 權威，而本地 host 測試看不出來。
+引擎參考 `modules/multiplayer.md` 的同一句錯誤也已更正。
+
+**3. 斷線處置序列的第 2 步隱含了一個為假的假設。**
+`DontDestroyWithOwner` 預設 `false`＝**預設銷毀**，且銷毀發生在 `OnClientDisconnectCallback`
+**之前**、同一個同步 call stack 內。#24 把「掉落手持物」寫成第 2 步，那時物件已不存在。
+已補前置條件：**prefab 必須先勾選該欄位**。⚠ 且 `RemoveOwnership()` **不做 unparent**，
+「掉落在原地」必須 Host 自行實作，引擎不代勞。
+
+### 一個讓 #23 升格的發現
+
+Relay 對**每個 client 連線**的 TTL 是 **10 秒**（無「allocation idle timeout」這種東西），
+靠 NGO 自動送的 PING 重置。**瀏覽器節流背景分頁 timer 會使 PING 停送 → 背景 10 秒即被踢。**
+後果：若 Lobby 階段已建立 Relay 連線，AC34a（30s）與 AC34b（120s）**必然失敗**，
+且失敗在 **Relay 層**，比 #23b 描述的 MPS 服務層更早觸發。
+**因此 `[P-10]` 查證項 (b)（能否拆分 Relay）不是效能優化問題，是整條 Lobby 設計成立與否的問題。**
+新增 Core Rule #23c 記錄此事。
+
+### 其他寫進文件的引擎事實
+
+- `DisconnectTimeoutMS` 預設 30s ≫ 8s → 約束⑤成立，app 心跳確實先判定；欄位名 1.x→2.x 無更名
+- `HeartbeatTimeoutMS` **雙重用途**（UTP heartbeat ＋ Relay PING 間隔），**不得調動**
+- `ClientConnectionBufferTimeout` = 10s，approval 握手上限，影響 #9 的閘門
+- `ChangeOwnership` 回傳 void、**失敗靜默**（四條 early-return，含「目標不在 Observers」）
+  → #6a 要求呼叫後回讀 `OwnerClientId`
+- 兩次 ownership 變更需隔 **6 個 network tick** → 新常數 `ownership_change_cooldown_ticks`；
+  **10Hz 下即 600ms**，對快節奏交接是可感知的延遲 → 新增 OQ#17
+- `OwnershipStatus`／`RequestOwnership` 那套**只在 distributed authority 有效**，本專案不適用
+- `DontDestroyWithOwner` 在 **2.4.0 之前是壞的**（2.13.2 已修）→ 網路上 2025 上半年討論不可信
+- `docs-multiplayer.unity3d.com` 已全數 301 轉址，舊連結會落到 package 首頁
+
+### 新增測試
+
+- **AC56（MVP-必達）**：斷線後道具須 `IsSpawned` 且 `IsOwnedByServer`、已 unparent 於斷線座標。
+  **這是唯一能在 CI 擋住「手持物斷線蒸發」的測試**，且本地 host 模式測不出來
+- **AC57**：交接冷卻 <6 tick 時須拒絕或延後，且 log 不得出現 NGO 的 Rapid Ownership Change 警告
+
+### 檔案變更
+
+GDD 1303 → 1364 行；registry 40 → 42 常數；`modules/multiplayer.md` 76 → 171 行。
+回填後約束重新驗算：④分情境成立、⑤ PASS（8s ≤ 30s）、⑧ PASS（250ms ≤ 300ms，餘裕 50ms）。
+
+**Next**：第 1 批（同一次 Sessions API 建連 ＋ Host 消失實驗）——`P-10`(a)(b)(c)(d) ＋ `P-17`
+＋ `P-14` ＋ `P-2(b)`。其中 P-10(b) 現已是整條 Lobby 設計的存亡問題。
