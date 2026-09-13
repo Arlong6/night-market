@@ -300,3 +300,68 @@ NetworkTransform 預設，不改寫」確為錯誤，實機預設就是 `Server`
 | 套件 | NGO **2.13.2**、Multiplayer Services **2.3.1**、UTP **2.7.4**、Authentication 3.7.4、Core 1.18.0 |
 | 編譯 | 零錯誤 |
 | **尚缺** | **UGS Project ID**——Relay 與 Sessions 沒有它無法連線，第 1 批因此卡住 |
+
+---
+
+## W1 原型 — 第 1 批（API 形狀，編譯期驗證）— 2026-09-13
+
+拿到 UGS Project ID 後建立原型專案。第 1 批原定要「一次建連實驗」，但發現**有一半的
+問題不需要連線就能回答**：套件裡有完整的 public API surface dump
+（`Unity.Services.Multiplayer.api`），而「API 存不存在、簽章對不對」可以用**編譯期驗證**
+確定——能編譯過就是真的有那個方法，比反射拿字串更硬。
+
+測試：`prototypes/w1-netcode/Assets/Tests/EditMode/SessionApiShapeTests.cs`
+結果：**12/12 通過，零編譯錯誤**（含第 0 批的 8 條）。
+
+### 三項解決，其中一項是全輪最嚴重的
+
+**`[P-10]`(b) 可拆分 → Core Rule #23 成立，風險解除。**
+`WithRelayNetwork()` 是 `SessionOptions` 的**擴充方法而非必填參數**；
+`IHostSession.Network`（`IHostSessionNetwork`）提供 **`StartRelayNetworkAsync()`** 與
+**`StopNetworkAsync()`**；`NetworkState` 有獨立的 **`Stopped`**。
+即 network 是 session 之上**可獨立啟停的一層**，正是 #23 需要的形狀。
+r4 曾依引擎參考的「Session 會自動處理 lobby、Relay allocation、NGO 連線」判斷三者是
+一次呼叫的封裝、與 #23 直接衝突——實際 API 顯示那句描述的是**便利路徑**，不是唯一路徑。
+**`StopNetworkAsync()` 同時讓 #23a（局間 teardown）有了對應 API。**
+
+**`[P-10]`(c) → B4 徹底解決，且排歧表比原設計更簡單。**
+`ISession` 直接提供 `Host`（目前 host 的 playerId）與 `HasPlayer(playerId)`，
+**不需要「輪詢 roster 再比對」**。事件面有
+`Deleted`／`SessionHostChanged`／`PlayerLeaving`／`PlayerHasLeft`／`RemovedFromSession`／
+`SessionMigrated`／`StateChanged`，其中 **`SessionHostChanged` 是先前完全沒預期到的**。
+r4 二次修訂曾擔心「兩條路徑共用 MPS session 層載體，同層不可用時 B4 會復發」——
+實際上 `Host`/`HasPlayer`/`Players` 與事件推播是**同一個物件上的兩種取用方式**，
+不是兩個可能各自缺席的 API。`[P-10]`(c) 剩下的唯一問題因此從「查不查得到」
+縮小為「多快反映」，那是時序量測，不是分支存亡。
+另證實 r4 對訊號語義的判斷正確：`SessionState`（None/Connected/Disconnected/Deleted）
+與 `NetworkState`（Stopped/Starting/Started/Stopping/Migrating）是**兩個獨立狀態機**，
+`session.Network.State` 描述的確實是本機 network 層。
+
+**`[P-10]`(d) `IHostSession.RemovePlayerAsync(playerId)` 存在**（經 `ISession.AsHost()`），
+另有 `DeleteAsync()`。→ **#24a 成立。這是 r4 全表唯一「沒有退路」的查證項，現已解除。**
+
+### 一個沒預期到的發現
+
+**host migration 在 MPS 2.3.1 是一等公民**：`GetHostMigrationDataAsync`／
+`SetHostMigrationDataAsync`、`IHostSession.Host` 可指派、`SessionMigrated` 事件、
+`NetworkState.Migrating`、`MigrationFailed` 事件。
+
+GDD 從 r1 起就把「房主關分頁＝本局結束」當成 MVP 的**既定限制**，#12 的 UI 也對玩家
+明示。現在看來那是**選擇**，不是引擎限制。已列為 **OQ#18** 交 creative-director 裁決——
+它影響 #12、#21、AC6b、AC13b、UI 翻譯表整條「店長把鐵門拉下來了」的敘事，
+以及 Relay 情境 B（host 掉線後 10s 回收）這個目前無解的限制。
+
+### 仍需實機連線驗證
+
+| 項目 | 為什麼編譯期驗不了 |
+|---|---|
+| `[P-10]`(a) MPS session 服務層在背景分頁是否停擺 | 需 Web build ＋ 真實瀏覽器分頁背景化 |
+| `[P-17]` `ConnectionApprovalCallback` 在 Sessions 封裝下可否用 | 需實際建連觀察 callback 是否被觸發 |
+| `[P-14]` kill 行程後其他 client 的偵測時刻 | 需兩個實例 |
+| `[P-2]`(b) 重連後 playerId 是否延續同值 | `ReconnectAsync`／`CurrentPlayer` 存在，但值的延續性要連線才知道 |
+| 事件推播延遲、是否需 `RefreshAsync()` | 時序量測 |
+
+### 環境
+
+Project ID `a214763c-…` 已寫入 `ProjectSettings.asset`（`cloudProjectId`＋`cloudEnabled: 1`）。
+註：Project ID 是公開識別碼不是密鑰，可入庫；**日後若出現 API key／secret，一律不得進 repo**。

@@ -681,12 +681,12 @@ PlayerSettings:
   captureStartupLogs: {}
   activeInputHandler: 0
   windowsGamepadBackendHint: 0
-  cloudProjectId: 
+  cloudProjectId: a214763c-56d9-452f-8e7f-dea61e31c57a
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: 
+  projectName: night-shift-w1
   organizationId: 
-  cloudEnabled: 0
+  cloudEnabled: 1
   legacyClampBlendShapeWeights: 0
   hmiLoadingImage: {fileID: 0}
   platformRequiresReadableAssets: 0
