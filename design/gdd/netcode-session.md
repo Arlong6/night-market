@@ -196,8 +196,17 @@ transport 無官方端到端範例），因此是第一個做技術原型的系�
     「房主離開視為本局結束」。**Best-effort 攔阻**：Host 於 Lobby／InShift 主動關閉分頁
     或導頁時觸發瀏覽器 `beforeunload` 確認（明寫 best-effort——行動瀏覽器與手勢關閉
     可能攔不住）。
+    - 🔴 **本條已於 W1 第 1 批升格為「關鍵機制」，不再是 best-effort 的錦上添花**：
+      實測顯示 Host **優雅離開**（主動呼叫 `DeleteAsync()`）時，其他 client 於 **1.14 秒**
+      收到 `session.Deleted`；而 Host **被強制終止**時要 **132.61 秒**才收到 `PlayerLeaving`。
+      **差 116 倍。** 換言之，本條就是「把 132 秒變成 1.14 秒」的那個開關——
+      關分頁、導頁、按離開這些最常見動作能否走到主動通知，直接決定 Lobby 的體驗
+      是否違反支柱 5。
     - **離開通知必須用 `sendBeacon`／`keepalive` 語義**（r4 新增）：一般 async HTTP 請求
-      在 unload 時會被瀏覽器取消，SDK 的 `LeaveSessionAsync` 幾乎必然來不及送出 `[P-18]`
+      在 unload 時會被瀏覽器取消，SDK 的 `LeaveSessionAsync` 幾乎必然來不及送出 `[P-18]`。
+      ⚠ **`[P-18]` 的重要性因此同步升格**——它先前的 fallback 是「退回心跳路徑」，
+      而實測證明那條路徑在 Lobby 要 132 秒。**若 `sendBeacon` 不可行，必須另尋
+      在 unload 期間可靠送出刪除請求的手段，不能只是接受降級。**
     - `beforeunload` 需自寫 `.jslib` 橋接（Web 平台無 C# 直達路徑），與 P-7 同屬
       SendMessage／stripping 風險面，查證併入 P-7
     - **站內離開按鈕統一為一顆 `end_shift_early`**（r4 改，原本「結束本班」與 #21 的
@@ -533,7 +542,42 @@ transport 無官方端到端範例），因此是第一個做技術原型的系�
     **偵測來源＝訂閱 `ISession` 的成員事件** ✅（與 #18 排歧表序 1 同一機制，一次做兩件事）：
     client 於進入 Lobby 時即訂閱 `session.Deleted`／`session.SessionHostChanged`／
     `session.PlayerLeaving`，收到 Host 對應事件即顯示「店長把鐵門拉下來了」→Idle。
-    時限依 `[P-10]` 實測的事件傳播延遲回填（**不硬寫 `session_end_worstcase_sec`**——那是 InShift 心跳路徑的數字）。
+
+    ✅🔴 **實測結果：兩條路徑差 116 倍（W1 第 1 批雙進程，2026-09-13）**
+
+    | Host 離開方式 | client 得知時間 | 命中訊號 |
+    |---|---|---|
+    | **優雅離開**（主動呼叫 `DeleteAsync()`） | **1.14 秒** | `session.Deleted`（隨後 `SessionState → Disconnected`） |
+    | **被強制終止**（`kill -9`） | **132.61 秒** | `session.PlayerLeaving` |
+
+    **這改變了問題的形狀。** 原本看起來是「Lobby 偵測根本不可行」，
+    實際上是「**只要走到優雅路徑就幾乎即時**」——而關分頁、按離開、導頁這些
+    **最常見的動作全都有機會走優雅路徑**。真正沒救的只有當機／斷電／行程被強制結束。
+
+    **直接後果：#12 的 `beforeunload` ＋ 主動通知從「best-effort 錦上添花」升格為
+    「關鍵機制」。** 它不再只是攔阻誤觸，而是**把 132 秒變成 1.14 秒的那個開關**。
+    - 測法：Host 與 client 各為獨立 Unity 進程與獨立匿名帳號；client 加入後 `kill -9` Host
+      （模擬行程被強制終止），client 同時訂閱五個事件並以 5 秒間隔輪詢 `HasPlayer(Host)`，
+      記錄哪個訊號先到。
+    - 結果：**`PlayerLeaving` 於 132.61 秒後到達**；輪詢路徑未更早命中——服務端在那之前
+      根本還沒把 Host 移出名冊，**兩條路徑同步，慢的是服務端判定本身**。
+    - 判讀：132 秒幾乎確定是服務端等 lobby heartbeat 逾時的時間
+      （Host 每 `HeartbeatSeconds`＝10 秒送一次，被 kill 後停送）；
+      而 1.14 秒是服務端收到主動刪除請求後的事件廣播延遲——**兩者量的是不同東西**。
+    - **衝擊（已縮小）**：支柱 5 的 design test 是「純看戲 >30 秒就重做」。
+      優雅路徑 1.14 秒**遠低於紅線**；只有強制終止路徑的 132 秒超標，
+      而那是**罕見情境**（當機／斷電／強制結束行程）。
+      r4 曾指出「矩陣承諾了一個沒有機制的行為」——現在機制有了，
+      且**在最常見的路徑上夠快**。
+    - ⚠ **本數字僅適用於 Lobby（純 session 層）**。InShift 有 NGO 心跳
+      （`heartbeat_timeout_sec`＝8 秒判定），該路徑不受影響。**問題精確地只在 Lobby。**
+    - ✅ **arlong 已裁決（2026-09-13）：慢路徑採「本地逾時提示」。**
+      Lobby **自己計時**，自最後一次收到任何 session 事件起超過
+      `lobby_host_silence_timeout_sec`（30s）仍無動靜，即顯示
+      「跟店長聯絡不上……」等店語提示 ＋ **可離開按鈕**。
+      **不等服務端**——服務端那 132 秒不在我們控制範圍內。
+      理由：這是唯一同時做到「不承諾做不到的事」與「卡在支柱 5 的 30 秒紅線內」的解。
+      實際文案與視覺歸 `/ux-design`。
 
 26. **「開始上班」轉場（Lobby → InShift，r4 新增）**：依 #23，Relay allocation 與 NGO 連線
     在此刻才建立；依 #23a，第二班起還要重跑一次。這是**最常見的開局路徑**（所有人都已在
@@ -799,7 +843,12 @@ NPC 本地插值僅在兩個 milestone 之間執行；若玩家肉身阻擋導�
 `T_load ≈ build_size ÷ bandwidth ＋ 多資源 TTFB`。50MB ÷ 25s ≈ **16Mbps 持續下載**——
 標準網路（20Mbps）下留約 5s 給 3-4 個資源的連線建立開銷。因應：
 - 縮 build size 是主要槓桿（專案硬標 ≤50MB，越小越好）。
-  **T_load 的餘裕實際為 0**（50MB ÷ 20Mbps ＝ 20s，加多資源 TTFB 5s 恰好用滿 25s），
+  **T_load 的餘裕實際為 0**（50MB ÷ 20Mbps ＝ 20s，加多資源 TTFB 5s 恰好用滿 25s）。
+  ✅ **W1 第 2 批實測的「地板值」**：一個**幾乎空的專案**（單一 OnGUI 探針 ＋ NGO 2.13.2
+  ＋ MPS 2.3.1）Brotli 壓縮後為 **7.0 MB**——`Web.wasm.br` 5607 KB、`Web.data.br` 1472 KB、
+  `Web.framework.js.br` 77 KB、`Web.loader.js` 26 KB（未壓縮）。
+  即：**netcode 層與 IL2CPP 執行環境就吃掉約 7 MB，留給遊戲內容約 43 MB。**
+  這個地板先前完全沒有依據，現在有了。
   因此**不得少列任何一個已知槓桿**（r4 補齊，依 `modules/web.md`）：
   **WebAssembly 2023 開關**（原生 Wasm 例外、SIMD、優化 memcpy、BigInt 互通——效能升、
   體積降，目標客群的瀏覽器支援無虞，**建議開**）、Unity 6.3 的 IL2CPP metadata 變長度索引、
@@ -975,6 +1024,7 @@ game-designer／`/ux-design`；客製 Web Template 視覺→`/ux-design`；Web �
 | UI 回饋上限 ui_feedback_sec | 1s | **`relay_disconnect_propagation_sec`–2**（約束⑮） | r4 新增：被 AC2／AC13a／AC37a 引用 |
 | 局終廣播（優雅路徑） session_end_graceful_sec | 5s `[P-13]` | 原型回填 | r4 新增：AC6a |
 | 局終廣播（保底路徑） session_end_worstcase_sec | **12s**（r4 修正：原 10s） | 原型回填 | `heartbeat_timeout(8) + heartbeat_interval(2) + 傳播(2) = 12`。原寫 10 的餘裕為 0，加上 AC27 自己的 ±1s 容差即破（9+2=11>10） |
+| Lobby 房主靜默逾時 lobby_host_silence_timeout_sec | 30s | 15-45（**上限受支柱 5 的 30 秒紅線約束，不宜超過**） | r4 後新增（arlong 裁決）：Lobby 自最後一次收到任何 session 事件起計時，逾時即顯示店語提示＋可離開按鈕。存在的理由是實測發現 Host 被**強制終止**時服務端要 132.61 秒才廣播——本地逾時是不等服務端的自救 |
 | 冷啟動 stall 逾時 load_stall_timeout_sec | 10s | 5-20 | r4 新增（#27）：**位元組數無增長**的容忍秒數，**不是總時長逾時** |
 | 進房總預算 join_time_budget_sec | 60s | 鎖定（支柱 4 硬標） | r4 二次修訂：先前三欄表宣稱「已補列」但本表實際沒有這一列（假 Y）。超標即違反支柱 4 的 design test |
 | 更衣室過場區間 onboarding_duration_sec | [3.0, 5.0]s | 區間固定，不可調 | r4 二次修訂登錄：**約束⑦直接引用它的上限**，先前該值只存在於「預設」欄。AC4 |
@@ -1102,6 +1152,24 @@ game-designer／`/ux-design`；客製 Web Template 視覺→`/ux-design`；Web �
 | **Lobby 期間 Host 離開**（#25，MPS 事件偵測） | 「店長把鐵門拉下來了」（與 InShift 同文案，玩家不需要知道偵測機制不同） | MVP |
 | **build 版本不符**（#9 的版本閘） | 「這是舊的班表，重新整理一下」 | MVP |
 
+🔴 **W1 第 2 批發現：Unity Web build 的預設字型不含 CJK——整張翻譯表在網頁上會是空白**
+
+實測 Release Web build 的探針畫面：**所有中文字元完全沒有渲染**，只有英數與符號顯示得出來
+（Unity 內建 GUI skin 的預設字型無 CJK glyph）。
+
+這對本系統是**支柱級的問題**，因為上表的核心主張正是「所有網路狀態一律翻譯成店語，
+技術詞彙一個都不准出現在玩家眼前」——**而店語全是中文**。字型缺失等於整條原則在
+目標平台上失效。
+
+- **必做**：**打包一套含 CJK 的字型**（思源黑體／Noto Sans TC 等）並設為專案預設，
+  不得依賴系統或引擎內建字型。
+- **成本要進預算**：CJK 字型即使子集化也有明顯體積，而公式⑤ 的 `T_load` 餘裕**已經是 0**，
+  地板又實測為 7.0 MB。**字型子集化（只打包實際用到的字）應列為 MVP 的建置步驟**，
+  不是 polish 階段的優化。
+- **交棒**：字型選型、子集化流程與授權 → `/ux-design` ＋ web-platform ADR。
+- 註：這與先前 Godot 專案遇到的是同一類問題（該引擎是 `ThemeDB.fallback_font` 無 CJK），
+  **換引擎並沒有換掉這個坑**。
+
 📌 **UX Flag — 網路同步層＋Session**：本系統有 UI 語言需求。Pre-Production Phase 4
 時，大廳與連線狀態畫面（含冷啟動 Web Template、beforeunload 文案、Lobby 房主引導）
 須先跑 `/ux-design`，stories 引用 `design/ux/[screen].md`。
@@ -1146,7 +1214,7 @@ Relay 中繼的純網路成本 ≥400ms，AC22 的 300ms 在數學上不可能�
 | 5 | GIVEN **Host 端計算之**班次剩餘 ≤`late_join_cutoff_sec`（30s）或已在 Settlement，WHEN 新玩家點連結，THEN **approval 閘門拒絕**並導向 **Lobby\***，顯示「這班快下班了，你排下一班」，不進入當前班次 | MVP |
 | 6a | GIVEN Host 分頁**優雅關閉**（`socket.close()` 或確認 close frame 已送出），WHEN 偵測斷線，THEN session ≤`session_end_graceful_sec`（5s）內結束，全員收到「店長把鐵門拉下來了」回主選單（best-effort 快速路徑）。**狀態限定：InShift** | MVP `[P-13]` |
 | 6b | GIVEN Host 於 **InShift** 以**任何路徑**離開（含真實點 X 關分頁、bfcache、行程強制終止），WHEN client 心跳逾時，THEN 全員 ≤`session_end_worstcase_sec`（**12s**＝逾時 8＋間隔 2＋傳播 2）內收到「店長把鐵門拉下來了」回主選單（保底路徑，必達）。**r4 修正**：原寫 ≤10s，餘裕為 0，加上 AC27 自己的 ±1s 容差即破（9+2=11>10） | **MVP-必達** `[P-10]` `[P-14]` |
-| 6c | GIVEN Host 於 **Lobby 或 Lobby\*** 離開（關頁／導頁／斷線），WHEN client 訂閱的 MPS session 成員事件到達，THEN 顯示「店長把鐵門拉下來了」回主選單。**時限依 `[P-10]` 實測回填**——Lobby 無 NGO 連線也無心跳，不得套用 AC6b 的 12s | MVP `[P-10]` |
+| 6c | GIVEN Host 於 **Lobby 或 Lobby\*** 離開（關頁／導頁／斷線），WHEN client 訂閱的 session 成員事件到達，THEN 顯示「店長把鐵門拉下來了」回主選單。✅ **實測：優雅離開路徑 ≤2s**（實測 1.14s，訊號 `session.Deleted`）。🔴 **強制終止路徑實測 132.61s**——該路徑的呈現方式待 OQ#19 裁決，本 AC 只驗優雅路徑。不得套用 AC6b 的 12s（那是 InShift 心跳路徑） | MVP |
 | 7 | GIVEN 全新玩家於**標準網路**點分享連結（冷啟動、清空快取），WHEN 開始計時，THEN 至「角色能響應移動輸入」≤`join_time_budget_sec`（60s），**5 次取樣 P95**。**量測邊界**：與 AC7a 同——**不含 Host 按「開始上班」前的人為等待**（那不是系統延遲；否則 Host 泡杯咖啡即 fail，pass/fail 不由系統決定） | **MVP-必達** |
 | 7a | GIVEN 同 AC7 條件，WHEN 分段計時，THEN T_load ≤25s、T_lobby ≤10s、T_spawn ≤10s **各自單獨成立**（5 次取樣 P95），不得以總和抵銷。**T_lobby 的計時邊界定義**：自大廳畫面可互動起，至玩家按下 Ready 為止，**不含 Host 按「開始上班」前的人為等待**（那不是系統延遲） | MVP |
 | 7b | GIVEN N 位玩家皆已在 Lobby 且 Ready，WHEN Host 按「開始上班」，THEN 至**全員可操作** ≤`T_spawn`（10s，5 次取樣 P95），且期間畫面為 #26 的世界語言轉場、**無進度條、無「連線中」字樣**。**第二班起（Settlement→Lobby→開始上班，含 #23a 的 Relay／NGO 重建）同樣成立** | MVP `[P-10]` |
@@ -1357,7 +1425,7 @@ Relay 中繼的純網路成本 ≥400ms，AC22 的 300ms 在數學上不可能�
 | P-4 | itch.io iframe 會轉發 `?code=` 給遊戲 | **實際部署一次測**（10 分鐘），與 P-6／P-19 同一次 | 不轉發 → 輸碼路徑成為唯一入口（AC2 已保底），並改用「短碼優先」的分享文案 | AC3 的前半。**fallback 是全表最健康的一條**——#8 已把輸碼釘成必備備援，AC2 已保底，非 blocking | 原型 W1 |
 | P-5 | NGO **跨 channel**（本專案實際使用的 reliable/unreliable 組合）可能亂序，需單物件 sequence 保護 | 原型以實際 channel 組合壓測（**不是**單 reliable channel——TCP 本就有序，會得偽陰性） | 證實有序 → **移除**通用 sequence 層，**但保留 `ClaimGeneration`**（防遲到請求，與有序性無關） | AC26。**fallback 可行**（移除是簡化，非損失），非 blocking | 原型 W2 |
 | P-6 | itch.io 正確回傳 Brotli `Content-Encoding` | 原型部署後看 network trace，與 P-4／P-19 同一次 | 不支援 → 改 gzip 或無壓縮，重估 T_load 與 build size 上限 | AC7、AC7a 的 `T_load ≤25s`——**該預算的餘裕已經是 0**（50MB ÷ 20Mbps ＝ 20s ＋ TTFB 5s）。⚠ **裸 fallback 不可行——與 P-3 同構**（r4 二次修訂）。代入算式：50MB(Brotli) → gzip 約 ×1.2 ＝ 60MB ÷ 20Mbps ＝ 24s ＋ TTFB 5s ＝ **29s > 25s**，缺口 4s。故 fallback **必須附帶「下修 build size 上限」**才成立，而該動作跨出本 GDD 權責（屬 technical-preferences 的專案級硬標）。另影響 `join_time_budget_sec`、`join_phase_budgets_sec`、跨文件常數 `build_size ≤50MB` | 原型 W1 |
-| P-7 | `visibilitychange`／`navigator.onLine`／`online`/`offline` 可經自建 `.jslib`（JS→C# `SendMessage`）橋接進 Unity WebGL；**接收方法在 IL2CPP＋Managed Stripping High 下需 `[Preserve]` 或 `link.xml` 保護**（否則被當死碼裁掉，僅正式 build 現形）；Editor 不執行 .jslib，分流邏輯**只能在實機 Release Web build 驗證** | 原型 W1 寫 .jslib＋`[Preserve]`，於 Release build 實測。**同一次併測 P-18**（`beforeunload`／`sendBeacon`）與 `performance.now()` 的單調時間源 | 事件不可靠 → 改以 `requestAnimationFrame` 停擺時長估算（精度較差，5s 閾值需放寬）；Stripping 裁掉 → link.xml 全保留該類別 | AC15、AC16、AC28、AC28a、AC29、AC34a/b/c、AC41、AC42、**AC43a/b/c**、AC48——**幾乎所有 Web 行為 AC**；另影響 Core Rule #17 的單調時鐘要求、#12 的 `beforeunload`、公式③全條、#18 排歧表序 2、常數 `background_disconnect_threshold_sec`。⚠ **fallback 與約束⑪直接衝突（r4 二次修訂）**：fallback 寫「5s 閾值需放寬」，但 `background_disconnect_threshold_sec` 的安全範圍上界＝5、約束⑪鎖死 `≤5`（>5 即違反「不瞬移」鐵律）——**閾值不能放寬**，而 rAF 停擺估算無法分辨 5.0s 與 5.1s → **AC29 在 fallback 下不可測**。二階影響：link.xml 全保留會增大 build size，打回已歸零的 T_load 餘裕（與 P-6 的 fallback 反向拉扯）。**r4 縮小查證範圍**：引擎參考文件記載「NGO 2.6+ 用 codegen 取代反射初始化（stripping 相容性較好）」，本專案為 2.13.2，故 **NGO 自身的序列化不在風險面**；風險僅限 `.jslib` 經 `SendMessage` 呼叫的 C# 接收方法（那確實是反射呼叫） | 原型 W1 |
+| ~~P-7~~ ✅✅ **已實測回填 2026-09-13（W1 第 2 批，Release Web build）** | **雙向皆通過**：JS→C# 的讀取（`location.search`／`visibilityState`／`navigator.onLine`／`performance.now`）與 **C#←JS 的 `SendMessage` 回呼**（clipboard 結果回傳 `OK`）在 **IL2CPP ＋ Managed Stripping High ＋ Brotli 的正式 build** 下**全部正常**，`[Preserve]` 確實擋住了裁切。實測 console：`[W1WEB] boot ownQuery='?code=TEST99' iframe=0`、`[W1WEB] clipboard result = OK`。~~原假設~~ `visibilitychange`／`navigator.onLine`／`online`/`offline` 可經自建 `.jslib`（JS→C# `SendMessage`）橋接進 Unity WebGL；**接收方法在 IL2CPP＋Managed Stripping High 下需 `[Preserve]` 或 `link.xml` 保護**（否則被當死碼裁掉，僅正式 build 現形）；Editor 不執行 .jslib，分流邏輯**只能在實機 Release Web build 驗證** | 原型 W1 寫 .jslib＋`[Preserve]`，於 Release build 實測。**同一次併測 P-18**（`beforeunload`／`sendBeacon`）與 `performance.now()` 的單調時間源 | 事件不可靠 → 改以 `requestAnimationFrame` 停擺時長估算（精度較差，5s 閾值需放寬）；Stripping 裁掉 → link.xml 全保留該類別 | AC15、AC16、AC28、AC28a、AC29、AC34a/b/c、AC41、AC42、**AC43a/b/c**、AC48——**幾乎所有 Web 行為 AC**；另影響 Core Rule #17 的單調時鐘要求、#12 的 `beforeunload`、公式③全條、#18 排歧表序 2、常數 `background_disconnect_threshold_sec`。⚠ **fallback 與約束⑪直接衝突（r4 二次修訂）**：fallback 寫「5s 閾值需放寬」，但 `background_disconnect_threshold_sec` 的安全範圍上界＝5、約束⑪鎖死 `≤5`（>5 即違反「不瞬移」鐵律）——**閾值不能放寬**，而 rAF 停擺估算無法分辨 5.0s 與 5.1s → **AC29 在 fallback 下不可測**。二階影響：link.xml 全保留會增大 build size，打回已歸零的 T_load 餘裕（與 P-6 的 fallback 反向拉扯）。**r4 縮小查證範圍**：引擎參考文件記載「NGO 2.6+ 用 codegen 取代反射初始化（stripping 相容性較好）」，本專案為 2.13.2，故 **NGO 自身的序列化不在風險面**；風險僅限 `.jslib` 經 `SendMessage` 呼叫的 C# 接收方法（那確實是反射呼叫） | 原型 W1 |
 | P-8 | Relay 偵測 Host socket 斷開並傳播至其餘 client 的延遲 ≤`relay_disconnect_propagation_sec`（2s） | 原型 Host 關分頁，量 client `OnClientDisconnect` 時刻 | 更慢 → AC6a／AC16／AC28 上限依實測放寬並回填該具名常數 | AC6a、AC16、AC28、公式①的 `T_detect`。**fallback 可行**（放寬上限），非 blocking。r4 已把此延遲提升為具名常數，四處引用同一個值 | 原型 W1 |
 | ~~P-9~~ ✅✅ **已回填並實機複驗通過 2026-09-13（W1 第 0 批）** | **`DisconnectTimeoutMS` 預設 30000ms＝30s ≫ 8s，約束⑤成立**；欄位名 1.x→2.x 無更名。**Relay 沒有 allocation idle timeout**，而是每 client 連線 **10s TTL**（host 獨自時 60s）→ 約束④ 已改為情境式，AC13c 填入 10s。⚠ 新發現：`HeartbeatTimeoutMS` 雙重用途（UTP heartbeat ＋ Relay PING 間隔）**不得調動**；`ClientConnectionBufferTimeout`＝10s 影響 #9 approval 閘門；`DisconnectTimeoutMS` 影響 send queue 容量。~~原假設~~ NGO/UTP 與 Relay 的內建連線逾時 ≥ `heartbeat_timeout_sec`（app-level 心跳才是先判定者）；**Relay allocation idle timeout ≥ `reconnect_window_sec + heartbeat_timeout_sec` ＝ 38s**（r4 修正：原寫 ≥30s，漏計 `T_detect`）。**順帶記錄 `UnityTransport` 逾時欄位的確切名稱**（NGO 1.x→2.x 有更名）**與 Relay allocation idle timeout 的實測值**（AC13c 需要它） | 查 NGO 2.13 `NetworkConfig`／`UnityTransport`／Relay 文件＋原型實測 | 內建更短 → 以內建值為心跳逾時上限，Tuning Knobs 約束區塊回填 | 約束④、約束⑤、⑬、AC13c、**#24a 末段**（Host 自己消失時的服務端回收）、常數 `heartbeat_timeout_sec` 與 `reconnect_window_sec`。⚠ **條件式不可行（r4 二次修訂）**：若內建逾時 <8s，代入約束①（k×interval）②③ → timeout=6 時需 `threshold < 4`，逼使 `background_disconnect_threshold_sec` 下修至 2 → **AC15（3s 背景走 catch-up）、AC16（8s 背景）、AC29（5.0/5.1 邊界）三條 MVP AC 的 GIVEN 全部作廢**。**前半（查 `UnityTransport` 逾時欄位名與預設值）是純文件查詢、零原型成本，應排最前** | 原型 W1 |
 | P-10 ✅**(b)(c)(d) 已回填；(a) 機制已證實、秒數待實測** | **四個查證項，三個已解決（W1 第 1 批，2026-09-13，編譯期驗證）**：**(b) 可拆分** ✅ `WithRelayNetwork` 為擴充方法、`IHostSessionNetwork.StartRelayNetworkAsync`/`StopNetworkAsync` 存在、`NetworkState.Stopped` 獨立存在 → **#23 成立**。**(c) 事件與查詢齊全** ✅ `ISession` 的 `Deleted`/`SessionHostChanged`/`PlayerLeaving`/`PlayerHasLeft`/`PlayerJoined`/`RemovedFromSession`/`SessionMigrated`/`StateChanged`，以及 `Host`/`HasPlayer`/`Players`/`PlayerCount` → **排歧表兩條路徑成立且較原設計更簡單**。**(d) `IHostSession.RemovePlayerAsync` 存在** ✅ → **#24a 成立，全表唯一無退路的查證項解除**。**(a) 機制已證實（W1 第 1 批，原始碼層面）**：保活 heartbeat 間隔 `HeartbeatSeconds => 10`，
@@ -1374,7 +1442,7 @@ fallback 仍為 #23 替代設計 (b)(c)：以實測 TTL × `lobby_bg_safety_fact
 | **P-16** | **UTP send queue 溢位時 NGO 的實際行為**（是否真的丟訊息並報錯；佇列深度上限與可監控性） | 原型：4 人＋10 NPC 尖峰壓測，監控 send queue 深度與錯誤 log | 會靜默丟訊息 → 必須為 Host 出站每 tick 的 payload 設上限並監控佇列深度 | 無單一 AC，但影響整個同步正確性的**底層前提**（r4 新增，取代 P-11 的 W1 位置）。**這才是 WSS 單一 TCP 底下真正該防的東西**——r3 全文與 OQ 都沒有 | 原型 W2 |
 | ~~P-17~~ ✅✅ **已實測回填 2026-09-13（W1 第 1 批）** | **callback 確實被呼叫、`ConnectionApproval` 未被 Sessions 覆蓋、`ConnectionData` payload 完整傳遞**（實測 `payload=w1-proto-v1`）→ **#9 的截止閘門與 AC54 的版本閘都有可用載體，先前「fallback 殺掉 AC54」的 blocking 解除**。⚠ 殘留：拒絕原因如何呈現給**遠端** client 待雙進程確認。~~原假設~~ Host 的 `ConnectionApprovalCallback` 在 Sessions API 封裝下仍可用 | 原型：以 Sessions API 建連，嘗試註冊 approval callback 並拒絕一個 client，觀察 client 端收到什麼 | 不可用 → 截止判定改由 Host 於 NGO 連線建立**後**立即踢出並附原因（體驗較差，玩家會閃一下才被退），版本閘同理 | AC5、AC35、AC54、#9 的「唯一執行點」。另影響 **AC51**、Lobby\* 的進入條件、#9 的版本閘、UI 翻譯表兩列、常數 `late_join_cutoff_sec`。⚠ **fallback 不可行，本項為 blocking（r4 二次修訂）**：fallback 是「連線建立**後**立即踢出」，但 **AC54（MVP-必達）** 的 THEN 明寫「不得靜默進入造成 desync」——fallback 下 client **一定先建立 NGO 連線**才被踢，在那個窗口內舊 build 已開始收發 NetworkVariable／RPC，**正是版本閘要防的事**；若序列化格式不相容，連線建立本身就可能讓 Host 收到畸形封包。**版本閘的全部意義是「在任何資料交換之前」擋下**，fallback 在語義上做不到。另 AC5／AC35 的 THEN 與取樣點須連帶改寫（AC35 的 0.5s 級鑑別會被連線建立的抖動侵蝕）。**查證成本近乎為零——與 P-10(b) 是同一次原型操作**，不應排在最後一批 | **原型 W1（與 P-10 同批）** |
 | **P-18** | `beforeunload` 可從 WebGL build 經 `.jslib` 觸發確認框；`sendBeacon`／`keepalive` 語義的離開通知可在 unload 時送達 | 原型：Release build 實測關分頁攔阻與離開通知到達率 | 攔不住 → #12 已明寫 best-effort，維持現狀；beacon 送不出 → 離開通知退回心跳路徑 | AC42、**AC6c**、**#25**（Lobby 的唯一偵測來源）、#12 的攔阻與離開通知。⚠ **fallback 在 Lobby 情境不成立（r4 二次修訂）**：fallback 寫「beacon 送不出 → 離開通知退回心跳路徑」，但 **Lobby 依 #20／#23 根本不跑心跳**——實際退路只剩 MPS 服務端 TTL（#23b 推測數十秒量級），於是 #25 自述的「留在 Lobby 的人會盯著一個說謊的 roster 數十秒，穩定觸發支柱 5」原封不動復活。**AC42 的桌面攔阻部分 fallback 仍可行**（best-effort 已明示），但 **AC6c 的離開通知部分不可行**。查證併入 P-7 的同一次 Release build（**因此應與 P-7 同批，而非排最後**） | **原型 W1（與 P-7 同批）** |
-| **P-19** | WebGL 可經 `.jslib` 使用 Clipboard API 寫入（需 user gesture），**且 itch.io 的 iframe 未以 permissions policy 擋掉 `clipboard-write`** | 與 P-4／P-6 同一次 itch.io 部署實測 | 不可用 → 「複製邀請連結」退化為「顯示可全選的連結文字框」＋提示手動複製 | #23 的**必做配套**（複製邀請連結按鈕）——而該按鈕是 #23 替代設計 (c) 的核心，也是降低 Host 切分頁必要性的唯一不依賴引擎行為的手段。**fallback 可行但削弱 #23 的保護** | 原型 W1 |
+| P-19 ✅**本地通過；iframe 情境待 itch.io** | **本地（非 iframe）實測 `clipboard result = OK`**——Clipboard API 在 Release Web build ＋ user gesture 下可用。⚠ **itch.io 的 iframe 是否以 permissions policy 擋掉 `clipboard-write` 仍待部署驗證**，那才是 #23 必做配套的真正考驗。原假設：WebGL 可經 `.jslib` 使用 Clipboard API 寫入（需 user gesture），且 itch.io 的 iframe 未擋 `clipboard-write` | 與 P-4／P-6 同一次 itch.io 部署實測 | 不可用 → 「複製邀請連結」退化為「顯示可全選的連結文字框」＋提示手動複製 | #23 的**必做配套**（複製邀請連結按鈕）——而該按鈕是 #23 替代設計 (c) 的核心，也是降低 Host 切分頁必要性的唯一不依賴引擎行為的手段。**fallback 可行但削弱 #23 的保護** | 原型 W1 |
 | ~~P-20~~ ✅✅ **(a) 已回填並實機複驗通過；(b) 已回填（原始碼層級，未實機）** 2026-09-13（W1 第 0 批） | **(a)** `NetworkObject.DontDestroyWithOwner` 是 **public bool field，預設 `false`＝預設銷毀**，Inspector 可勾選；**銷毀發生在 `OnClientDisconnectCallback` 之前、同一 call stack** → #24 的前置條件已補（原序列第 2 步隱含「物件還在」的假設為假）。⚠ `RemoveOwnership()` **不做 unparent**，「掉落在原地」須自行實作。⚠ 版本陷阱：2.4.0 前該欄位是壞的，2.13.2 已修，網路上 2025 上半年討論不可信。**(b)** `ChangeOwnership(ulong)` 在 client-server **同步原子、無 pending 窗口** → **#6 的「單一真相時刻」定義成立**；但回傳 void 失敗靜默（須回讀 `OwnerClientId`）、兩次變更需隔 6 tick、只有 server 能發起；`OwnershipStatus` 那套**只在 DA 有效** | 查 NGO 2.13 API＋原型：owner 斷線後觀察其 owned NetworkObject 是否被銷毀 | 預設為銷毀 → **顯式設定為不隨 owner 銷毀**（NGO 約定段已要求，本來就要做） | **拆兩半（r4 二次修訂）**：**(a) `DontDestroyWithOwner` 名稱與預設值**＝AC10、#24 步驟 2。修法（顯式設定）無論預設為何都安全 → **非 blocking**；且這是**查 API 文件**而非原型項，應排第 0 批。⚠ 註：NGO 約定段給的兩條路中，「Host 在掉落前先收回 ownership」**在時序上脆弱**（斷線不可預測，若銷毀發生在 `OnClientDisconnectCallback` 之前或同幀則來不及），真正安全的只有顯式設定那一條。**(b) ownership transfer 在 NGO 2.x 的 API 與限制**＝**#6 的「單一真相時刻」與 AC14（MVP）**——若 transfer 是非同步、存在 pending 窗口，則「Host 提交的那一刻」不存在，AC14 的二分無法成立。**(b) 目前無 fallback** | 原型 W1 |
 
 ## Open Questions
@@ -1398,6 +1466,7 @@ fallback 仍為 #23 替代設計 (b)(c)：以實測 TTL × `lobby_bg_safety_fact
 | 13 | **行動瀏覽器的 WebGL context loss**：iOS Safari 切 App 回來可能是 `webglcontextlost`——畫布死亡，**這不是「背景 >5s」可以涵蓋的分支**（沒有可恢復的 client 可以 teardown）。是否加規則「偵測到 context loss → 視同離開 session → 引導重新整理頁面」？ | 原型於 iOS Safari 實測（與 OQ#10 併問） | 原型 W2 |
 | 14 | **`settlement_timeout_sec` = 20s 是否打斷 Fellowship**：concept 把「結算檢討直接變成『剛剛那波我們應該…』的重開動力」列為 Short-Term Loop 的核心，而 Fellowship 是第一優先 aesthetic。20s 對認真檢討的朋友團可能太短，尤其首次遇到細項清單。tuning 範圍 10-60 已留夠彈性，但**預設值的依據看不出對齊過 concept** | playtest 時特別驗證「是否打斷檢討」，不只驗「有沒有自動推進」 | 原型後 playtest |
 | 15 | **更衣室 3-5s 對重連者是否為無回報的時間稅**：`#10` 的「推門進店的動作節奏」理由只對**第一次**進店成立。對一個 6 秒前才掉線、系統把他當全新員工對待的玩家，這 3-5s 是純等待。是否在**演出上**區隔（維持定長，但改為「回到崗位」而非「新人報到」）？ | game-designer ＋ `/ux-design` | Pre-Production Phase 4 |
+| 19 | **Lobby 階段「Host 被強制終止」的 132 秒偵測延遲，要怎麼對玩家呈現？**（W1 第 1 批實測後新增）。實測已把問題縮小：**優雅離開只要 1.14 秒**（`Deleted` 事件），**只有強制終止／當機才是 132.61 秒**。因此方向已明確——**#12 的 `beforeunload` ＋ 主動 `DeleteAsync()` 升格為關鍵機制**，覆蓋最常見的關分頁情境。**剩下的裁決只有一個：那條罕見的 132 秒路徑要怎麼呈現？** 選項：✅ **arlong 已裁決（2026-09-13）：採本地逾時提示**——Lobby 自最後一次 session 事件起計時，超過 `lobby_host_silence_timeout_sec`（30s）即顯示店語提示＋可離開按鈕，**不等服務端**。新增常數 `lobby_host_silence_timeout_sec`。文案歸 `/ux-design`。註：host migration（OQ#18）**解決不了這個延遲**——瓶頸是服務端判定 host 消失的時間，migration 只改變判定之後做什麼 | 已裁決 | 已納入 #25 |
 | 18 | **MVP 是否仍要維持「無 host migration」？**（W1 第 1 批發現後新增）。GDD 從 r1 起就把「房主關分頁＝本局結束」當成 MVP 的既定限制，#12 的 UI 也對玩家明示。但 MPS 2.3.1 的 API 顯示 **host migration 是一等公民**：`IHostSession.GetHostMigrationDataAsync`／`SetHostMigrationDataAsync`、`IHostSession.Host` 可指派、`ISession.SessionMigrated` 事件、`NetworkState.Migrating` 狀態、`IClientSessionNetwork.MigrationFailed` 事件。也就是說「無 migration」是**選擇**而非引擎限制。是否至少列入 Post-MVP？（影響 #12、#21、AC6b、AC13b、UI 翻譯表的「店長把鐵門拉下來了」整條敘事，以及 Relay 情境 B 的 10s 回收問題） | creative-director 裁決 ＋ 實機評估遷移成本 | 原型 W1 後 |
 | 17 | **`network_tick_rate` 的第三個考量：交接冷卻**（W1 第 0 批查證後新增）。引擎要求兩次 ownership 變更間隔 ≥6 個 network tick。代入本專案：**10Hz → 600ms**、20Hz → 300ms、30Hz → 200ms。600ms 對一款 Overcooked-like 的快節奏合作遊戲是**可感知的**交接延遲，而「借過！把東西丟給你」正是核心樂趣之一。先前選 10Hz 只考慮了移動平滑度與頻寬；現在它還牽動交接手感。是否為此把 tick 提到 20-30Hz？（提高會增加 NetworkTransform 與 NetworkVariable 流量，須與 OQ#12 的頻寬預算一起看） | 原型 W1 量測 ＋ 攜帶與交付 GDD | 原型 W1 |
 | 16 | **Host 獨留長時間續戰時是否主動引導補位**：#21 給了「提前收班」出口，但沒有「開放補位」的引導（例如提示 Host 再貼一次連結）。若班次才過 1/4 隊友就全掛，Host 要撐 6 分鐘以上 | 波次導演 GDD ＋ playtest（與 OQ#9 併問） | 原型後 playtest |

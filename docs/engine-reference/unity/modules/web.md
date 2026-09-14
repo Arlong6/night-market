@@ -28,6 +28,31 @@
 - 音訊：首次使用者手勢前不可自動播放（跟 Godot web 相同——標題畫面點擊開始的模式沿用）
 - Web Profiler 可用裝置 IP attach 到執行中的 build（6.3）
 
+## 字型（2026-09-13 W1 原型實測）
+
+- ⚠ **Unity 內建 GUI skin 的預設字型不含 CJK glyph**。Release Web build 實測：
+  介面上的中文字元**完全不渲染**（英數與符號正常）。
+- **任何以中文呈現 UI 的專案都必須打包自己的 CJK 字型**並設為預設，不得依賴引擎內建。
+- **體積警告**：CJK 字型即使子集化仍有明顯體積，而 Web 的下載預算通常吃緊。
+  **字型子集化應視為建置步驟而非後期優化。**
+- 註：Godot 也有同一個坑（`ThemeDB.fallback_font` 無 CJK）——**這是 Web 平台的通例，不是引擎特性**。
+
+## Build size 參考值（2026-09-13 W1 原型實測）
+
+一個**幾乎空的專案**（單一 OnGUI 腳本 ＋ NGO 2.13.2 ＋ Multiplayer Services 2.3.1），
+IL2CPP ＋ Managed Stripping High ＋ Strip Engine Code ＋ Brotli：
+
+| 檔案 | 大小 |
+|---|---|
+| `Web.wasm.br` | 5607 KB |
+| `Web.data.br` | 1472 KB |
+| `Web.framework.js.br` | 77 KB |
+| `Web.loader.js`（未壓縮） | 26 KB |
+| **合計** | **約 7.0 MB** |
+
+建置耗時約 3 分鐘（Apple Silicon，首次含 IL2CPP 編譯則更久）。
+**即：執行環境與 netcode 套件就是約 7 MB 的地板**，規劃下載預算時要從這裡起算。
+
 ## 本專案硬指標
 
 - 壓縮後下載 ≤ 50MB（支柱「開連結就開玩」）

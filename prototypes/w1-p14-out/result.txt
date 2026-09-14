@@ -1,0 +1,1 @@
+signal=PlayerLeaving;seconds=132.61

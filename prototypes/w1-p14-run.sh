@@ -16,8 +16,9 @@ wait_for () { # $1=檔名 $2=秒數上限
 }
 
 echo "[1/5] 啟動 host…"
-"$U" -batchmode -nographics -projectPath "$BASE/w1-netcode" \
-     -executeMethod W1Harness.RunHost -w1out "$OUT" \
+"$U" -runTests -batchmode -nographics -projectPath "$BASE/w1-netcode" \
+     -testPlatform PlayMode -testFilter "W1HostRole" -w1out "$OUT" \
+     -testResults "$BASE/w1-p14-host-results.xml" \
      -logFile "$BASE/w1-p14-host.log" & HOST_PID=$!
 echo "      host pid=$HOST_PID"
 
@@ -27,8 +28,9 @@ fi
 echo "      session code=$(cat "$OUT/code.txt")"
 
 echo "[2/5] 啟動 client…"
-"$U" -batchmode -nographics -projectPath "$BASE/w1-client" \
-     -executeMethod W1Harness.RunClient -w1out "$OUT" \
+"$U" -runTests -batchmode -nographics -projectPath "$BASE/w1-client" \
+     -testPlatform PlayMode -testFilter "W1ClientRole" -w1out "$OUT" \
+     -testResults "$BASE/w1-p14-client-results.xml" \
      -logFile "$BASE/w1-p14-client.log" & CLIENT_PID=$!
 
 if ! wait_for client-armed.txt 300; then
@@ -42,7 +44,7 @@ kill -9 $HOST_PID 2>/dev/null
 echo "      killed at $KILL_TS"
 
 echo "[4/5] 等待 client 偵測…"
-wait_for result.txt 100
+wait_for result.txt 330
 
 echo "[5/5] 結果："
 if [ -f "$OUT/result.txt" ]; then cat "$OUT/result.txt"; echo; else echo "NONE (timeout)"; fi

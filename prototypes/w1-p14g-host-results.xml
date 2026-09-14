@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Passed" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-14 14:37:16Z" end-time="2026-09-14 14:37:28Z" duration="11.5373537">
+  <test-suite type="TestSuite" id="1020" name="w1-netcode" fullname="w1-netcode" runstate="Runnable" testcasecount="8" result="Passed" start-time="2026-09-14 14:37:16Z" end-time="2026-09-14 14:37:28Z" duration="11.537354" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <test-suite type="Assembly" id="1016" name="W1.Tests.PlayMode.dll" fullname="/Users/arlong/Projects/Claude-Code-Game-Studios/prototypes/w1-netcode/Library/ScriptAssemblies/W1.Tests.PlayMode.dll" runstate="Runnable" testcasecount="8" result="Passed" start-time="2026-09-14 14:37:16Z" end-time="2026-09-14 14:37:28Z" duration="11.533967" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="12413" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <test-suite type="TestSuite" id="1017" name="W1" fullname="W1" runstate="Runnable" testcasecount="8" result="Passed" start-time="2026-09-14 14:37:16Z" end-time="2026-09-14 14:37:28Z" duration="11.533781" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1018" name="Tests" fullname="W1.Tests" runstate="Runnable" testcasecount="8" result="Passed" start-time="2026-09-14 14:37:16Z" end-time="2026-09-14 14:37:28Z" duration="11.533653" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1019" name="PlayMode" fullname="W1.Tests.PlayMode" runstate="Runnable" testcasecount="8" result="Passed" start-time="2026-09-14 14:37:16Z" end-time="2026-09-14 14:37:28Z" duration="11.533514" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1007" name="W1HostRole" fullname="W1.Tests.PlayMode.W1HostRole" classname="W1.Tests.PlayMode.W1HostRole" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-09-14 14:37:16Z" end-time="2026-09-14 14:37:28Z" duration="11.533001" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1008" name="RunHost" fullname="W1.Tests.PlayMode.W1HostRole.RunHost" methodname="RunHost" classname="W1.Tests.PlayMode.W1HostRole" runstate="Runnable" seed="92834721" result="Passed" start-time="2026-09-14 14:37:16Z" end-time="2026-09-14 14:37:28Z" duration="11.528666" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[W1H] signed in as lEYLoSNzPcbDMI7OnZij79CxFKGp
+[W1H] wrote code.txt: W68D79
+[W1H] wrote host-player.txt: lEYLoSNzPcbDMI7OnZij79CxFKGp
+[W1H][host] up. Code=W68D79 Host=lEYLoSNzPcbDMI7OnZij79CxFKGp
+[W1H] wrote host-ready.txt: 2026-09-14T14:37:18.9636020Z
+Saving results to: /Users/arlong/Library/Application Support/DefaultCompany/w1-netcode/TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

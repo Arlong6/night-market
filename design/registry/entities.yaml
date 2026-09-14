@@ -652,6 +652,18 @@ constants:
     added: 2026-09-13
     revised: ""
 
+  - name: lobby_host_silence_timeout_sec
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      # Future dependents: 大廳 UI GDD, /ux-design lobby screen
+    value: 30
+    unit: seconds
+    notes: "Lobby 自最後一次收到任何 session 事件起計時，逾時即顯示店語提示＋可離開按鈕（Core Rule #25）。**不等服務端**。存在的理由：W1 第 1 批實測發現 Host 被強制終止（kill -9）時，服務端要 **132.61 秒**才廣播 PlayerLeaving；而 Host 優雅離開只要 **1.14 秒**。本常數是針對那條罕見慢路徑的本地自救。Tuning 15-45，**上限受支柱 5 的『純看戲 >30 秒就重做』約束，不宜超過**。arlong 於 2026-09-13 裁決。"
+    added: 2026-09-13
+    revised: ""
+
   - name: join_phase_budgets_sec
     status: active
     source: design/gdd/netcode-session.md

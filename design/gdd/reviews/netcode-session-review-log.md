@@ -471,3 +471,52 @@ r4 曾標註 `[P-17]` 是「用一個未驗證機制去修另一個未驗證機�
    `ServicesInitializationException`，且 `?.` **擋不住**——拋例外的是 getter 本身。
 2. 雙進程測試中，兩個專案副本若 `productName` 相同會**共用 PlayerPrefs**，
    於是拿到**同一個匿名帳號**，client 會變成 host 自己。已把副本改名為 `w1-client`。
+
+---
+
+## W1 原型 — 第 2 批（Release Web build，本地驗證部分）— 2026-09-13
+
+建置設定刻意採 GDD 指定的正式組態：IL2CPP ＋ Managed Stripping High ＋ Strip Engine Code
+＋ Brotli，因為 `[P-7]` 的整個風險就在「只有 Release build 才現形」。
+建置成功、零錯誤、耗時約 3 分鐘。
+
+**`[P-7]` 雙向通過 —— 這是本批最重要的結果**
+
+`.jslib` 的 JS→C# 讀取（`location.search`／`visibilityState`／`navigator.onLine`／
+`performance.now`）與 **C#←JS 的 `SendMessage` 回呼**在正式 build 下**全部正常**。
+後者才是 `[Preserve]` 的真正考驗——它證明了 r4 為此加的保護是有效的。
+實測 console：
+
+```
+[W1WEB] boot ownQuery='?code=TEST99' parentQuery='?code=TEST99' iframe=0 referrer=''
+[W1WEB] clipboard result = OK
+```
+
+**`[P-19]` 本地通過**：Clipboard API 在 user gesture 下回傳 `OK`。
+⚠ 但 **itch.io 的 iframe 是否以 permissions policy 擋掉 `clipboard-write` 仍待部署驗證**，
+那才是 #23「複製邀請連結」這個必做配套的真正考驗。
+
+**`[P-4]` 本地部分通過**：非 iframe 情境下 `?code=TEST99` 讀得到。
+⚠ **真正的問題（itch.io 把遊戲放進 iframe 後 query 是否還在）必須部署才知道**。
+探針已同時取自身 query、父視窗 query 與 `document.referrer` 三個來源，以便分辨
+「完全讀不到」與「要改從父視窗取」。
+
+### 兩個原本不知道的數字與限制
+
+**Build size 的地板是 7.0 MB。** 一個幾乎空的專案（單一 OnGUI 探針 ＋ NGO ＋ MPS）
+Brotli 後：`Web.wasm.br` 5607 KB、`Web.data.br` 1472 KB、`Web.framework.js.br` 77 KB、
+`Web.loader.js` 26 KB。**執行環境與 netcode 套件就吃掉約 7 MB，留給遊戲內容約 43 MB。**
+公式⑤ 的 `T_load` 餘裕本來就是 0，現在連地板都有依據了。
+
+🔴 **Unity Web build 的預設字型不含 CJK——整張 UI 翻譯表在網頁上會是空白。**
+實測探針畫面：**中文字元完全不渲染**，只有英數與符號出得來。
+這是**支柱級問題**：UI Requirements 的核心主張正是「所有網路狀態一律翻譯成店語」，
+而店語全是中文。已寫入 UI Requirements 與 `modules/web.md`：
+必須打包 CJK 字型並設為預設，且**字型子集化應列為 MVP 建置步驟而非後期優化**
+（體積直接壓在已經歸零的 `T_load` 餘裕上）。
+註：Godot 也有同一個坑（`ThemeDB.fallback_font` 無 CJK）——**換引擎沒有換掉這個坑**。
+
+### 尚待 itch.io 部署
+
+`[P-4]`（iframe 是否轉發 `?code=`）、`[P-6]`（Brotli `Content-Encoding`）、
+`[P-19]` 的 iframe 情境。三者同屬一次部署，需 butler 登入與一個 itch.io 專案頁。
