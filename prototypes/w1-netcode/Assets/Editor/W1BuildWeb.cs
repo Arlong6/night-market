@@ -44,7 +44,11 @@ public static class W1BuildWeb
         PlayerSettings.SetManagedStrippingLevel(NamedBuildTarget.WebGL, ManagedStrippingLevel.High);
         PlayerSettings.stripEngineCode = true;
         PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Brotli;
-        PlayerSettings.WebGL.decompressionFallback = false; // 讓伺服器負責 Content-Encoding，才測得到 [P-6]
+        // [P-6] 第一次建置刻意設 false，為的是測出**伺服器真實行為**——結果測到 itch.io
+        // 不支援 Brotli：它把 .br 解壓後以 gzip/無壓縮重新提供，實際傳輸量變成 2.00 倍，
+        // 直接打穿公式⑤ 的 T_load 預算。改為 true 後由 Unity 內建的 JS 解壓器處理 Brotli，
+        // 不再依賴伺服器 header，傳輸量應回到 Brotli 水準（代價是解壓的 CPU 時間）。
+        PlayerSettings.WebGL.decompressionFallback = true;
         PlayerSettings.WebGL.template = "APPLICATION:Default";
         PlayerSettings.WebGL.memorySize = 512;             // GDD 記憶體天花板
         PlayerSettings.runInBackground = true;             // [P-7] 要觀察背景行為，不要被這個設定先擋掉

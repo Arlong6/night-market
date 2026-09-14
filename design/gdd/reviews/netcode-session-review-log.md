@@ -520,3 +520,60 @@ Brotli 後：`Web.wasm.br` 5607 KB、`Web.data.br` 1472 KB、`Web.framework.js.b
 
 `[P-4]`（iframe 是否轉發 `?code=`）、`[P-6]`（Brotli `Content-Encoding`）、
 `[P-19]` 的 iframe 情境。三者同屬一次部署，需 butler 登入與一個 itch.io 專案頁。
+
+## W1 原型 — 第 2 批（itch.io 真實部署）— 2026-09-14
+
+部署到 `arlong666.itch.io/w1-netcode-probe-internal-test`（草稿，僅擁有者可見）。
+三項假設全部有了決定性答案，**其中兩項為假，一項後果比預期嚴重**。
+
+### `[P-4]` 帶碼連結：假設為假，但找到唯一可行路徑
+
+| 來源 | 實測值 |
+|---|---|
+| `location.search` | **`?v=1789400690`**——itch.io 自己的版本參數，原始 `?code=` 完全不見 |
+| `parent.location.search` | **`__CROSS_ORIGIN_BLOCKED__`**——iframe 來自 `html-classic.itch.zone`，與 `itch.io` 跨域 |
+| **`document.referrer`** | **`https://arlong666.itch.io/…?code=…`——原始 URL 含 query，可讀** |
+
+**帶碼連結仍可實作**，但必須改從 `document.referrer` 解析。
+⚠ referrer 會被使用者隱私設定或 `Referrer-Policy` 削減，因此
+**#8 的輸碼備援絕不可砍**（AC2 已保底）。探針同時取三個來源，正是為了分辨這件事。
+
+### `[P-6]` Brotli：假設為假，且直接打穿支柱 4
+
+itch.io **不支援 Brotli `Content-Encoding`，而且會把上傳的 `.br` 解壓後重新提供**。
+
+| 檔案 | 我們的 Brotli | itch.io 實際傳輸 | 倍數 |
+|---|---|---|---|
+| `Web.wasm.br` | 5,741,298 | 8,108,255（`content-encoding: gzip`） | 1.41 |
+| `Web.data.br` | 1,506,949 | 6,522,513（**無 content-encoding**） | **4.32** |
+| `Web.framework.js.br` | 78,508 | 92,753 | 1.18 |
+| `Web.loader.js` | 26,983 | 9,514 | 0.35 |
+| **合計** | **7,353,738** | **14,733,035** | **2.00** |
+
+機制已確認：`Web.data.br` 下載後前 4 位元組是 `UnityFS` **明文** → itch.io 解壓了 Brotli。
+遊戲能跑，是因為 Unity 收到的本來就是可用資料——**壞消息藏在傳輸量裡，不在功能裡**。
+
+🔴 **公式⑤ 的 `T_load ≤25s` 建立在「50MB Brotli ÷ 20Mbps」之上。
+在 itch.io 上那是 ≈100MB → `T_load ≈50s` → 60 秒硬標破，支柱 4 不成立。**
+
+正在驗證解法：`decompressionFallback = true`（Unity 內建 JS 解壓，不依賴伺服器 header）。
+第一次建置刻意設 `false`，為的正是測出伺服器真實行為。
+
+### `[P-19]` 剪貼簿：iframe 情境為假
+
+itch.io 的 iframe `allow` 屬性實測**沒有 `clipboard-write`**：
+
+```
+autoplay; fullscreen *; geolocation; microphone; camera; midi; monetization;
+xr-spatial-tracking; gamepad; gyroscope; accelerometer; xr; cross-origin-isolated; web-share
+```
+
+→ **#23 的「複製邀請連結」在 itch.io 上必須走 fallback**（可全選的文字框＋提示手動複製）。
+本地非 iframe 情境仍為 `OK`，故此限制**專屬於 iframe 部署平台**。
+⚠ 這一項在本地測試會通過、在正式平台失敗——正是 r4 擔心的那類「只在正式環境現形」的缺陷。
+
+### 方法論註記
+
+三項全部是「本地測不出來」的。`[P-4]` 與 `[P-19]` 在本地都通過，`[P-6]` 在本地根本不存在
+（本地伺服器是我自己寫的，當然回正確的 header）。**必須真的部署**這件事本身，
+是 r4 把這三項綁成同一批的理由，現在證明那個判斷是對的。
