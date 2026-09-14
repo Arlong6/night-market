@@ -139,10 +139,17 @@ transport 無官方端到端範例），因此是第一個做技術原型的系�
 **加入與離開**
 8. 帶碼連結是主要入口（房間碼為 Sessions API 原生 `session.Code`，格式平台決定
    `[P-1]`）；手動輸碼為**必備備援**——若部署平台不轉發 URL query（`[P-4]`，
-   itch.io iframe 未驗證），輸碼路徑就是唯一入口，不得砍。**輸碼規則**：比對一律
-   **大小寫不敏感**；易混淆字元（0/O、1/I/l）於輸入端正規化為同一值；若 `session.Code`
-   字集不受控（含易混淆字元且無法正規化），走 P-1 既有 fallback（自建短碼對照表）。
-   輸入框**必須支援整串貼上**
+   itch.io iframe 未驗證），輸碼路徑就是唯一入口，不得砍。**輸碼規則** ✅ **（`[P-1]` 已於 W1 第 1 批實測回填，2026-09-13）**：
+   實測 6 個 session 的 `session.Code` 為 **固定 6 碼、全大寫英數**，
+   觀察字集 `689BCDFGHJKLMPQRTW`——**數字只有 6/8/9，字母不含任何母音，
+   且完全不含 0、O、1、I、L**。服務端顯然已刻意避開易混淆字元（避開母音應是為了
+   不讓隨機碼拼出真實字詞）。因此：
+   - **「易混淆字元正規化」規則已刪除**——服務端字集已處理，客戶端再做是多餘的
+   - **`[P-1]` 的 fallback（自建短碼對照表）不需要**
+   - **仍須保留：比對大小寫不敏感**（碼本身全大寫，但玩家會用小寫輸入）
+   - 輸入框**必須支援整串貼上**
+   > 取樣說明：6 個樣本共 36 個字元位置，未出現任何易混淆字元。若真實字集含
+   > 4 個易混淆字元，36 次抽樣全不中的機率約 0.9%——證據強，但非窮舉證明。
 9. 中途加入：允許，但**班次剩 30 秒起鎖 join**（含 Settlement 全程），此後加入者
    一律導向 **Lobby（前一班進行中）**（見 States 表；不是另開新房）。
    邊界：剩餘 `t ≤ 30.0s` 即鎖（含端點）。
@@ -213,7 +220,10 @@ transport 無官方端到端範例），因此是第一個做技術原型的系�
     僅約 9 秒且可逐波重複——「用 alt-tab 調低難度」違反支柱 1「兩段式節奏不可破壞」。
     本條保住保護的本體，只拿掉可重複刷的那一部分。
     計數以 **session-level player 身分**為準（非 NGO ClientId——重連會配發新 ClientId，
-    見 `[P-2]`）；計數於**班次結束時歸零**，不跨班累積。
+    見 `[P-2]`）。✅ W1 第 1 批實測：該身分＝`AuthenticationService.PlayerId`，
+    只要匿名帳號不變就跨 session 延續。⚠ **匿名帳號綁本機憑證，清快取或換瀏覽器即換身分**
+    ——「換裝置即重新計數」屬已知接受（濫用成本仍高於收益）。
+    計數於**班次結束時歸零**，不跨班累積。
     註：真的網路不穩的人仍拿得到降載（最常態的保護），只是第二次起沒有額外的寬限緩衝。
 16. 例外：`player_count` 僅計算**在線**玩家；重連保留中的 slot（Post-MVP）不計入
     （避免留守者扛不存在的人力份額）。**多人相繼離線**：寬限期以**最新**離線時刻
@@ -386,10 +396,25 @@ transport 無官方端到端範例），因此是第一個做技術原型的系�
       即：**network 是 session 之上可獨立啟停的一層**，正是本條需要的形狀。
     - **`StopNetworkAsync()` 同時讓 #23a（局間 teardown 回 MPS-only）有了對應 API。**
 
+    ✅ **runtime 實測證據（W1 第 1 批，PlayMode 4/4 通過）**：
+    - 建立時：`Code=M69T96`、`SessionState=Connected`、**`NetworkState=Stopped`**
+    - **場景中沒有 `NetworkManager` 也能建立成功**——比原設計預期的更好：
+      Lobby 階段連 NGO 的單例都不需要存在
+    - 延後呼叫 `StartRelayNetworkAsync()` 後：`NetworkState=Started`、`NGO.IsListening=True`
+      （這一刻即 Host 按下「開始上班」）
+    - 再呼叫 `StopNetworkAsync()`：回到 `NetworkState=Stopped`，而 `SessionState` 仍為
+      `Connected`——**#23a 的局間 teardown 經 runtime 證實**，且兩個狀態機確實獨立
+
     r4 曾依引擎參考的敘述（「Session 會自動處理 lobby、Relay allocation、NGO 連線」）
     判斷三者是一次呼叫的封裝、與本條直接衝突，因而把它降級為高風險假設。
-    實際 API 顯示那句話描述的是**便利路徑**（一次帶齊選項時的行為），不是**唯一路徑**。
-    本條的風險因此解除；`[P-10]` 剩餘的查證項轉為時序與服務層行為（見下）。
+    實際 API 與 runtime 都顯示那句話描述的是**便利路徑**（一次帶齊選項時的行為），
+    不是**唯一路徑**。本條的風險解除；`[P-10]` 剩餘的查證項只剩 (a) 服務層在背景分頁
+    是否停擺——那需要 Web build ＋ 真實瀏覽器。
+
+    ⚠ **一併記錄的引擎事實**：`WithRelayNetwork()` 這條路徑**依賴 `NetworkManager.Singleton`**
+    （首次測試在無 NetworkManager 的空場景下拋
+    `SessionException: Cannot start when Singleton is not set`）。
+    不帶 network 的 session 則無此依賴。這正好強化本條：Lobby 階段可以完全不碰 NGO。
 
     **若不可拆的替代設計（r4 補完，不再只是一句 timeout 調整）**：
     - (a) **接受 Lobby 期間存在 Relay／NGO 連線**，並把 Lobby 的 Host 離開偵測改回心跳
@@ -1096,7 +1121,7 @@ Relay 中繼的純網路成本 ≥400ms，AC22 的 300ms 在數學上不可能�
 | # | 準則 | 層級 |
 |---|---|---|
 | 1 | GIVEN 大廳按建立房間，WHEN 建立成功，THEN 收到 room_code，且產生的分享連結貼到另一瀏覽器分頁開啟後免輸碼直接顯示大廳 | MVP |
-| 2 | GIVEN 有效 room_code，WHEN 於標準網路手動輸入送出（含全小寫、含 0/O 互換），THEN ≤1s 加入 roster（**此路徑不得依賴 URL 轉發**） | MVP |
+| 2 | GIVEN 有效 room_code，WHEN 於標準網路手動輸入送出（**含全小寫**；r4 後移除「0/O 互換」子項——`[P-1]` 實測字集不含易混淆字元，該測試無意義），THEN ≤1s 加入 roster（**此路徑不得依賴 URL 轉發**） | MVP |
 | 3 | GIVEN 部署於 itch.io 的正式頁面（iframe 環境），WHEN 開啟帶碼連結，THEN 免輸碼進大廳；若平台不轉發 query，THEN 自動 fallback 至輸碼畫面且顯示「請輸入工號」 | MVP `[P-4]` |
 | 4 | GIVEN 遊戲進行中且班次剩餘 >30s，WHEN 新玩家加入，THEN 更衣室過場時長 ∈[3.0s, 5.0s]（含端點，逾時視為 fail）；期間既有玩家**本機** frame time 無單幀 >100ms、既有玩家螢幕上**其他角色**位置無單幀 >1m 跳變、輸入未被鎖 | MVP |
 | 5 | GIVEN **Host 端計算之**班次剩餘 ≤`late_join_cutoff_sec`（30s）或已在 Settlement，WHEN 新玩家點連結，THEN **approval 閘門拒絕**並導向 **Lobby\***，顯示「這班快下班了，你排下一班」，不進入當前班次 | MVP |
@@ -1307,8 +1332,8 @@ Relay 中繼的純網路成本 ≥400ms，AC22 的 300ms 在數學上不可能�
 
 | # | 假設 | 驗證方式 | 若為假的 fallback | **影響（若為假，什麼會死）** | 目標 |
 |---|---|---|---|---|---|
-| P-1 | `session.Code` 為短、可口述的碼，且字集不含或可正規化 0/O、1/I/l | 原型直接取值列印 | 碼太長/不可讀/字集不受控 → 自建短碼對照表映射到 session id | AC1、AC2 的可用性。**fallback 可行**（自建短碼表），非 blocking。註：此 fallback 同時是 P-10 服務層 fallback 的前置——只有短碼與 session id 解耦，才可能在 session 被服務端回收後用**同一個房間碼**重建 | 原型 W1 |
-| P-2 | 30s slot-hold 可與 Relay/MPS 服務端逾時共存，且能靠自建 GUID 表恢復原位 | 原型斷線 29s/31s 實測 | 服務端更早釋放 → 縮短 W 至服務端上限；或砍掉原位恢復（本就是 Post-MVP） | **拆兩半（r4 二次修訂）**：**(a) 30s slot-hold 與原位恢復**＝AC17／AC18／AC19，全為 Post 層級，fallback 可行，非 blocking。**(b) 跨重連的 session-level player 身分** ✅ **API 存在（W1 第 1 批）**：`ISession.ReconnectAsync()` 與 `ISession.CurrentPlayer`（`IPlayer`，帶 playerId）皆存在；**但「重連後 playerId 是否延續同一值」仍需實機連線驗證**。＝**AC50（MVP）** 與 **#15a 的全部目的**——若身分不可得，離線次數只能用 NGO ClientId 計數，而重連會配發新 ClientId，**每次都算「第一次」，「用 alt-tab 調低難度」的漏洞原封復活**。**(b) 目前無 fallback，且應移入 W1**（先前整條排 W2 是層級誤判） | 原型 W2 |
+| ~~P-1~~ ✅✅ **已實測回填 2026-09-13（W1 第 1 批）** | **固定 6 碼、全大寫英數，字集 `689BCDFGHJKLMPQRTW`（6 樣本）——無母音、無 0/O/1/I/L。** 假設成立且優於預期：**fallback 不需要，#8 的正規化規則已刪除**。~~原假設~~ `session.Code` 為短、可口述的碼，且字集不含或可正規化 0/O、1/I/l | 原型直接取值列印 | 碼太長/不可讀/字集不受控 → 自建短碼對照表映射到 session id | AC1、AC2 的可用性。**fallback 可行**（自建短碼表），非 blocking。註：此 fallback 同時是 P-10 服務層 fallback 的前置——只有短碼與 session id 解耦，才可能在 session 被服務端回收後用**同一個房間碼**重建 | 原型 W1 |
+| P-2 | 30s slot-hold 可與 Relay/MPS 服務端逾時共存，且能靠自建 GUID 表恢復原位 | 原型斷線 29s/31s 實測 | 服務端更早釋放 → 縮短 W 至服務端上限；或砍掉原位恢復（本就是 Post-MVP） | **拆兩半（r4 二次修訂）**：**(a) 30s slot-hold 與原位恢復**＝AC17／AC18／AC19，全為 Post 層級，fallback 可行，非 blocking。**(b) 跨重連的 session-level player 身分** ✅✅ **已實測回填（W1 第 1 批）**：`session.CurrentPlayer.Id` **等同** `AuthenticationService.Instance.PlayerId`（實測皆為 `lEYLoSNzPcbDMI7OnZij79CxFKGp`）。因此**只要匿名帳號不變，身分就跨 session 延續**，#15a 的離線次數計數與 AC50 有可靠依據。`ISession.ReconnectAsync()` 亦存在。⚠ 殘留：匿名帳號本身綁在本機憑證上，**清快取／換瀏覽器會換身分**（與 OQ#5 的 PlayerPrefs 儲存分割同源）——這是設計可接受的限制，但應在 #15a 註明「換裝置即重新計數」。＝**AC50（MVP）** 與 **#15a 的全部目的**——若身分不可得，離線次數只能用 NGO ClientId 計數，而重連會配發新 ClientId，**每次都算「第一次」，「用 alt-tab 調低難度」的漏洞原封復活**。**(b) 目前無 fallback，且應移入 W1**（先前整條排 W2 是層級誤判） | 原型 W2 |
 | ~~P-3~~ ✅✅ **已回填並實機複驗通過 2026-09-13（W1 第 0 批）** | ~~玩家同步 10Hz 可獨立於全域 tick 調整~~ → **假設為假，但後果與預期相反（是好消息）**。NetworkTransform 送出頻率**＝全域 `NetworkConfig.TickRate`，無 per-instance 設定**（預設 30）。**但 RPC 完全不受 tick 影響**（每幀 `PostLateUpdate` 送出），受影響的只有 NetworkVariable 與 NetworkTransform。→ **AC22 可達成**（≈235-250ms），約束⑧ 已重寫。殘留實機項：server frame rate、WebSocket 丟包 P95 尾端、`InterpolationBufferTickOffset` 實際預設值 | 查 NGO 2.13 API＋原型實測，**必須與 AC22／OQ#1 同一次量測** | 實為全域 tick → **必須先驗證 tick rate 對 AC22 的影響**，必要時把 tick 拉高至 20-30Hz 並改用 interpolation／send-threshold 降低單物件發送頻率（tick rate 與「每個物件多久送一次」本來就是兩件事） | **AC22（MVP）**、AC23、AC46、約束⑧、registry 的 `interact_rtt_p95_ms`。⚠ **裸 fallback 不可行**——「改為統一 tick 值」若沿用 10Hz，往返多 200ms，AC22 數學上必敗。fallback 必須附帶「拉高 tick」才成立 | 原型 W1 |
 | P-4 | itch.io iframe 會轉發 `?code=` 給遊戲 | **實際部署一次測**（10 分鐘），與 P-6／P-19 同一次 | 不轉發 → 輸碼路徑成為唯一入口（AC2 已保底），並改用「短碼優先」的分享文案 | AC3 的前半。**fallback 是全表最健康的一條**——#8 已把輸碼釘成必備備援，AC2 已保底，非 blocking | 原型 W1 |
 | P-5 | NGO **跨 channel**（本專案實際使用的 reliable/unreliable 組合）可能亂序，需單物件 sequence 保護 | 原型以實際 channel 組合壓測（**不是**單 reliable channel——TCP 本就有序，會得偽陰性） | 證實有序 → **移除**通用 sequence 層，**但保留 `ClaimGeneration`**（防遲到請求，與有序性無關） | AC26。**fallback 可行**（移除是簡化，非損失），非 blocking | 原型 W2 |

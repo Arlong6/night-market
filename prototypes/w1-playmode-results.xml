@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="4" result="Passed" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-14 13:19:28Z" end-time="2026-09-14 13:19:36Z" duration="8.7365282">
+  <test-suite type="TestSuite" id="1012" name="w1-netcode" fullname="w1-netcode" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-09-14 13:19:28Z" end-time="2026-09-14 13:19:36Z" duration="8.736528" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <test-suite type="Assembly" id="1008" name="W1.Tests.PlayMode.dll" fullname="/Users/arlong/Projects/Claude-Code-Game-Studios/prototypes/w1-netcode/Library/ScriptAssemblies/W1.Tests.PlayMode.dll" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-09-14 13:19:28Z" end-time="2026-09-14 13:19:36Z" duration="8.733120" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="84040" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <test-suite type="TestSuite" id="1009" name="W1" fullname="W1" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-09-14 13:19:28Z" end-time="2026-09-14 13:19:36Z" duration="8.733000" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1010" name="Tests" fullname="W1.Tests" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-09-14 13:19:28Z" end-time="2026-09-14 13:19:36Z" duration="8.732937" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1011" name="PlayMode" fullname="W1.Tests.PlayMode" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-09-14 13:19:28Z" end-time="2026-09-14 13:19:36Z" duration="8.732867" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1003" name="UgsSmokeTests" fullname="W1.Tests.PlayMode.UgsSmokeTests" classname="W1.Tests.PlayMode.UgsSmokeTests" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-09-14 13:19:28Z" end-time="2026-09-14 13:19:36Z" duration="8.732431" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1004" name="A01_可以在batchmode完成初始化與匿名登入" fullname="W1.Tests.PlayMode.UgsSmokeTests.A01_可以在batchmode完成初始化與匿名登入" methodname="A01_可以在batchmode完成初始化與匿名登入" classname="W1.Tests.PlayMode.UgsSmokeTests" runstate="Runnable" seed="529026934" result="Passed" start-time="2026-09-14 13:19:28Z" end-time="2026-09-14 13:19:28Z" duration="0.334724" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[W1][UGS] InitializeAsync 完成，State=Initialized
+[W1][UGS] IsSignedIn=True PlayerId=lEYLoSNzPcbDMI7OnZij79CxFKGp
+]]></output>
+              </test-case>
+              <test-case id="1005" name="B01_不帶Network的Session_不需要NetworkManager_P10b" fullname="W1.Tests.PlayMode.UgsSmokeTests.B01_不帶Network的Session_不需要NetworkManager_P10b" methodname="B01_不帶Network的Session_不需要NetworkManager_P10b" classname="W1.Tests.PlayMode.UgsSmokeTests" runstate="Runnable" seed="1239888026" result="Passed" start-time="2026-09-14 13:19:28Z" end-time="2026-09-14 13:19:31Z" duration="2.543469" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[W1][UGS] IsSignedIn=True PlayerId=lEYLoSNzPcbDMI7OnZij79CxFKGp
+[W1][P-10b] 無 NetworkManager 下建立成功：Code=M69T96 SessionState=Connected NetworkState=Stopped Host=lEYLoSNzPcbDMI7OnZij79CxFKGp PlayerCount=1
+]]></output>
+              </test-case>
+              <test-case id="1006" name="B02_可延後啟動Relay_模擬開始上班_P10b" fullname="W1.Tests.PlayMode.UgsSmokeTests.B02_可延後啟動Relay_模擬開始上班_P10b" methodname="B02_可延後啟動Relay_模擬開始上班_P10b" classname="W1.Tests.PlayMode.UgsSmokeTests" runstate="Runnable" seed="1403509150" result="Passed" start-time="2026-09-14 13:19:31Z" end-time="2026-09-14 13:19:35Z" duration="4.346015" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[W1][UGS] IsSignedIn=True PlayerId=lEYLoSNzPcbDMI7OnZij79CxFKGp
+[W1][NGO] NetworkManager 已建立，Singleton=True
+[W1][P-10b] 建立時 NetworkState=Stopped
+[W1][P-10b] 延後 StartRelayNetworkAsync 後 NetworkState=Started NGO.IsListening=True
+[W1][#23a] StopNetworkAsync 後 NetworkState=Stopped
+[Multiplayer]: GameObjectsNetcodeNetworkHandler.StopAsync: Failed to stop session: session was never started.
+]]></output>
+              </test-case>
+              <test-case id="1007" name="B03_sessionPlayerId等同AuthPlayerId_P2b" fullname="W1.Tests.PlayMode.UgsSmokeTests.B03_sessionPlayerId等同AuthPlayerId_P2b" methodname="B03_sessionPlayerId等同AuthPlayerId_P2b" classname="W1.Tests.PlayMode.UgsSmokeTests" runstate="Runnable" seed="1144139771" result="Passed" start-time="2026-09-14 13:19:35Z" end-time="2026-09-14 13:19:36Z" duration="1.503435" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[W1][UGS] IsSignedIn=True PlayerId=lEYLoSNzPcbDMI7OnZij79CxFKGp
+[W1][P-2b] AuthPlayerId=lEYLoSNzPcbDMI7OnZij79CxFKGp CurrentPlayer.Id=lEYLoSNzPcbDMI7OnZij79CxFKGp
+Saving results to: /Users/arlong/Library/Application Support/DefaultCompany/w1-netcode/TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

@@ -365,3 +365,66 @@ GDD 從 r1 起就把「房主關分頁＝本局結束」當成 MVP 的**既定�
 
 Project ID `a214763c-…` 已寫入 `ProjectSettings.asset`（`cloudProjectId`＋`cloudEnabled: 1`）。
 註：Project ID 是公開識別碼不是密鑰，可入庫；**日後若出現 API key／secret，一律不得進 repo**。
+
+### 第 1 批的 runtime 驗證（PlayMode，真實連上 UGS）
+
+編譯期驗證只能證明 API 形狀。以下四條是**真的連上服務端**跑出來的，
+`prototypes/w1-netcode/Assets/Tests/PlayMode/`，**PlayMode 4/4 ＋ P-1 1/1 通過**。
+
+**過程中的一次失敗本身是事實**：首次執行三條全倒在
+`SessionException: Cannot start when Singleton is not set`——`WithRelayNetwork()` 這條
+路徑**依賴 `NetworkManager.Singleton`**，而 PlayMode 空場景沒有。拆成「不帶 network」
+與「有 NetworkManager 才延後啟動」兩條後，問題反而更精確。
+
+**`[P-10]`(b) runtime 證實，且優於設計預期**
+
+```
+無 NetworkManager 下建立成功：Code=M69T96 SessionState=Connected NetworkState=Stopped
+延後 StartRelayNetworkAsync 後：NetworkState=Started  NGO.IsListening=True
+StopNetworkAsync 後：NetworkState=Stopped（SessionState 仍 Connected）
+```
+
+三件事同時成立：Lobby 階段 **連 NGO 單例都不需要存在**；「開始上班」時才配 Relay 可行；
+**#23a 的局間 teardown 經 runtime 證實**，且 `SessionState` 與 `NetworkState` 確實是
+兩個獨立狀態機。Core Rule #23 的風險完全解除。
+
+**`[P-1]` 實測回填 → 反而刪掉一條設計規則**
+
+```
+樣本=8RHW98,BJDDTW,WBQBKM,Q9WF6J,8RGHPL,QH8GCH
+碼長=6  字集=689BCDFGHJKLMPQRTW
+大寫=True 小寫=False 數字=True 易混淆字元=無
+```
+
+固定 6 碼、全大寫英數。字集是刻意設計的：數字只有 6/8/9，**字母不含任何母音**
+（應是為了不讓隨機碼拼出真實字詞），且完全避開 0/O/1/I/L。
+因此 **#8 的「易混淆字元正規化」規則已刪除**（服務端已處理，客戶端再做是多餘的），
+**`[P-1]` 的 fallback（自建短碼對照表）不需要**，AC2 的「0/O 互換」子項亦移除。
+大小寫不敏感仍保留（碼全大寫，但玩家會用小寫輸入）。
+取樣說明：6 樣本共 36 個字元位置全未出現易混淆字元；若字集真含 4 個易混淆字元，
+36 次抽樣全不中的機率約 0.9%——證據強，但非窮舉。
+
+**`[P-2]`(b) 實測回填**
+
+`session.CurrentPlayer.Id` **等同** `AuthenticationService.Instance.PlayerId`
+（實測兩者皆 `lEYLoSNzPcbDMI7OnZij79CxFKGp`）。只要匿名帳號不變，身分即跨 session 延續，
+**#15a 的離線次數計數與 AC50 有了可靠依據**。
+⚠ 殘留限制：匿名帳號綁本機憑證，**清快取或換瀏覽器即換身分**（與 OQ#5 同源）。
+已在 #15a 註明「換裝置即重新計數」屬已知接受——濫用成本仍高於收益。
+
+**`[P-10]`(a) 仍未解**：MPS 服務層在背景分頁是否停擺，需 Web build ＋ 真實瀏覽器。
+
+### 第 1 批後的假設狀態
+
+| 假設 | 狀態 |
+|---|---|
+| P-1 房間碼格式 | ✅✅ 實測回填，**fallback 與一條設計規則一併刪除** |
+| P-2(b) 重連身分 | ✅✅ 實測回填 |
+| P-3 tick 與送出頻率 | ✅✅ 實機複驗（第 0 批） |
+| P-9 逾時常數 | ✅✅ 實機複驗（第 0 批） |
+| P-10(b)(c)(d) | ✅✅ (b) runtime 證實；(c)(d) 編譯期證實 |
+| P-10(a) 服務層背景停擺 | ⬜ 待 Web build |
+| P-14 kill 行程偵測時刻 | ⬜ 待雙實例 |
+| P-17 approval callback | ⬜ 待實際連線觀察 |
+| P-20(a) | ✅✅ 實機複驗（第 0 批） |
+| P-20(b) ownership transfer | ✅ 原始碼層級，待實機 |
