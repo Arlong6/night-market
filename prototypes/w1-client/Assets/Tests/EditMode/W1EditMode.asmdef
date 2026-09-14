@@ -1,0 +1,28 @@
+{
+    "name": "W1.Tests.EditMode",
+    "rootNamespace": "",
+    "references": [
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
+        "Unity.Netcode.Runtime",
+        "Unity.Networking.Transport",
+        "Unity.Services.Multiplayer",
+        "Unity.Services.Core",
+        "Unity.Services.Authentication"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

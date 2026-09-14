@@ -1,0 +1,5 @@
+Unity.Services.Core.ServicesInitializationException: You are attempting to initialize Unity Services in Edit Mode. Unity Services can only be initialized in Play Mode
+  at Unity.Services.Core.UnityServices.InitializeAsync (Unity.Services.Core.InitializationOptions options) [0x0002a] in ./Library/PackageCache/com.unity.services.core@3464cb68d709/Runtime/Core/UnityServices.cs:130 
+  at W1Harness.SignInAsync () [0x00024] in /Users/arlong/Projects/Claude-Code-Game-Studios/prototypes/w1-netcode/Assets/Editor/W1Harness.cs:57 
+  at W1Harness.RunHostAsync () [0x00028] in /Users/arlong/Projects/Claude-Code-Game-Studios/prototypes/w1-netcode/Assets/Editor/W1Harness.cs:76 
+  at W1Harness.RunHost () [0x00000] in /Users/arlong/Projects/Claude-Code-Game-Studios/prototypes/w1-netcode/Assets/Editor/W1Harness.cs:66 

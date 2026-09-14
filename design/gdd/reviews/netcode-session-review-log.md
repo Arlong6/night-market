@@ -428,3 +428,46 @@ StopNetworkAsync 後：NetworkState=Stopped（SessionState 仍 Connected）
 | P-17 approval callback | ⬜ 待實際連線觀察 |
 | P-20(a) | ✅✅ 實機複驗（第 0 批） |
 | P-20(b) ownership transfer | ✅ 原始碼層級，待實機 |
+
+### 第 1 批續：approval callback 與服務層保活機制
+
+**`[P-17]` 實測回填 → r4 的一項 blocking 解除**
+
+```
+ConnectionApprovalCallback 被呼叫！ ClientId=0 PayloadLen=11
+approvalCalls=1  ConnectionApproval 設定值=True  payload=w1-proto-v1
+```
+
+三件事同時成立：Sessions 的 `StartRelayNetworkAsync` **沒有覆蓋** `ConnectionApproval` 設定；
+callback **確實被呼叫**；`NetworkConfig.ConnectionData` 的 payload **完整傳遞**到 `req.Payload`。
+最後一項就是 AC54（MVP-必達）版本閘所需的通道。
+
+r4 曾標註 `[P-17]` 是「用一個未驗證機制去修另一個未驗證機制」，並判定其 fallback
+（連線後才踢）在語義上做不到版本閘該做的事、因而是 blocking。**該 blocking 現已解除。**
+⚠ 已驗的是 host 自身 local client（`ClientId=0`）那次 approval；
+**拒絕原因如何呈現給遠端 client** 仍待雙進程情境確認。
+
+**`[P-10]`(a) 從「未知」變成「機制已證實，只剩秒數」——而且不必做 Web build 就查到了**
+
+在 SDK 原始碼中找到保活的完整鏈條：
+
+- `LobbyHandler` 有週期性 heartbeat 排程，間隔常數 `LobbySettings.HeartbeatSeconds => 10`
+- 排程器 `ActionScheduler`（`com.unity.services.core`）使用 **`PlayerLoopSystem`**
+  並呼叫 **`JoinPlayerLoopSystem()`**
+- `RunScheduledHeartbeat` 還有一道 `if (Application.isPlaying)` 檢查
+
+即：**保活訊號掛在 Unity PlayerLoop 上**。WebGL 主迴圈由瀏覽器動畫影格驅動，
+背景分頁會被節流甚至停止 → **保活必然停送**。這不再是猜測，是機制事實。
+
+**剩餘未知縮小為單一數字**：Lobby 服務端「多久沒收到 heartbeat 就回收房間」。
+需 Release Web build ＋ 真實瀏覽器背景化實測（第 3 批）。
+
+⚠ 與 Relay 的 10 秒 client TTL 是**兩個獨立計時器**，都受背景分頁節流影響，
+但 **Relay 那個更早觸發**——這再次強化 Core Rule #23 的必要性（見 #23c）。
+
+**過程中的兩個工程教訓（已寫進 README 與 harness 註解）**
+
+1. `AuthenticationService.Instance` 在 `UnityServices.InitializeAsync()` 之前存取會拋
+   `ServicesInitializationException`，且 `?.` **擋不住**——拋例外的是 getter 本身。
+2. 雙進程測試中，兩個專案副本若 `productName` 相同會**共用 PlayerPrefs**，
+   於是拿到**同一個匿名帳號**，client 會變成 host 自己。已把副本改名為 `w1-client`。

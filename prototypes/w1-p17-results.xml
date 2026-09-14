@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Passed" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-14 13:25:09Z" end-time="2026-09-14 13:25:17Z" duration="8.6501904">
+  <test-suite type="TestSuite" id="1016" name="w1-netcode" fullname="w1-netcode" runstate="Runnable" testcasecount="6" result="Passed" start-time="2026-09-14 13:25:09Z" end-time="2026-09-14 13:25:17Z" duration="8.650190" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <test-suite type="Assembly" id="1012" name="W1.Tests.PlayMode.dll" fullname="/Users/arlong/Projects/Claude-Code-Game-Studios/prototypes/w1-netcode/Library/ScriptAssemblies/W1.Tests.PlayMode.dll" runstate="Runnable" testcasecount="6" result="Passed" start-time="2026-09-14 13:25:09Z" end-time="2026-09-14 13:25:17Z" duration="8.636000" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="90183" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <test-suite type="TestSuite" id="1013" name="W1" fullname="W1" runstate="Runnable" testcasecount="6" result="Passed" start-time="2026-09-14 13:25:09Z" end-time="2026-09-14 13:25:17Z" duration="8.634943" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1014" name="Tests" fullname="W1.Tests" runstate="Runnable" testcasecount="6" result="Passed" start-time="2026-09-14 13:25:09Z" end-time="2026-09-14 13:25:17Z" duration="8.634314" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1015" name="PlayMode" fullname="W1.Tests.PlayMode" runstate="Runnable" testcasecount="6" result="Passed" start-time="2026-09-14 13:25:09Z" end-time="2026-09-14 13:25:17Z" duration="8.633941" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1003" name="ApprovalCallbackTests" fullname="W1.Tests.PlayMode.ApprovalCallbackTests" classname="W1.Tests.PlayMode.ApprovalCallbackTests" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-09-14 13:25:09Z" end-time="2026-09-14 13:25:17Z" duration="8.632426" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1004" name="P17_ApprovalCallback在Sessions啟動下是否被呼叫" fullname="W1.Tests.PlayMode.ApprovalCallbackTests.P17_ApprovalCallback在Sessions啟動下是否被呼叫" methodname="P17_ApprovalCallback在Sessions啟動下是否被呼叫" classname="W1.Tests.PlayMode.ApprovalCallbackTests" runstate="Runnable" seed="1393184334" result="Passed" start-time="2026-09-14 13:25:09Z" end-time="2026-09-14 13:25:17Z" duration="8.606931" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[W1][P-17] session 建立 Code=B9QWFW NetworkState=Stopped
+[W1][P-17] ConnectionApprovalCallback 被呼叫！ ClientId=0 PayloadLen=11
+[W1][P-17] StartRelayNetworkAsync 後 NetworkState=Started IsListening=True IsHost=True IsServer=True
+[W1][P-17] 結果：approvalCalls=1 ConnectionApproval 設定值=True payload=w1-proto-v1
+Saving results to: /Users/arlong/Library/Application Support/DefaultCompany/w1-netcode/TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>
