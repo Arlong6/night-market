@@ -44,9 +44,9 @@ cd .. && ./w1-p14-run.sh
 |---|---|---|
 | 第 0 批 | 純 API 文件查詢，零原型成本 | 完成，並以 EditMode 測試在實機複驗 |
 | 第 1 批 | Sessions API 形狀 ＋ 真實連線 | 完成（`[P-10]`(a) 除外） |
-| 第 2 批 | itch.io 部署（`[P-4]`／`[P-6]`／`[P-19]`） | 未開始 |
-| 第 3 批 | Release Web build（`[P-7]`／`[P-18]`） | 未開始 |
-| 第 4 批 | tick ＋ RTT ＋ AC22 聯測 | 未開始 |
+| 第 2 批 | Release Web build ＋ itch.io 部署 | 完成（`[P-4]`／`[P-6]`／`[P-7]`／`[P-19]`） |
+| 第 3 批 | 背景分頁下的服務端回收秒數（`[P-10]`(a)／`[P-18]`） | 未開始 |
+| 第 4 批 | tick ＋ RTT ＋ AC22 聯測、JS 解壓的 CPU 成本 | 未開始 |
 
 ## 發現
 
@@ -90,10 +90,39 @@ cd .. && ./w1-p14-run.sh
   NetworkVariable 更新可能遺失。10Hz 下即 **600ms**，對「互相拋接道具」的玩法
   是可感知的延遲，已列為待裁決事項。
 
+### 第 1 批（連線）
+
+- **大廳延後建連可行，且優於預期**：不帶 network 的 session **連 NGO 單例都不需要存在**；
+  `StartRelayNetworkAsync` 可延後呼叫；`StopNetworkAsync` 讓局間 teardown 有了 API。
+- **B4 徹底解決**：`ISession` 直接有 `Host` 與 `HasPlayer(id)`，排歧表不必輪詢名冊再比對。
+- **`RemovePlayerAsync` 存在**——r4 全表唯一「沒有退路」的查證項解除。
+- **房間碼** 固定 6 碼全大寫，字集 `689BCDFGHJKLMPQRTW`（無母音、無 `0/O/1/I/L`）
+  → **刪掉了一條設計規則**（易混淆字元正規化）。
+- **身分跨 session 延續**：`CurrentPlayer.Id` ＝ `AuthenticationService.PlayerId`。
+- 🔴 **Host 被 `kill -9` 後，大廳的其他人要 132.61 秒才知道**；但 **優雅離開只要 1.14 秒**。
+  差 116 倍 → `beforeunload` ＋ 主動通知從「best-effort」升格為**關鍵機制**。
+  慢路徑由 arlong 裁決為「本地逾時提示」（新常數 `lobby_host_silence_timeout_sec`）。
+- **意外**：host migration 在 MPS 是一等公民 → GDD 的「MVP 無 migration」是**選擇**而非限制（OQ#18）。
+
+### 第 2 批（Web build ＋ itch.io）
+
+- **`.jslib` 雙向在 Release ＋ Stripping High 下全通過**——`[Preserve]` 確實有效。
+- 🔴 **帶碼連結不會穿過 iframe**：`location.search` 被換成 itch.io 的 `?v=`，
+  父視窗跨域。**`document.referrer` 是唯一路徑**，且 referrer 可被隱私設定削減
+  → 輸碼備援不可砍。
+- 🔴 **itch.io 不支援 Brotli**，還會把 `.br` 解壓後重送 → 傳輸量 **2.00 倍**
+  （資料檔膨脹 4.32 倍）。**遊戲照樣能跑，壞消息全在傳輸量裡。**
+  解法已驗證：`decompressionFallback = true`（產出 `.unityweb`）→ 回到 **0.99 倍**。
+  **這是強制建置規範。**
+- 🔴 **iframe 的 `allow` 沒有 `clipboard-write`** → 複製邀請連結必須降級為可全選文字框。
+- ⚠ **這三項在本地全是綠的**：兩項測過通過，第三項在本地根本觀察不到（伺服器是自己寫的）。
+  「必須真的部署」這件事本身就是結論。
+
 ### 尚未回答
 
-`[P-10]`(a) 服務端多久回收背景分頁的 session、`[P-14]` kill 行程的偵測時刻、
-`[P-4]`/`[P-6]`/`[P-19]` itch.io 平台行為、`[P-7]`/`[P-18]` Release build 的 `.jslib` 行為。
+`[P-10]`(a) 服務端在背景分頁多久回收 session（機制已在原始碼層面確認，只剩秒數）、
+`[P-18]` `sendBeacon` 在 unload 的可靠性、JS 解壓的 CPU 成本、
+`[P-3]` 後半與 AC22 的 RTT 聯測、`[P-20]`(b) ownership transfer 的實機行為。
 
 ## 注意
 

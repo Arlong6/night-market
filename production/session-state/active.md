@@ -1,6 +1,6 @@
 # Active Session State
 
-> Last Updated: 2026-09-13 (大夜班 **W1 原型第 0 批完成**，三條假設已回填；下一步＝第 1 批 Sessions API 建連；Road Rage 段落為歷史紀錄)
+> Last Updated: 2026-09-14 (大夜班 **W1 原型第 0/1/2 批完成**；下一步＝第 3 批背景分頁；Road Rage 段落為歷史紀錄)
 > Purpose: Living checkpoint. Read this first after compaction or new session.
 
 ## Active build: 橫衝直撞 (Road Rage) — standalone `road-rage/`, Godot 4.6
@@ -378,7 +378,34 @@ docs-multiplayer.unity3d.com **已全數 301 轉址**.
 檔案: GDD 1303 → **1364 行**; registry 40 → **42 常數**; modules/multiplayer.md 76 → **171 行**.
 回填後驗算: ④分情境成立 / ⑤ PASS(8s<=30s) / ⑧ PASS(250ms<=300ms, 餘裕 50ms).
 
-NEXT: **W1 第 1 批** (同一次 Sessions API 建連 + Host 消失實驗): P-10(a)(b)(c)(d) + P-17
+W1 第 1 批 DONE (2026-09-13): 建原型專案 prototypes/w1-netcode (Unity 6000.3.24f1 + NGO 2.13.2
++ MPS 2.3.1 + UTP **2.7.4**). EditMode 12/12 + PlayMode 5/5 通過.
+**大廳延後建連可行且優於預期**(不帶 network 的 session 連 NGO 單例都不需要; StartRelayNetworkAsync
+可延後; StopNetworkAsync 讓 #23a 有 API). **B4 徹底解決**(ISession 直接有 Host/HasPlayer).
+**RemovePlayerAsync 存在** → r4 唯一無退路的查證項解除. 房間碼 6 碼全大寫、字集無母音無易混淆字元
+→ **刪掉一條設計規則**. 身分 = AuthenticationService.PlayerId, 跨 session 延續.
+🔴 **Host kill -9 後大廳其他人要 132.61s 才知道; 優雅離開只要 1.14s (差 116 倍)**
+→ #12 beforeunload 升格為關鍵機制; 慢路徑經 arlong 裁決採「本地逾時提示」(新常數
+lobby_host_silence_timeout_sec=30). 意外: **host migration 是 MPS 一等公民** → OQ#18 待裁決.
+
+W1 第 2 批 DONE (2026-09-14): Release Web build (IL2CPP/Stripping High/Brotli) + 部署到
+arlong666.itch.io/w1-netcode-probe-internal-test (草稿).
+**.jslib 雙向在 Stripping High 下全通過** → [Preserve] 有效.
+🔴 **帶碼連結不會穿過 iframe**: location.search 被換成 itch.io 的 ?v=, 父視窗跨域
+→ **document.referrer 是唯一路徑**, 且可被隱私設定削減 → 輸碼備援不可砍.
+🔴 **itch.io 不支援 Brotli 且會解壓 .br 再重送** → 傳輸 **2.00 倍**(資料檔 4.32 倍).
+**遊戲照樣能跑, 壞消息全在傳輸量裡.** 解法已驗證: decompressionFallback=true (產出 .unityweb)
+→ 回到 **0.99 倍**. **這是強制建置規範**, 已寫進 engine ref.
+🔴 **iframe allow 無 clipboard-write** → 複製連結必須降級為可全選文字框.
+⚠ **這三項在本地全是綠的** —— 「必須真的部署」本身就是結論.
+另: **Unity 預設字型無 CJK**, 網頁上中文完全不渲染 → 必須打包字型, 子集化列為 MVP 建置步驟
+(壓在已歸零的 T_load 餘裕上). Build size 地板 7.0MB (netcode+IL2CPP), 留給內容約 43MB.
+
+NEXT: **W1 第 3 批** (背景分頁): [P-10](a) 服務端多久回收背景分頁的 session (機制已在原始碼
+層面確認 —— ActionScheduler 掛 PlayerLoop、HeartbeatSeconds=10, 只剩秒數)、[P-18] sendBeacon
+在 unload 的可靠性. 之後第 4 批: [P-3] 後半 + OQ#1 + AC22 的 RTT 聯測、JS 解壓的 CPU 成本、
+[P-20](b) ownership transfer 實機行為.
+(原第 1 批規劃): **W1 第 1 批** (同一次 Sessions API 建連 + Host 消失實驗): P-10(a)(b)(c)(d) + P-17
 + P-14 + P-2(b). 其中 **P-10(b) 現已是整條 Lobby 設計的存亡問題**.
 之後: 第2批 itch.io 部署(P-4+P-6+P-19) → 第3批 Release build(P-7+P-18) →
 第4批 P-3後半+OQ#1+AC22聯測 → 第5批 P-13+P-15.
@@ -392,7 +419,7 @@ NEXT: **W1 第 1 批** (同一次 Sessions API 建連 + Host 消失實驗): P-10
 <!-- STATUS -->
 Epic: 大夜班 Pre-production
 Feature: Systems Design
-Task: W1 原型第 0 批完成 (3 假設回填) → 第 1 批 Sessions API 建連
+Task: W1 原型第 0/1/2 批完成 (12 假設回填) → 第 3 批背景分頁回收秒數
 <!-- /STATUS --> KEY FACTS: C# 9.0 only;
 [SerializeField] fields-only; URP render-graph only; NGO 2.13.2 + Multiplayer Services
 2.3.1 (Sessions API: CreateSessionAsync + session.Code = room codes built-in); Web needs
