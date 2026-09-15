@@ -51,6 +51,16 @@ public class W1WebProbe : MonoBehaviour
     private int m_VisibilityChanges;
     private string m_LastVisibilityAt = "-";
 
+    // ── [P-10](a) 的核心量測 ──────────────────────────────────────
+    // 問題不是「session 多久被回收」，而是它的前提：**背景分頁時 Unity 主迴圈
+    // 是完全停止，還是只是被節流？** MPS 的 lobby heartbeat 掛在 PlayerLoop 上、
+    // 間隔 10 秒。若瀏覽器只節流到 1Hz，heartbeat 照樣送得出去，session 根本不會
+    // 被回收；若完全停止，heartbeat 才會斷。這一格數字就決定了整條 #23b 的成立與否。
+    private int m_UpdateCount;
+    private float m_LastUpdateMs;
+    private float m_MaxGapMs;
+    private float m_MaxGapAtMs;
+
     private void Awake()
     {
         gameObject.name = ObjectName;   // SendMessage 需要固定名稱
@@ -60,6 +70,7 @@ public class W1WebProbe : MonoBehaviour
     private void Start()
     {
         m_BootMs = W1_Now();
+        m_LastUpdateMs = m_BootMs;
         Refresh();
         Debug.Log($"[W1WEB] boot ownQuery='{m_OwnQuery}' parentQuery='{m_ParentQuery}' " +
                   $"iframe={m_InIframe} referrer='{m_Referrer}'");
@@ -77,8 +88,19 @@ public class W1WebProbe : MonoBehaviour
 
     private void Update()
     {
-        // 背景分頁偵測（[P-7]）：輪詢 visibilityState 的變化次數。
-        // 若 build 在背景時完全不跑 Update，回到前景後這個計數與時間戳會露出破綻。
+        // 主迴圈是否被停掉：量 Update 之間的最大間隔。
+        // 回到前景後，若最大間隔 ≈ 背景時長 → 主迴圈**完全停止**（heartbeat 會斷）。
+        // 若最大間隔 ≈ 1 秒 → 只是**節流到 1Hz**（10 秒的 heartbeat 仍送得出去）。
+        var now = W1_Now();
+        var gap = now - m_LastUpdateMs;
+        if (gap > m_MaxGapMs)
+        {
+            m_MaxGapMs = gap;
+            m_MaxGapAtMs = now - m_BootMs;
+        }
+        m_LastUpdateMs = now;
+        m_UpdateCount++;
+
         var v = W1_GetVisibility();
         if (v != m_Visibility)
         {
@@ -120,6 +142,9 @@ public class W1WebProbe : MonoBehaviour
         GUILayout.Label($"[P-4] 在 iframe 內     : {(m_InIframe == 1 ? "是" : m_InIframe == 0 ? "否" : "?")}", mono);
         GUILayout.Space(6);
         GUILayout.Label($"[P-7] visibilityState : {m_Visibility}（變化 {m_VisibilityChanges} 次，最後 {m_LastVisibilityAt}）", mono);
+        var elapsed = (W1_Now() - m_BootMs) / 1000f;
+        GUILayout.Label($"[P-10a] Update 次數     : {m_UpdateCount}（經過 {elapsed:F1}s，平均 {(elapsed > 0 ? m_UpdateCount / elapsed : 0):F1} fps）", mono);
+        GUILayout.Label($"[P-10a] **最大 Update 間隔** : {m_MaxGapMs:F0} ms（發生在 {m_MaxGapAtMs / 1000f:F1}s）", mono);
         GUILayout.Label($"[P-7] navigator.onLine: {(m_Online == 1 ? "true" : m_Online == 0 ? "false" : "?")}", mono);
         GUILayout.Label($"[P-7] .jslib 回呼存活 : {(m_CopyResult == "(未測試)" ? "待測（按下方按鈕）" : "是 —— 收到回呼")}", mono);
         GUILayout.Space(6);
@@ -137,7 +162,9 @@ public class W1WebProbe : MonoBehaviour
         }
 
         GUILayout.Space(10);
-        GUILayout.Label("判讀：自身 query 有 ?code= → P-4 成立，帶碼連結可直接用。\n" +
+        GUILayout.Label("[P-10a] 判讀：最大間隔 ≈ 背景時長 → 主迴圈完全停止，heartbeat 會斷。\n" +
+                        "        最大間隔 ≈ 1000ms → 僅節流到 1Hz，10 秒的 heartbeat 仍送得出去。\n" +
+                        "判讀：自身 query 有 ?code= → P-4 成立，帶碼連結可直接用。\n" +
                         "若自身為空而父視窗可讀 → 需改從父視窗取。\n" +
                         "若兩者皆空或顯示 CROSS_ORIGIN_BLOCKED → P-4 為假，輸碼路徑成為唯一入口。\n" +
                         "clipboard 顯示 OK → P-19 成立；DENIED/NO_API → 退化為可全選文字框。\n" +

@@ -450,7 +450,15 @@ transport 無官方端到端範例），因此是第一個做技術原型的系�
     代價已記帳：「再開一班」時每個人要重跑一次 Relay 配置＋WSS handshake，該成本納入
     #26 的轉場預算並以世界語言遮蔽。
 
-23c. ⚠⚠ **Relay 連線 TTL 使 #23 從「優化」升格為「必需」（W1 第 0 批查證，2026-09-13）**：
+23c. **Relay 連線 TTL** ✅ **（W1 第 3 批實測後降級：#23 仍是好設計，但不再是「必需」）**：
+
+    🟢 第 0 批查到 Relay 對每個 client 連線的 TTL 是 10 秒、靠 NGO 每 500ms 的 PING 維持，
+    當時據此推論「背景分頁會讓 PING 停送 → 10 秒內被踢」，並把 #23 從優化**升格為必需**。
+    **第 3 批的實測推翻了那個推論**：背景分頁只是節流到 1 Hz，500ms 的 PING 變成約 1 秒一次，
+    **仍遠低於 10 秒 TTL**，連線不會斷。
+    **#23（Lobby 延後建連）因此回到「好設計」而非「必需」**——它仍值得做（少一層資源、
+    狀態更單純、局間 teardown 有明確語意），但**不再是支柱 4／5 的存亡問題**。
+    下列原始論述保留作為背景：
     Relay 對**每個 client 連線**的存活時限是 **10 秒**（host 在 BIND 後尚無 peer 時為 60 秒），
     靠 NGO 自動送出的 PING（間隔＝`HeartbeatTimeoutMS`＝500ms）持續重置。
     **但瀏覽器會節流背景分頁的 timer**——Host 切到背景貼連結時 PING 很可能停送，
@@ -466,8 +474,26 @@ transport 無官方端到端範例），因此是第一個做技術原型的系�
     ⚠ 另：`HeartbeatTimeoutMS` 是**雙重用途**（UTP 連線 heartbeat ＋ Relay PING 間隔），
     調大到 >10s 會直接破壞 Relay keepalive——**此值不得調動**，已在 Tuning Knobs 標記。
 
-23b. **MPS session 自身的服務端存活要求** ⚠ **（機制已於 W1 第 1 批在原始碼層面證實，
-    2026-09-13；只剩「服務端多久回收」待實測）**：
+23b. **MPS session 自身的服務端存活要求** ✅ **（W1 第 3 批實測：擔憂不成立，2026-09-14）**：
+
+    🟢 **實測結論：背景分頁不會讓 session 被回收。**
+    先前的推論是「保活掛在 PlayerLoop 上 → 背景分頁 Update 不執行 → heartbeat 停送」。
+    **前半正確，後半錯誤**——關鍵在於背景分頁**不是停止主迴圈，而是節流**。
+
+    | 背景時長 | Update 次數 | 平均 | 最大 Update 間隔 |
+    |---|---|---|---|
+    | 4.4s | 9 | 2.1 fps | 1001 ms |
+    | 201.0s | 209 | 1.0 fps | 1601 ms（發生在第 6 秒，啟動初期） |
+    | 384.7s | 396 | 1.0 fps | 1601 ms（**六分半鐘內未惡化**） |
+
+    Chrome 桌面版把背景分頁的主迴圈節流到**穩定 1 Hz**，且六分半鐘內**未觸發 Page Freezing**。
+    - MPS heartbeat 間隔 **10 秒** → 1 Hz 下照常送出 ✅
+    - Relay PING 間隔 **500ms** → 節流後約 1 秒一次，仍**遠低於 10 秒 TTL** ✅
+    - **兩個計時器都活著，#23b 與 #23c 的擔憂皆不成立。**
+
+    ⚠ **實測範圍的誠實邊界**：macOS 桌面 Chrome、分頁背景化（非視窗最小化、非系統休眠）、
+    六分半鐘。**行動瀏覽器不在此列**——iOS Safari 的背景回收遠比桌面激進，OQ#10 仍然有效。
+    下列原始擔憂保留作為背景說明：
     - **保活機制確認存在**：`LobbyHandler` 有週期性 heartbeat 排程，間隔常數
       `LobbySettings.HeartbeatSeconds => 10`（**10 秒**）。
     - **它確實掛在 Unity 主迴圈上**：排程器 `ActionScheduler` 使用
@@ -1433,12 +1459,15 @@ Relay 中繼的純網路成本 ≥400ms，AC22 的 300ms 在數學上不可能�
 | ~~P-7~~ ✅✅ **已實測回填 2026-09-13（W1 第 2 批，Release Web build）** | **雙向皆通過**：JS→C# 的讀取（`location.search`／`visibilityState`／`navigator.onLine`／`performance.now`）與 **C#←JS 的 `SendMessage` 回呼**（clipboard 結果回傳 `OK`）在 **IL2CPP ＋ Managed Stripping High ＋ Brotli 的正式 build** 下**全部正常**，`[Preserve]` 確實擋住了裁切。實測 console：`[W1WEB] boot ownQuery='?code=TEST99' iframe=0`、`[W1WEB] clipboard result = OK`。~~原假設~~ `visibilitychange`／`navigator.onLine`／`online`/`offline` 可經自建 `.jslib`（JS→C# `SendMessage`）橋接進 Unity WebGL；**接收方法在 IL2CPP＋Managed Stripping High 下需 `[Preserve]` 或 `link.xml` 保護**（否則被當死碼裁掉，僅正式 build 現形）；Editor 不執行 .jslib，分流邏輯**只能在實機 Release Web build 驗證** | 原型 W1 寫 .jslib＋`[Preserve]`，於 Release build 實測。**同一次併測 P-18**（`beforeunload`／`sendBeacon`）與 `performance.now()` 的單調時間源 | 事件不可靠 → 改以 `requestAnimationFrame` 停擺時長估算（精度較差，5s 閾值需放寬）；Stripping 裁掉 → link.xml 全保留該類別 | AC15、AC16、AC28、AC28a、AC29、AC34a/b/c、AC41、AC42、**AC43a/b/c**、AC48——**幾乎所有 Web 行為 AC**；另影響 Core Rule #17 的單調時鐘要求、#12 的 `beforeunload`、公式③全條、#18 排歧表序 2、常數 `background_disconnect_threshold_sec`。⚠ **fallback 與約束⑪直接衝突（r4 二次修訂）**：fallback 寫「5s 閾值需放寬」，但 `background_disconnect_threshold_sec` 的安全範圍上界＝5、約束⑪鎖死 `≤5`（>5 即違反「不瞬移」鐵律）——**閾值不能放寬**，而 rAF 停擺估算無法分辨 5.0s 與 5.1s → **AC29 在 fallback 下不可測**。二階影響：link.xml 全保留會增大 build size，打回已歸零的 T_load 餘裕（與 P-6 的 fallback 反向拉扯）。**r4 縮小查證範圍**：引擎參考文件記載「NGO 2.6+ 用 codegen 取代反射初始化（stripping 相容性較好）」，本專案為 2.13.2，故 **NGO 自身的序列化不在風險面**；風險僅限 `.jslib` 經 `SendMessage` 呼叫的 C# 接收方法（那確實是反射呼叫） | 原型 W1 |
 | P-8 | Relay 偵測 Host socket 斷開並傳播至其餘 client 的延遲 ≤`relay_disconnect_propagation_sec`（2s） | 原型 Host 關分頁，量 client `OnClientDisconnect` 時刻 | 更慢 → AC6a／AC16／AC28 上限依實測放寬並回填該具名常數 | AC6a、AC16、AC28、公式①的 `T_detect`。**fallback 可行**（放寬上限），非 blocking。r4 已把此延遲提升為具名常數，四處引用同一個值 | 原型 W1 |
 | ~~P-9~~ ✅✅ **已回填並實機複驗通過 2026-09-13（W1 第 0 批）** | **`DisconnectTimeoutMS` 預設 30000ms＝30s ≫ 8s，約束⑤成立**；欄位名 1.x→2.x 無更名。**Relay 沒有 allocation idle timeout**，而是每 client 連線 **10s TTL**（host 獨自時 60s）→ 約束④ 已改為情境式，AC13c 填入 10s。⚠ 新發現：`HeartbeatTimeoutMS` 雙重用途（UTP heartbeat ＋ Relay PING 間隔）**不得調動**；`ClientConnectionBufferTimeout`＝10s 影響 #9 approval 閘門；`DisconnectTimeoutMS` 影響 send queue 容量。~~原假設~~ NGO/UTP 與 Relay 的內建連線逾時 ≥ `heartbeat_timeout_sec`（app-level 心跳才是先判定者）；**Relay allocation idle timeout ≥ `reconnect_window_sec + heartbeat_timeout_sec` ＝ 38s**（r4 修正：原寫 ≥30s，漏計 `T_detect`）。**順帶記錄 `UnityTransport` 逾時欄位的確切名稱**（NGO 1.x→2.x 有更名）**與 Relay allocation idle timeout 的實測值**（AC13c 需要它） | 查 NGO 2.13 `NetworkConfig`／`UnityTransport`／Relay 文件＋原型實測 | 內建更短 → 以內建值為心跳逾時上限，Tuning Knobs 約束區塊回填 | 約束④、約束⑤、⑬、AC13c、**#24a 末段**（Host 自己消失時的服務端回收）、常數 `heartbeat_timeout_sec` 與 `reconnect_window_sec`。⚠ **條件式不可行（r4 二次修訂）**：若內建逾時 <8s，代入約束①（k×interval）②③ → timeout=6 時需 `threshold < 4`，逼使 `background_disconnect_threshold_sec` 下修至 2 → **AC15（3s 背景走 catch-up）、AC16（8s 背景）、AC29（5.0/5.1 邊界）三條 MVP AC 的 GIVEN 全部作廢**。**前半（查 `UnityTransport` 逾時欄位名與預設值）是純文件查詢、零原型成本，應排最前** | 原型 W1 |
-| P-10 ✅**(b)(c)(d) 已回填；(a) 機制已證實、秒數待實測** | **四個查證項，三個已解決（W1 第 1 批，2026-09-13，編譯期驗證）**：**(b) 可拆分** ✅ `WithRelayNetwork` 為擴充方法、`IHostSessionNetwork.StartRelayNetworkAsync`/`StopNetworkAsync` 存在、`NetworkState.Stopped` 獨立存在 → **#23 成立**。**(c) 事件與查詢齊全** ✅ `ISession` 的 `Deleted`/`SessionHostChanged`/`PlayerLeaving`/`PlayerHasLeft`/`PlayerJoined`/`RemovedFromSession`/`SessionMigrated`/`StateChanged`，以及 `Host`/`HasPlayer`/`Players`/`PlayerCount` → **排歧表兩條路徑成立且較原設計更簡單**。**(d) `IHostSession.RemovePlayerAsync` 存在** ✅ → **#24a 成立，全表唯一無退路的查證項解除**。**(a) 機制已證實（W1 第 1 批，原始碼層面）**：保活 heartbeat 間隔 `HeartbeatSeconds => 10`，
-排程器 `ActionScheduler` 掛在 **Unity PlayerLoop** 上（`JoinPlayerLoopSystem()`），
-因此 **WebGL 背景分頁必然使其停送**。**剩餘未知只有「服務端多久回收」的秒數**，
-待 Release Web build ＋ 真實瀏覽器背景化實測（第 3 批）。
-fallback 仍為 #23 替代設計 (b)(c)：以實測 TTL × `lobby_bg_safety_factor` 訂上限，
-並以「複製邀請連結」消除切分頁的必要性。 以下為原始查證項描述：：(a) **MPS session heartbeat 由誰驅動、背景分頁凍結後 session 實際存活秒數**（#23b——**排最前面，它比「能否拆分 Relay」更能否定 #23**）；(b) MPS 2.3.1 是否支援「先建 session member、按開始上班才配 Relay／建 NGO」的拆分（#23）；(c) **session 成員事件的名稱與 roster 輪詢 API**（#18 排歧表序 1 與序 3 的載體）；(d) **host-side 成員移除 API 是否存在**（#24a） | 原型：CDP 對 Lobby 中 Host 背景化 30s／120s，另一 client 加入，**並記錄失敗發生在哪一層**（transport vs 服務層）；讀 MPS API 是否可拆；列印 session 事件與 roster 查詢結果 | (a) 服務層停擺 → 以 `.jslib`／Web Worker 維持最小 keepalive，或接受 Lobby 背景上限＝實測 TTL×0.5 並走 #23 的替代設計 (b)；(b) 不可拆 → #23 的替代設計 (a)(b)(c)；(c) 事件不可得 → **改用 roster 輪詢**（序 3）；**兩者皆不可得才退化** | ⚠ **最大的一條**。影響 **AC6b（MVP-必達）**、AC6c、AC7b、AC8、AC28、AC33、AC34a/b/c、AC36、AC43b、AC52、AC53、**AC55**、#18 **序 1／序 3／序 4／序 5**（四者皆以 MPS session 層為載體）、#23、#23a、#23b、#24a、#25、#26、常數 `max_players`。**r3 的 fallback 不可行**——它會讓「Host 消失」分支永遠不可達，殺掉 AC6b。r4 已改為雙路徑（事件＋輪詢）並補上「roster 查詢是 Lobby 前提」的載體論證（見 #18）。⚠ **查證項 (d)（host-side 成員移除 API）目前無 fallback**——若不存在，AC53 死，並連帶 AC33／AC36（測試基建已標 `blocked-by: AC53`）與 AC8 互相打架，且「單向失效的永久軟鎖死」無解。**(d) 是本表唯一沒有退路的查證項，因此 P-10 排 W1 第一順位**。替代設計 (a) 成立時 **AC52 語義上必 fail**（無 teardown 可驗）；替代設計 (b) 成立時 **AC34b 的 120s 承諾被明文放棄**——兩者都是有意識的取捨，不是遺漏 | 原型 W1（**最優先**） |
+| P-10 ✅**(b)(c)(d) 已回填；(a) 機制已證實、秒數待實測** | **四個查證項，三個已解決（W1 第 1 批，2026-09-13，編譯期驗證）**：**(b) 可拆分** ✅ `WithRelayNetwork` 為擴充方法、`IHostSessionNetwork.StartRelayNetworkAsync`/`StopNetworkAsync` 存在、`NetworkState.Stopped` 獨立存在 → **#23 成立**。**(c) 事件與查詢齊全** ✅ `ISession` 的 `Deleted`/`SessionHostChanged`/`PlayerLeaving`/`PlayerHasLeft`/`PlayerJoined`/`RemovedFromSession`/`SessionMigrated`/`StateChanged`，以及 `Host`/`HasPlayer`/`Players`/`PlayerCount` → **排歧表兩條路徑成立且較原設計更簡單**。**(d) `IHostSession.RemovePlayerAsync` 存在** ✅ → **#24a 成立，全表唯一無退路的查證項解除**。**(a) ✅ 已完整回填（W1 第 3 批實測，2026-09-14）：假設為假，背景分頁不會回收 session。**
+第 1 批在原始碼層面確認保活掛在 PlayerLoop 上（`HeartbeatSeconds => 10`、
+`ActionScheduler.JoinPlayerLoopSystem()`），並據此推論背景分頁會使其停送——**推論錯了**。
+實測：Chrome 桌面版把背景分頁節流到**穩定 1 Hz**（384.7 秒內 396 次 Update，
+最大間隔 1601ms 且發生在啟動初期），六分半鐘內未凍結。
+10 秒的 heartbeat 與 500ms 的 Relay PING **都照常送出**。
+→ **AC34a（背景 30s）與 AC34b（背景 120s）應可通過**；`lobby_bg_safety_factor` 失去用途
+（保留常數但標記為未使用）。
+⚠ 邊界：macOS 桌面 Chrome、分頁背景化、六分半鐘。**行動瀏覽器不在此列**（OQ#10 仍有效）。 以下為原始查證項描述：：(a) **MPS session heartbeat 由誰驅動、背景分頁凍結後 session 實際存活秒數**（#23b——**排最前面，它比「能否拆分 Relay」更能否定 #23**）；(b) MPS 2.3.1 是否支援「先建 session member、按開始上班才配 Relay／建 NGO」的拆分（#23）；(c) **session 成員事件的名稱與 roster 輪詢 API**（#18 排歧表序 1 與序 3 的載體）；(d) **host-side 成員移除 API 是否存在**（#24a） | 原型：CDP 對 Lobby 中 Host 背景化 30s／120s，另一 client 加入，**並記錄失敗發生在哪一層**（transport vs 服務層）；讀 MPS API 是否可拆；列印 session 事件與 roster 查詢結果 | (a) 服務層停擺 → 以 `.jslib`／Web Worker 維持最小 keepalive，或接受 Lobby 背景上限＝實測 TTL×0.5 並走 #23 的替代設計 (b)；(b) 不可拆 → #23 的替代設計 (a)(b)(c)；(c) 事件不可得 → **改用 roster 輪詢**（序 3）；**兩者皆不可得才退化** | ⚠ **最大的一條**。影響 **AC6b（MVP-必達）**、AC6c、AC7b、AC8、AC28、AC33、AC34a/b/c、AC36、AC43b、AC52、AC53、**AC55**、#18 **序 1／序 3／序 4／序 5**（四者皆以 MPS session 層為載體）、#23、#23a、#23b、#24a、#25、#26、常數 `max_players`。**r3 的 fallback 不可行**——它會讓「Host 消失」分支永遠不可達，殺掉 AC6b。r4 已改為雙路徑（事件＋輪詢）並補上「roster 查詢是 Lobby 前提」的載體論證（見 #18）。⚠ **查證項 (d)（host-side 成員移除 API）目前無 fallback**——若不存在，AC53 死，並連帶 AC33／AC36（測試基建已標 `blocked-by: AC53`）與 AC8 互相打架，且「單向失效的永久軟鎖死」無解。**(d) 是本表唯一沒有退路的查證項，因此 P-10 排 W1 第一順位**。替代設計 (a) 成立時 **AC52 語義上必 fail**（無 teardown 可驗）；替代設計 (b) 成立時 **AC34b 的 120s 承諾被明文放棄**——兩者都是有意識的取捨，不是遺漏 | 原型 W1（**最優先**） |
 | P-11 | ~~UTP 於 WebSocket 下提供可用的 Unreliable pipeline~~ **（r4 降級）** 改為量測題：節流網路下尖峰流量對心跳到達時刻的延遲分布為何，8s 判定是否仍有足夠餘裕 | 原型於節流網路量心跳到達 pattern | 延遲過大 → 逾時判定改為「連續 N 拍延遲 >X」（⚠ **r4 二次修訂更正**：先前寫「已升格為主判定」是**假陳述**——#20 的主判定全文是「連續 8 秒未收到」，GDD 內不存在任何「連續 N 拍延遲 >X」的規則。若真要改為該形式，約束①的語義、AC27 的判定區間、AC44 全部要重寫） | 無 MVP AC 直接依賴。**r4 移出 W1**——B9 證明原問題基於錯誤前提（HOL blocking 在 TCP 層、在 pipeline 之下），pipeline 選擇對到達時刻無實質差異 | 原型 W2 |
 | P-12 | NGO 2.13 的 NetworkVariable／NetworkTransform 在 client 經歷 5s 無 Update 後恢復時，不會把積壓變更於單幀 burst 套用造成瞬跳；「只套用最新 milestone」可靠 | 原型：背景 5s 後恢復，逐幀 log NetworkTransform 軌跡與 `IsClaimed` 變更序列 | 會瞬跳 → NetworkVariable 層自建 coalescing（只套用最新值） | AC24、AC15 的位移判準。**fallback 可行**（自建 coalescing），非 blocking | 原型 W2 |
 | P-13 | Chrome 使用者主動關閉分頁時 WebSocket close frame **可靠**送達（AC6a 的前提） | 原型：真實點 X 關分頁 20 次，量 client 偵測時刻分布 | 不可靠 → AC6a 降為 Nice-to-have，**AC6b（`session_end_worstcase_sec`）為唯一硬指標** | AC6a、`session_end_graceful_sec`、約束⑩的裸撐窗口縮短手段。**fallback 可行**（AC6b 保底），非 blocking | 原型 W1 |
