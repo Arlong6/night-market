@@ -37,6 +37,25 @@
   **字型子集化應視為建置步驟而非後期優化。**
 - 註：Godot 也有同一個坑（`ThemeDB.fallback_font` 無 CJK）——**這是 Web 平台的通例，不是引擎特性**。
 
+## ⚠ itch.io 的壓縮陷阱（2026-09-14 W1 原型實測，強制建置規範）
+
+**itch.io 不支援 Brotli `Content-Encoding`，而且會把上傳的 `.br` 檔解壓後重新提供**
+（`Web.data.br` 下載後前 4 位元組是 `UnityFS` 明文即為證據）。
+遊戲照樣能跑——**壞消息全在傳輸量裡，功能上看不出來**。
+
+| 建置設定 | 副檔名 | 本地 | itch.io 實際傳輸 | 倍數 |
+|---|---|---|---|---|
+| `decompressionFallback = false` | `.br` | 7,353,738 | **14,733,035** | **2.00** |
+| `decompressionFallback = true` | `.unityweb` | 7,444,699 | **7,416,748** | **0.99** |
+
+**強制設定：`PlayerSettings.WebGL.decompressionFallback = true`。**
+副檔名變成 `.unityweb` 後 itch.io 不認得它是壓縮檔，原樣提供，改由 Unity 的 loader
+自行解壓。代價是 `Web.loader.js` 由約 27KB 增為約 118KB（內含 JS Brotli 解壓器），
+外加解壓的 CPU 時間。
+
+🔴 **若誤用預設的 `.br`，50MB 的 build 在 itch.io 上等於約 100MB 傳輸。**
+逐檔看更清楚：`Web.data.br` 的膨脹率是 **4.32 倍**（完全未壓縮送出）。
+
 ## Build size 參考值（2026-09-13 W1 原型實測）
 
 一個**幾乎空的專案**（單一 OnGUI 腳本 ＋ NGO 2.13.2 ＋ Multiplayer Services 2.3.1），

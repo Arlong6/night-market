@@ -577,3 +577,34 @@ xr-spatial-tracking; gamepad; gyroscope; accelerometer; xr; cross-origin-isolate
 三項全部是「本地測不出來」的。`[P-4]` 與 `[P-19]` 在本地都通過，`[P-6]` 在本地根本不存在
 （本地伺服器是我自己寫的，當然回正確的 header）。**必須真的部署**這件事本身，
 是 r4 把這三項綁成同一批的理由，現在證明那個判斷是對的。
+
+### `[P-6]` 的解法已驗證成立
+
+把 `PlayerSettings.WebGL.decompressionFallback` 設為 **`true`**，副檔名隨之從 `.br`
+變為 **`.unityweb`**。itch.io 不認得那是壓縮檔，因此**原樣提供**，改由 Unity 的 loader
+自行解壓。
+
+| 建置方式 | 本地 | itch.io 傳輸 | 倍數 |
+|---|---|---|---|
+| `.br`（fallback=false） | 7,353,738 | 14,733,035 | 2.00 |
+| `.unityweb`（fallback=true） | 7,444,699 | **7,416,748** | **0.99** |
+
+**傳輸量減半，公式⑤ 的 `T_load` 預算恢復，支柱 4 保住。** 部署後實測遊戲正常運作。
+代價：`Web.loader.js` 由 26,983 → 117,894 bytes（+90KB），外加解壓的 CPU 時間
+（未量測，列入第 4 批）。
+
+🔴 **這是建置規範的強制項，不是可選優化。** 已同步寫入
+`docs/engine-reference/unity/modules/web.md`——若誤用預設的 `.br`，50MB 的 build
+在 itch.io 上等於約 100MB 傳輸。
+
+### 第 2 批結論
+
+| 假設 | 結果 |
+|---|---|
+| `[P-4]` 帶碼連結 | 假設為假；`document.referrer` 是唯一路徑；輸碼備援不可砍 |
+| `[P-6]` Brotli | 假設為假；**但解法已驗證，傳輸量從 2.00 倍回到 0.99 倍** |
+| `[P-7]` .jslib | ✅ 雙向皆通過（第 2 批本地 ＋ 部署後再次確認） |
+| `[P-19]` 剪貼簿 | iframe 情境為假（`allow` 無 `clipboard-write`）；必須走 fallback |
+
+三項為假中有兩項找到了可行路徑，一項（剪貼簿）確認必須降級。
+**沒有任何一項需要改動架構。**
