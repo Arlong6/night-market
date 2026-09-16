@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Passed" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-16 00:40:01Z" end-time="2026-09-16 00:40:25Z" duration="23.4637976">
+  <test-suite type="TestSuite" id="1024" name="w1-netcode" fullname="w1-netcode" runstate="Runnable" testcasecount="10" result="Passed" start-time="2026-09-16 00:40:01Z" end-time="2026-09-16 00:40:25Z" duration="23.463798" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <test-suite type="Assembly" id="1020" name="W1.Tests.PlayMode.dll" fullname="/Users/arlong/Projects/Claude-Code-Game-Studios/prototypes/w1-netcode/Library/ScriptAssemblies/W1.Tests.PlayMode.dll" runstate="Runnable" testcasecount="10" result="Passed" start-time="2026-09-16 00:40:01Z" end-time="2026-09-16 00:40:25Z" duration="23.460271" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="95333" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <test-suite type="TestSuite" id="1021" name="W1" fullname="W1" runstate="Runnable" testcasecount="10" result="Passed" start-time="2026-09-16 00:40:01Z" end-time="2026-09-16 00:40:25Z" duration="23.460032" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1022" name="Tests" fullname="W1.Tests" runstate="Runnable" testcasecount="10" result="Passed" start-time="2026-09-16 00:40:01Z" end-time="2026-09-16 00:40:25Z" duration="23.459876" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1023" name="PlayMode" fullname="W1.Tests.PlayMode" runstate="Runnable" testcasecount="10" result="Passed" start-time="2026-09-16 00:40:01Z" end-time="2026-09-16 00:40:25Z" duration="23.459703" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1007" name="W1RttHost" fullname="W1.Tests.PlayMode.W1RttHost" classname="W1.Tests.PlayMode.W1RttHost" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-09-16 00:40:01Z" end-time="2026-09-16 00:40:25Z" duration="23.459090" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1008" name="RunRttHost" fullname="W1.Tests.PlayMode.W1RttHost.RunRttHost" methodname="RunRttHost" classname="W1.Tests.PlayMode.W1RttHost" runstate="Runnable" seed="1615326638" result="Passed" start-time="2026-09-16 00:40:01Z" end-time="2026-09-16 00:40:25Z" duration="23.453851" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[[W1H] signed in as lEYLoSNzPcbDMI7OnZij79CxFKGp
+[W1RTT][host] Relay regions: asia-southeast1, us-central1, europe-north1, australia-southeast1, europe-west4, asia-south1, europe-central2, asia-northeast1, southamerica-east1, us-east1, us-west1
+[W1RTT] NetworkManager 建立，TickRate=10
+[W1RTT][host] session 建立 NetworkState=Stopped（應為 Stopped）
+[W1RTT][host] Code=P777QJ IsListening=True TickRate=10
+[W1H] wrote code.txt: P777QJ
+[W1H] wrote host-ready.txt: 2026-09-16T00:40:06.3632290Z
+Saving results to: /Users/arlong/Library/Application Support/DefaultCompany/w1-netcode/TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

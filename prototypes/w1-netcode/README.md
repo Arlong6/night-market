@@ -45,8 +45,8 @@ cd .. && ./w1-p14-run.sh
 | 第 0 批 | 純 API 文件查詢，零原型成本 | 完成，並以 EditMode 測試在實機複驗 |
 | 第 1 批 | Sessions API 形狀 ＋ 真實連線 | 完成（`[P-10]`(a) 除外） |
 | 第 2 批 | Release Web build ＋ itch.io 部署 | 完成（`[P-4]`／`[P-6]`／`[P-7]`／`[P-19]`） |
-| 第 3 批 | 背景分頁下的服務端回收秒數（`[P-10]`(a)／`[P-18]`） | 未開始 |
-| 第 4 批 | tick ＋ RTT ＋ AC22 聯測、JS 解壓的 CPU 成本 | 未開始 |
+| 第 3 批 | 背景分頁下的服務端回收秒數（`[P-10]`(a)／`[P-18]`） | 完成（主迴圈只被節流到 1Hz，`#23b` 的擔憂解除） |
+| 第 4 批 | tick ＋ RTT ＋ AC22 聯測、JS 解壓的 CPU 成本 | **RTT 與 tick 已完成**；JS 解壓 CPU 成本、`[P-18]`、`[P-20]`(b) 未做 |
 
 ## 發現
 
@@ -118,11 +118,111 @@ cd .. && ./w1-p14-run.sh
 - ⚠ **這三項在本地全是綠的**：兩項測過通過，第三項在本地根本觀察不到（伺服器是自己寫的）。
   「必須真的部署」這件事本身就是結論。
 
+### 第 4 批（RTT ＋ tick ＋ region）
+
+跑法：`./w1-rtt-run.sh [tick] [region]`，雙進程經真實 Relay WSS，每組 20 樣本。
+
+- **`RPC 不受 network tick 閘門控制` 由推論升格為實測事實。**
+  tick 改十倍，往返一毫秒未動：
+
+  | tick | min | median | p95 | max |
+  |---|---|---|---|---|
+  | 10 Hz | 329.2 | 331.1 | 335.8 | 337.2 |
+  | 1 Hz | 329.2 | 330.7 | 333.0 | 336.5 |
+
+  若 RPC 真的按 tick 批次，1Hz 下每筆最長要等 1 秒，p95 必落在秒級。它沒有。
+  約束⑧ 的原前提正式作廢，AC22 不再受 tick 威脅。
+
+- 🔴 **但同一次量測掀出一個原設計完全沒有的變數：Relay region。**
+  上表兩組都是**預設 region**，而 `interact_rtt_p95_ms` 的上限是 300ms——
+  **p95 335.8ms，遊戲邏輯一行都還沒跑就已經超標。**
+  只把 region 指定為 `asia-northeast1`（其餘完全不變）：
+
+  ```
+  samples=20;min=85.4;median=88.8;p95=94.5;max=104.4;tick=10;region=asia-northeast1
+  ```
+
+  **3.7 倍。AC22 的成敗實際上由 region 決定，不是由 tick 決定。**
+
+- **補測第三點把模型釘死了**（`europe-west4`：median 434.3／p95 437.8ms）。
+  兩個進程都在台灣，故 `RTT = 4 × d(台灣, R)`，三點反推的單程值
+  （東京 22.2ms／美中 82.8ms／荷蘭 108.6ms）都落在該路線的合理範圍。
+  **模型成立 → 可以拿來推還沒量的組合。**
+
+- **arlong 裁決「讓國外的人也可以參與」→ 不能寫死任一大區。**
+  解法不是折衷，是可證明的：`RTT_i = 2 × (d(i,R) + d(R,H))`，由三角不等式，
+  **`R = H` 讓每個 client 同時拿到各自的理論下限**；移向任一 client 只會讓其他人變差。
+  → **relay 貼著 Host 選**（GDD Core Rule #28），由時區查表決定、可覆寫。
+  ⚠ 修正一個先前的錯誤前提：**Host 不付這筆延遲**（它是權威，自身互動本地結算），
+  所以最佳化目標是所有 *client* 的延遲，Host 不計入。
+  <br>殘留代價已如實記錄：歐洲玩家在台灣 Host 房中的裸往返，由已測值夾擠得
+  **217–306ms**——**能玩，但正好壓在 300ms 邊緣**。故 AC22 拆為同區（必達 300ms）
+  與跨區（降級契約：慢但正確、有回饋、不卡死）。
+  ⚠ 該區間是**夾擠推得，非直接量測**，待有海外測試者時補量。
+  而這條**沒有自動解**：Relay 的 QoS（自動挑最近 region）在 Web 上拋
+  `PlatformNotSupportedException: QoS SDK does not support WebGL`，本作又是 Web-only。
+  已升為 GDD 約束⑮ ＋ Core Rule #28 ＋ registry 的兩張對照表
+  （`relay_region_by_timezone`／`relay_region_offset_fallback`）＋ AC22／22a/22b。
+  **OQ#20 已結案。** 可用 region 無台灣／香港節點，東亞最近是東京。
+
+- **Web 的協定設定有兩個會讓人踩空的地方**，兩個都是實際撞到才發現的：
+  1. Relay 協定**只能在建 session 當下**經 `SessionOptions.WithNetworkOptions()` 指定
+     （`RelayNetworkOptions(RelayProtocol)` 已 `[Obsolete]`，而延後建連用的
+     `StartRelayNetworkAsync` 根本沒有 protocol 參數）。
+     好消息是它**只設定不啟動**——Core Rule #23 的延後建連與指定 WSS 可以並存，
+     實測 `CreateSessionAsync` 後 `NetworkState` 仍為 `Stopped`。
+  2. **協定不會從 Host 傳染給加入者。** Host 設好 WSS 且 `IsListening=True` 之後，
+     加入端只傳房間碼照樣拋 `Mismatched Relay configuration and network interface`；
+     `JoinSessionOptions` 必須自己再宣告一次。
+     → 實作上協定設定必須集中成共用 helper，漏掉任一條加入路徑都會**只在該路徑失敗**，
+     而 Host 端一切正常——這種不對稱失敗在本地單機測試中看不出來。
+
+- 附帶：`EnableSceneManagement` 兩端必須一致，否則 NGO 在握手階段就拒絕連線
+  （測試場景不在 build list 時會先撞到 `Scene Hash ... does not exist`）。
+
+### 第 4 批（續）— ownership transfer（`[P-20]`(b)）
+
+跑法：`./w1-own-run.sh [tick] [region]`，雙進程，一個 owner-write `NetworkVariable<int>`。
+協定：host 交出所有權 → client 在 `OnGainedOwnership` 當下寫入 marker 並回報 →
+host 等 `delay` 毫秒後收回 → 讀值比對。
+
+- **OQ#17 消解，而且是被量測消解的，不是被裁決消解的。**
+  GDD 原文「引擎要求兩次 ownership 變更間隔 ≥6 tick，10Hz → 600ms 可感知交接延遲」
+  兩個前提都不成立：那個 `6` 只存在於一則**被 `LogLevel == Developer` 擋著的警告**裡，
+  **不延遲也不阻擋任何交接**；而交接實測 **100-104ms（tick=10）／101-105ms（tick=1）**，
+  **不受 tick 影響**，與同 region 的 RTT 同量級。**沒有 600ms 這回事。**
+
+- **真正存在的是 owner-write NetworkVariable 的遺失窗口，且它 ≈ 一個 tick 週期**（非六個）：
+
+  | delay ms | 0 | 40 | 80 | 120 | 160 | 240 | 400 | 700 |
+  |---|---|---|---|---|---|---|---|---|
+  | **tick=10** | 0/3 | 1/3 | **3/3** | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 |
+  | **tick=1** | 0/3 | 0/3 | 0/3 | 0/3 | 1/3 | 1/3 | 1/3 | 2/3 |
+
+  tick=1 是刻意的對照組。存活率近乎 `delay ÷ tick 週期`，正是「寫入落在 tick 週期內的
+  **隨機相位**」該有的分布。機制：送出端在**下一個 tick 序列化時**才評估 `CanWrite()`，
+  屆時若已非 owner，該筆 delta 根本不會被送出。
+
+- 🔴 **唯一的壞消息，而且比原設計假設的嚴重**：伺服器收到越權 delta 時記錄
+  `Client wrote to NetworkVariable without permission.` **`No more variables can be read.
+  This is critical.`** —— 它**中止解析整則訊息的其餘部分**，
+  所以**同一物件上其他無關的 NetworkVariable 也會一起掉**。
+  → **約束⑧ 的「互動結果一律走 RPC」從效能考量升格為正確性要求。**
+
+- 兩個過程中的坑：(1) 第一版測試「失敗」的訊息本身就是上面那個發現 ——
+  UTF 把未預期的 Error 日誌當失敗，**若當初直接把它關成雜訊就會錯過**。
+  (2) runtime 造的 prefab 若 `SetActive(false)`，client 端拋
+  `OverflowException: Reading past the end of the buffer`：NGO 反序列化時的
+  `networkBehaviour?.Synchronize(...)` 在 behaviour 為 null 時**靜靜跳過但資料仍在緩衝區**，
+  而 inactive 實例不跑 `Awake`。host 端沒事只因為我手動啟用了 —— 又一次只在跨進程才現形的
+  不對稱失敗。
+
 ### 尚未回答
 
-`[P-10]`(a) 服務端在背景分頁多久回收 session（機制已在原始碼層面確認，只剩秒數）、
-`[P-18]` `sendBeacon` 在 unload 的可靠性、JS 解壓的 CPU 成本、
-`[P-3]` 後半與 AC22 的 RTT 聯測、`[P-20]`(b) ownership transfer 的實機行為。
+`[P-18]` `sendBeacon` 在 unload 的可靠性、JS 解壓的 CPU 成本。
+OQ#10（行動瀏覽器的背景回收）與 OQ#18（是否啟用 host migration）待裁決。
+另有兩項由 API 形狀推得但未實測：跨班次能否重選 region（`StopNetworkAsync` →
+`StartRelayNetworkAsync(另一個 region)`）、以及真實跨洲往返的實測值。
 
 ## 注意
 

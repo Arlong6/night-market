@@ -649,3 +649,247 @@ Chrome 桌面版穩定節流到 **1 Hz**，六分半鐘內**未觸發 Page Freez
 另註：1 Hz 意味著背景期間 `deltaTime` 約為 1 秒，**任何以每幀累加的模擬在背景都會行為異常**
 ——這與 GDD「模擬不快轉、不補跑」的裁定方向一致，但實作時要確認模擬確實凍結而非以 1 秒
 步長繼續跑。
+
+---
+
+## W1 第 4 批 — 互動往返延遲（2026-09-15）
+
+要驗的是第 0 批從 NGO 原始碼推出、但一直沒有實測的那個結論：**RPC 不受 network tick 閘門
+控制**。它是 AC22（MVP-必達）成立與否的支點——若推論為假，約束⑧ 會讓該 AC 在數學上不可能。
+
+### 測法
+
+雙進程（Unity 不允許兩實例開同一專案，client 跑 `w1-client` 副本），經**真實 Relay WSS**，
+以 `CustomMessagingManager` 的 named message 往返 20 次、每次間隔 250ms。
+用 named message 而非 `[Rpc]`：兩者走**同一條**傳輸路徑
+（`MessageManager` → `PostLateUpdate` → transport），但不需要 NetworkObject／prefab 註冊。
+量到的是傳輸路徑本身的延遲，那正是 AC22 的分母。
+
+`./w1-rtt-run.sh [tick] [region]`，tick 與 region 由命令列帶入，
+**對照組與實驗組跑的是完全同一份程式碼**。
+
+### 結果一：tick 的問題被釘死了
+
+| tick | min | median | p95 | max |
+|---|---|---|---|---|
+| 10 Hz | 329.2 | 331.1 | 335.8 | 337.2 |
+| **1 Hz** | 329.2 | 330.7 | 333.0 | 336.5 |
+
+**tick 改十倍，往返一毫秒未動。** 選 1Hz 當對照組是刻意的：若 RPC 真按 tick 批次送出，
+每筆最長要等 1 秒，p95 必然落在秒級。它沒有，而且兩組的離散度都只有 8ms——
+連 10Hz 閘門該有的百毫秒級抖動都不存在。
+
+**約束⑧ 的原前提正式作廢。AC22 不再受 tick 威脅。**
+
+### 結果二：真正的威脅在別處
+
+上表兩組都是**預設 region**。而 `interact_rtt_p95_ms` 的上限是 300ms——
+**p95 335.8ms，遊戲邏輯一行都還沒跑就已經超標。**
+
+只把 region 指定為 `asia-northeast1`，其餘完全不變：
+
+```
+samples=20;min=85.4;median=88.8;p95=94.5;max=104.4;tick=10;region=asia-northeast1
+```
+
+**3.7 倍。AC22 的成敗實際上由 region 決定，不是由 tick 決定。**
+
+而這條**沒有自動解**：Relay 的 QoS（自動挑最近 region）在 Web 上拋
+`PlatformNotSupportedException: QoS SDK does not support WebGL`，本作又是 Web-only。
+沒有「不設就會自動最佳」這條路，遊戲必須自己決定並顯式傳入。
+
+實機列舉的可用 region：`asia-southeast1`、`asia-northeast1`、`asia-south1`、
+`us-central1`、`us-east1`、`us-west1`、`europe-north1`、`europe-west4`、
+`europe-central2`、`australia-southeast1`、`southamerica-east1`。
+**沒有台灣／香港節點**，東亞最近的是東京。
+
+難處在於 **region 由 Host 在建立 allocation 時一次決定，整局不可改**，
+而房間裡的人可能散在不同大洲。已升為約束⑮ ＋ registry 常數 `relay_region` ＋ **OQ#20**。
+
+### 過程中撞到的兩個協定陷阱
+
+兩個都不是查文件查到的，是測試連續失敗兩次逼出來的。
+
+1. **Relay 協定只能在建 session 當下指定。**
+   `RelayNetworkOptions(RelayProtocol)` 已 `[Obsolete]`（訊息明言改用
+   `SessionOptions.WithNetworkOptions()`），而 Core Rule #23 延後建連用的
+   `StartRelayNetworkAsync` 的非 obsolete 建構子只收 `region`／`preserveRegion`，
+   **沒有 protocol 參數**。
+   → **#23 不因此受損**：`WithNetworkOptions()` 只設定、不啟動，實測
+   `CreateSessionAsync` 之後 `NetworkState` 仍為 `Stopped`，延後建連與指定 WSS 並存。
+   但「協定」從執行期決定變成**建 session 時的一次性決定**。
+
+2. **協定不會從 Host 傳染給加入者。**
+   Host 已設 WSS 且 `IsListening=True`，加入端只傳房間碼
+   （`JoinSessionByCodeAsync(code)`）照樣拋
+   `ArgumentException: Mismatched Relay configuration and network interface`。
+   `JoinSessionOptions` 同樣繼承 `BaseSessionOptions`，必須自己再宣告一次。
+   → 實作上協定設定**必須集中成共用 helper**：漏掉任一條加入路徑會**只在該路徑失敗**，
+   而 Host 端一切正常。**這種不對稱失敗在本地單機測試中看不出來**——
+   與第 2 批 itch.io 那三項「本地全綠」是同一類陷阱。
+
+附帶：`EnableSceneManagement` 兩端必須一致，否則 NGO 握手階段就拒絕連線。
+
+### 方法論註記
+
+這一批的價值有一半來自**對照組**。單看 tick=10 的那組數字，8ms 的離散度已經很像
+「沒有閘門」，但那是解讀；跑 1Hz 之後，「若有閘門則 p95 必為秒級」讓結論變成不需要解讀的事實。
+
+另一半價值完全是意外。原本只想驗 tick，結果 330ms 這個絕對值本身比 tick 更要命——
+**如果只問「tick 會不會影響 RTT」而不看絕對值對不對得上 AC，這一批會得出「AC22 沒問題」
+的錯誤結論並結案。** 量測時同時檢查「這個數字能不能過 AC」，而不只是檢查假設的真偽。
+
+---
+
+## OQ#20 裁決 — 「讓國外的人也可以參與」（arlong，2026-09-15）
+
+第 4 批提出的三選一（寫死東亞／Host 端量測挑選／依時區推測）在裁決後**不再是三選一**：
+既然不能犧牲海外玩家，就不能寫死任一大區。
+
+### 追加量測：把模型驗到洲際距離
+
+先前只有兩個資料點（東京 88.8ms、預設 331.1ms），不足以確定關係是線性的。補了第三點：
+
+| region | median | p95 | 反推單程 `d(台灣, R)` |
+|---|---|---|---|
+| `asia-northeast1` | 88.8 | 94.5 | 22.2 ms |
+| 預設（美國中部） | 331.1 | 335.8 | 82.8 ms |
+| **`europe-west4`** | **434.3** | **437.8** | **108.6 ms** |
+
+兩個進程都在台灣，故 `RTT = 4 × d(台灣, R)`。三點的反推單程值都落在該路線的合理範圍，
+**模型成立，可以拿來推還沒量的組合。**
+
+### 裁決後的解法不是折衷，是可證明的
+
+Relay 的往返路徑是 `client → relay → host → relay → client`，故
+`RTT_i = 2 × (d(i, R) + d(R, H))`。
+
+先修正一個先前寫錯的前提：**Host 不付這筆延遲**——它是權威，自身互動本地就結算了。
+所以要最小化的是**所有 client** 的延遲，Host 不計入。
+
+由三角不等式 `d(i,R) + d(R,H) ≥ d(i,H)`，等號在 `R` 落於 `i` 與 `H` 之間時成立，
+而 **`R = H` 對所有 `i` 同時成立**。把 relay 移向某個 client 會讓其他 client 變差；
+移向 Host 則讓每個人同時拿到各自的理論下限 `2 × d(i, H)`。
+
+**沒有人因此變差，所以沒有取捨要做。** → Core Rule #28：relay 貼著 Host 選。
+
+原本擔心的「Host 端量測會吃掉 `T_load` 預算」也隨之消失——查時區是本地的、零延遲。
+時區須用 `.jslib` 讀 `Intl.DateTimeFormat().resolvedOptions().timeZone`，
+**不可用 .NET `TimeZoneInfo`**（Unity Web 的時區資料庫不完整）；
+`.jslib` 在 Stripping High 下的存活已於第 2 批證實。
+
+### 殘留代價，如實記錄
+
+用模型推跨洲房間：歐洲玩家加入台灣 Host 的房、`R = asia-northeast1` 時，
+`RTT = 2 × (d(歐,東京) + 22.2)`。`d(歐,東京)` 無法自本地量得，但由已測兩值夾擠得
+`86.4 ≤ d(歐,東京) ≤ 130.8` → **`RTT ∈ [217, 306] ms`**。
+
+**跨洲能玩，但正好壓在 `interact_rtt_p95_ms`(300ms) 的邊緣**，再加 server frame rate
+與遊戲處理必定超過。
+
+把跨區也硬綁 300ms 等於寫一條**注定失敗且無法靠實作補救**的 AC——那是光速問題，不是
+實作問題。故 AC22 拆為兩條：
+
+- **AC22（同區）**：p95 ≤300ms，MVP 必達。實測 `asia-northeast1` 裸往返 94.5ms，餘裕約 205ms。
+- **AC22a（跨區）**：不設時間上限，改以**降級契約**承接——慢，但**正確、有回饋、不卡死**，
+  且不得給出會被推翻的樂觀結果。
+- **AC22b**：自動選區 ＋ 可覆寫；**留空即為缺陷**（會落到預設 region 的 335.8ms）。
+
+⚠ 217–306ms 是**夾擠推得，非直接量測**（本地兩進程都在台灣，量不到歐洲↔東京）。
+真實跨洲數字須待有海外測試者時補量。
+
+### 一個順帶修正的過度斷言
+
+先前寫「region 由 Host 一次決定，**整局**不可改」。查 API 形狀後這句太絕對：
+region 是傳給 `StartRelayNetworkAsync` 的，而依 #23 那是「開始上班」才呼叫、
+依 #23a 局間會 `StopNetworkAsync` 拆掉。所以固定範圍是**一個班次**，不是整局——
+理論上每班次可重選，若日後啟用 host migration（OQ#18），region 得以跟著新 Host 走。
+⚠ 此為由 API 形狀推得的推論，**未實測** stop→start 能否真的換區，列為結案後待驗項。
+
+### 設計上的推論：誰當房主，決定了房裡所有人的延遲
+
+一群人多數在歐洲卻由台灣的人開房，全體被綁在 `2 × d(自己, 台灣)`；
+換一個歐洲的人開房即可消除。這是 Lobby UI 應該讓玩家知道的資訊，
+也是 OQ#18（host migration）在 MVP 之後的一個實際用途。
+
+---
+
+## W1 第 4 批（續）— [P-20](b) ownership transfer 實機行為（2026-09-16）
+
+這一項原本只是「把第 0 批查到的 API 行為做實機複驗」，結果推翻了 OQ#17 的兩個前提。
+
+### 先在原始碼裡發現描述有問題
+
+GDD 寫的是「引擎**要求**兩次 ownership 變更間隔 ≥6 個 network tick，10Hz → 600ms，
+對 Overcooked-like 是**可感知的**交接延遲」。翻 `NetworkSpawnManager` 後發現那個 6
+只存在於一則警告字串裡：
+
+```
+if (NetworkManager.LogLevel == LogLevel.Developer && !distributedAuthorityMode && ...)
+    NetworkLog.LogWarningServer("[Rapid Ownership Change Detected][Potential Loss in State] ...");
+```
+
+**它不延遲、不阻擋任何交接**，而且還被 `LogLevel == Developer` 擋著。
+註解裡寫的機制也不是 tick 而是延遲：「ownership changes faster than **the latency**
+between the client-server」。
+
+再往下翻 `NetworkVariableDeltaMessage`：
+
+```csharp
+var shouldWrite = networkVariable.IsDirty() && networkVariable.CanClientRead(TargetClientId)
+    && (networkManager.IsServer || (networkVariable.CanWrite() && networkVariable.CanSend()));
+```
+
+`CanWrite()` 是在**下一個 tick 序列化時**才評估的。若那時所有權已被收回，
+這筆 delta 根本不會被送出。→ 推得危險窗口 ≈ **一個** tick 週期，不是六個。
+
+### 實機掃描
+
+雙進程經 Relay WSS（`asia-northeast1`），一個 owner-write `NetworkVariable<int>`。
+協定：host 把所有權交給 client → client 在 `OnGainedOwnership` 當下寫入 marker 並回報
+→ host 等 `delay` 毫秒後收回所有權 → 900ms 後讀值，比對是否等於 marker。
+每個 delay 跑 3 次。`prototypes/w1-own-run.sh [tick] [region]`。
+
+| delay ms | 0 | 40 | 80 | 120 | 160 | 240 | 400 | 700 |
+|---|---|---|---|---|---|---|---|---|
+| **tick=10** | 0/3 | 1/3 | **3/3** | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 |
+| **tick=1** | 0/3 | 0/3 | 0/3 | 0/3 | 1/3 | 1/3 | 1/3 | 2/3 |
+
+tick=1 是刻意的對照組：若窗口真的隨 tick 週期縮放，1Hz 下連 700ms 都該不安全。它正是如此。
+
+存活率近乎 `delay ÷ tick 週期`（10Hz@40ms→40%→1/3；1Hz@700ms→70%→2/3），
+正是「寫入落在 tick 週期內的**隨機相位**」該有的分布 —— 這比單一門檻值更能說明機制。
+
+**handoff（交接傳播＋寫入＋回報，一個往返量級）**：tick=10 為 100-104ms、
+tick=1 為 101-105ms。**不受 tick 影響**，與同 region 的 RTT（median 88.8、max 104.4ms）同量級。
+
+### 結論
+
+1. **OQ#17 消解，不需要 arlong 裁決** —— 是量測取代了裁決，不是有人做了取捨。
+   「10Hz → 600ms 可感知交接延遲」不存在；交接約 100ms 且與 tick 無關。
+   `network_tick_rate = 10` 不因交接而受威脅。
+2. **`[P-20]`(b) 結案**：`ChangeOwnership` 同步原子、約 100ms → #6 的「單一真相時刻」
+   與 AC14 皆成立，(b) 原本標註的「無 fallback」不再是問題。
+3. 🔴 **但後果比原設計假設的嚴重**，這是本項唯一的壞消息。
+   伺服器收到越權 delta 時記錄的是：
+
+   > `Client wrote to NetworkVariable without permission.`
+   > **`No more variables can be read. This is critical.`**
+
+   它**中止解析該訊息的其餘部分** —— 所以掉的不只是那一筆，
+   **同一物件上其他無關的 NetworkVariable 也會一起掉**。
+   → **約束⑧ 的後半（互動結果一律走 RPC）從效能考量升格為正確性要求。**
+
+### 方法論註記
+
+第一版測試「失敗」了，而失敗訊息本身就是最重要的發現：Unity Test Framework 把
+未預期的 Error 日誌當成測試失敗，於是那則 `No more variables can be read` 直接
+中斷了整個掃描。**如果當初把它當成雜訊直接關掉，就會錯過這一行。**
+先讀懂它、確認它是要量的現象，才放行 `LogAssert.ignoreFailingMessages`。
+
+另一個坑值得記：runtime 造的 prefab 若 `SetActive(false)`，client 端會拋
+`OverflowException: Reading past the end of the buffer`。根因是 NGO 反序列化時執行
+`networkBehaviour?.Synchronize(...)` —— 那個 `?.` 在 behaviour 為 null 時**靜靜跳過，
+但資料仍留在緩衝區**，於是讀爆。而 inactive 的實例不跑 `Awake`，
+`ChildNetworkBehaviours` 是空的。host 端當時沒事，只因為我在 `Spawn()` 前手動啟用了。
+**同一份程式碼、兩端行為不同**，又是一次只在跨進程才現形的不對稱失敗。

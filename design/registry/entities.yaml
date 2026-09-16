@@ -519,6 +519,117 @@ constants:
     unit: hz
     notes: "＝ NetworkConfig.TickRate。引擎預設 30，本專案設 10。Tuning 10-30。✅ **[P-3] 已於 2026-09-13 回填（NGO 2.13.2 原始碼）**：本值**同時**決定 NetworkTransform 與 NetworkVariable 的送出節奏（兩者皆每 tick 收集送出），**但完全不影響 RPC**——RPC 每『幀』於 PostLateUpdate 批次送出，非 tick-gated。因此先前『10Hz 會讓互動往返 +200ms 而使 AC22 不可達』的判斷**解除**；約束⑧已重寫為『RTT + 2 幀 + 處理 ≤ interact_rtt_p95_ms，且互動結果一律走 RPC 不得用 NetworkVariable 承載』。⚠ NetworkTransform **無 per-instance 頻率設定**（可調的只有 PositionThreshold 等門檻）。⚠ 設為 10 等於把所有 NetworkVariable 也從引擎預設的 30Hz 降到 10Hz。AC46。"
     added: 2026-09-13
+    revised: "2026-09-15：W1 第 4 批雙進程實測直接驗證 —— tick=10Hz 往返 p95 335.8ms、tick=1Hz p95 333.0ms，tick 改十倍而往返不動。『RPC 非 tick-gated』自此為實測事實而非原始碼推論。同時發現主導 AC22 的其實是 relay_region 而非本值，見該常數。 | 2026-09-16：OQ#17（交接冷卻）實測後消解，**本值不因 ownership 交接而受威脅**。ownership 交接實測約 100ms 且不受 tick 影響（tick=10 為 100-104ms、tick=1 為 101-105ms），先前『引擎要求間隔 6 tick → 10Hz 即 600ms 可感知延遲』的說法有誤：那個 6 只是一則被 LogLevel.Developer 擋著的警告，不延遲也不阻擋交接。真正存在的是 owner-write NetworkVariable 的遺失窗口 ≈ **一個** tick 週期（本值 10Hz 下約 100ms，實測門檻落在 40-80ms 之間；對照組 tick=1 時連 700ms 都仍在掉，證明窗口隨 tick 週期縮放）。存活率近乎 delta_delay ÷ tick 週期。⚠ 調高本值會縮短該窗口，但那不是調整本值的理由 —— 約束⑧ 已規定互動結果一律走 RPC，只要攜帶物狀態不放在 owner-write NetworkVariable，本項風險不存在。見 [P-20](b)。"
+
+  - name: relay_region_by_timezone
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+    value:
+      # IANA 時區 → Relay region。由 Host 端在建立 allocation 前查表。
+      # 依 Core Rule #28：relay 貼著 Host 放對房裡每個人同時最佳，故只需判斷 Host 位置。
+      Asia/Taipei: asia-northeast1
+      Asia/Tokyo: asia-northeast1
+      Asia/Seoul: asia-northeast1
+      Asia/Shanghai: asia-northeast1
+      Asia/Hong_Kong: asia-northeast1
+      Asia/Macau: asia-northeast1
+      Asia/Singapore: asia-southeast1
+      Asia/Bangkok: asia-southeast1
+      Asia/Jakarta: asia-southeast1
+      Asia/Kuala_Lumpur: asia-southeast1
+      Asia/Manila: asia-southeast1
+      Asia/Ho_Chi_Minh: asia-southeast1
+      Asia/Kolkata: asia-south1
+      Asia/Karachi: asia-south1
+      Asia/Dhaka: asia-south1
+      Asia/Colombo: asia-south1
+      Asia/Dubai: asia-south1
+      Australia/Sydney: australia-southeast1
+      Australia/Melbourne: australia-southeast1
+      Australia/Brisbane: australia-southeast1
+      Australia/Perth: australia-southeast1
+      Pacific/Auckland: australia-southeast1
+      Europe/Helsinki: europe-north1
+      Europe/Stockholm: europe-north1
+      Europe/Oslo: europe-north1
+      Europe/Copenhagen: europe-north1
+      Europe/Tallinn: europe-north1
+      Europe/Riga: europe-north1
+      Europe/Vilnius: europe-north1
+      Europe/Warsaw: europe-central2
+      Europe/Prague: europe-central2
+      Europe/Budapest: europe-central2
+      Europe/Bucharest: europe-central2
+      Europe/Kyiv: europe-central2
+      Europe/Athens: europe-central2
+      Europe/Sofia: europe-central2
+      Europe/London: europe-west4
+      Europe/Dublin: europe-west4
+      Europe/Paris: europe-west4
+      Europe/Berlin: europe-west4
+      Europe/Amsterdam: europe-west4
+      Europe/Brussels: europe-west4
+      Europe/Madrid: europe-west4
+      Europe/Lisbon: europe-west4
+      Europe/Rome: europe-west4
+      Europe/Zurich: europe-west4
+      Europe/Vienna: europe-west4
+      America/Sao_Paulo: southamerica-east1
+      America/Argentina/Buenos_Aires: southamerica-east1
+      America/Santiago: southamerica-east1
+      America/Bogota: southamerica-east1
+      America/Lima: southamerica-east1
+      America/Los_Angeles: us-west1
+      America/Vancouver: us-west1
+      America/Tijuana: us-west1
+      America/Denver: us-west1
+      America/Phoenix: us-west1
+      America/Anchorage: us-west1
+      Pacific/Honolulu: us-west1
+      America/New_York: us-east1
+      America/Toronto: us-east1
+      America/Montreal: us-east1
+      America/Halifax: us-east1
+      America/Chicago: us-central1
+      America/Mexico_City: us-central1
+      America/Winnipeg: us-central1
+    unit: iana_timezone_to_relay_region
+    notes: "Host 端建立 Relay allocation 前的查表依據，配合 Core Rule #28。時區由 .jslib 讀 Intl.DateTimeFormat().resolvedOptions().timeZone 取得——**不可用 .NET TimeZoneInfo**，Unity Web 的時區資料庫不完整。.jslib 橋接已於 W1 第 2 批證實可在 IL2CPP ＋ Managed Stripping High 下存活。查不到的時區走 relay_region_offset_fallback；玩家可在建房介面覆寫（AC22b）。⚠ 本表刻意只列高人口時區，不求窮舉——漏列的走 offset fallback，代價是可能選到次佳 region 而非失敗。⚠ VPN 與旅居者會被判到錯的區，這是接受的誤差：後果是延遲較高，不是連不上。約束⑮、AC22b。"
+    added: 2026-09-15
+    revised: ""
+
+  - name: relay_region_offset_fallback
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+    value:
+      # UTC 偏移（小時）→ region。時區名查不到時的退路。
+      # 偏移永遠讀得到（new Date().getTimezoneOffset()），故本表不會再失手。
+      "-11..-7": us-west1
+      "-6..-4": us-central1
+      "-3..-2": southamerica-east1
+      "-1..3": europe-west4
+      "4..6": asia-south1
+      "7..8": asia-southeast1
+      "9..10": asia-northeast1
+      "11..14": australia-southeast1
+    unit: utc_offset_hours_to_relay_region
+    notes: "relay_region_by_timezone 查不到時的退路。UTC 偏移約略對應經度，對本用途足夠——選錯相鄰 region 的代價是數十毫秒，不是連線失敗。⚠ 偏移無法區分同經度的南北半球（例如 UTC+8 的新加坡與台北落在不同表列），故本表只是退路，命中時區名時一律以 relay_region_by_timezone 為準。"
+    added: 2026-09-15
+    revised: ""
+
+  - name: relay_region
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+    value: "asia-northeast1"
+    unit: relay_region_id_last_resort_default
+    notes: "Unity Relay allocation 的 region —— **最後退路的預設值，不是寫死值**。🔴 本值直接決定 AC22 成敗，且沒有自動解：W1 第 4 批實測（20 樣本、Relay WSS、雙進程同置台灣，故 RTT = 4 × d(台灣,region)）—— asia-northeast1 p95 = 94.5ms（單程 22.2）／預設 region p95 = 335.8ms（單程 82.8，已超過 interact_rtt_p95_ms 的 300ms）／europe-west4 p95 = 437.8ms（單程 108.6）。三點吻合線性模型。之所以不能留空靠引擎自選：Relay 的 QoS（自動挑最近 region）在 Web 上拋 PlatformNotSupportedException（QoS SDK does not support WebGL），而本作 Web-only。⚠ **本值不得被當成寫死的全域 region 使用**（arlong 2026-09-15 裁決「讓國外的人也可以參與」）：依 Core Rule #28，region 須貼著 Host 選，先查 relay_region_by_timezone、再退 relay_region_offset_fallback，兩者皆未命中時才用本值。之所以取東亞值當最後退路，僅因首批玩家預期集中於此，與「該選哪區」的規則無關。可用值（2026-09-15 實機列舉）：asia-southeast1 / asia-northeast1 / asia-south1 / us-central1 / us-east1 / us-west1 / europe-north1 / europe-west4 / europe-central2 / australia-southeast1 / southamerica-east1 —— 無台灣／香港節點，東亞最近為東京。⚠ region 由 Host 在建立 allocation（＝#26「開始上班」呼叫 StartRelayNetworkAsync）時決定，**一個班次內不可改**；依 #23a 局間會 StopNetworkAsync 拆掉，故理論上每班次可重選 —— 此為由 API 形狀推得的推論，尚未實測。約束⑮、Core Rule #28、AC22b。"
+    added: 2026-09-15
     revised: ""
 
   - name: interpolation_buffer_ms

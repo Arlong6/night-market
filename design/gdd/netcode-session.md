@@ -432,6 +432,47 @@ transport 無官方端到端範例），因此是第一個做技術原型的系�
     `SessionException: Cannot start when Singleton is not set`）。
     不帶 network 的 session 則無此依賴。這正好強化本條：Lobby 階段可以完全不碰 NGO。
 
+    🔴 **延後建連對「協定選擇」的硬性約束（W1 第 4 批新發現，本條的實作規範）**：
+    Web 目標平台必須走 **WSS**（WebGL 沒有 UDP）。但 Relay 協定**無法在延後那一刻指定**——
+    `StartRelayNetworkAsync(RelayNetworkOptions)` 的非 obsolete 建構子只收
+    `region` 與 `preserveRegion`，沒有 protocol 參數；帶 `RelayProtocol` 的建構子已標記
+    `[Obsolete]`，訊息明言「應改由 `SessionOptions.WithNetworkOptions()` 設定」。
+    協定因此只能在**建立 session 當下**就決定：
+
+    ```csharp
+    // ✅ 正確：建 session 時就定協定，但**不啟動**網路（NetworkState 仍為 Stopped）
+    var session = await MultiplayerService.Instance.CreateSessionAsync(
+        new SessionOptions { MaxPlayers = 4 }
+            .WithNetworkOptions(new NetworkOptions { RelayProtocol = RelayProtocol.WSS }));
+    // …Lobby 階段…（此時完全沒有 Relay allocation）
+    await session.Network.StartRelayNetworkAsync(new RelayNetworkOptions());  // 「開始上班」
+    ```
+
+    **本條不因此受損**：`WithNetworkOptions()` 只設定、不啟動，與 `WithRelayNetwork()`
+    是兩回事——延後建連與指定 WSS 可以並存。但它把「協定」從執行期決定變成
+    **建 session 時的一次性決定**，Lobby 建立後無法再改。
+    同時 `UnityTransport.UseWebSockets` 必須為 `true`，兩端不一致會拋
+    `ArgumentException: Mismatched Relay configuration and network interface`
+    （首次 RTT 測試即因此失敗）。
+
+    🔴 **協定不會從 Host 傳染給加入者**：第二次 RTT 測試中 Host 已設 WSS 且
+    `IsListening=True`，加入端只傳房間碼（`JoinSessionByCodeAsync(code)`）便再次拋出
+    同一個 `Mismatched` 例外。**每個角色都必須各自宣告一次**——
+    `JoinSessionOptions` 同樣繼承 `BaseSessionOptions`，吃得下同一個擴充方法：
+
+    ```csharp
+    await MultiplayerService.Instance.JoinSessionByCodeAsync(code,
+        new JoinSessionOptions()
+            .WithNetworkOptions(new NetworkOptions { RelayProtocol = RelayProtocol.WSS }));
+    ```
+
+    對 #8（輸碼／帶碼連結加入）與 #26（開始上班轉場）的實作意義：
+    **協定設定必須集中成一個共用的 helper**，任何一條加入路徑漏掉就會在該路徑上
+    單獨失敗，而 Host 端完全正常——這種不對稱失敗在本地單機測試中看不出來。
+
+    ⚠ 附帶事實：**QoS SDK 不支援 WebGL**（`PlatformNotSupportedException`，非致命，
+    僅表示無法用 QoS 自動選 region）。Web 上的 region 選擇只能靠預設或顯式指定。
+
     **若不可拆的替代設計（r4 補完，不再只是一句 timeout 調整）**：
     - (a) **接受 Lobby 期間存在 Relay／NGO 連線**，並把 Lobby 的 Host 離開偵測改回心跳
       （#20 的運行範圍相應擴及 Lobby），同時拉高 Lobby 階段 transport disconnect timeout
@@ -621,6 +662,31 @@ transport 無官方端到端範例），因此是第一個做技術原型的系�
     條件「App 啟動」預設成功，而唯一的錯誤態 ServiceError 被限縮在 build 已載入之後，
     涵蓋不到 404／斷網／瀏覽器不相容。視覺歸 `/ux-design`
 
+28. **Relay region 貼著 Host 選（W1 第 4 批實測後新增；arlong 2026-09-15 裁決「讓國外的人
+    也可以參與」）**：Host 在建立 allocation 前，依 `relay_region_by_timezone` 查自己的
+    時區得出 region 並顯式傳入 `RelayNetworkOptions(region)`；查不到時退到
+    `relay_region_offset_fallback`；玩家可在建房介面覆寫（AC22b）。
+
+    **為什麼是「貼著 Host」而不是「貼著多數玩家」或「取中點」**——這不是取捨，是可證明的：
+    Relay 的往返路徑是 `client → relay → host → relay → client`，故
+    `RTT_i = 2 × (d(i, R) + d(R, H))`。由三角不等式 `d(i,R) + d(R,H) ≥ d(i,H)`，
+    **等號在 R 落於 i 與 H 之間時成立，而 R = H 對所有 i 同時成立**。
+    把 relay 移向某個 client 只會讓其他 client 變差；移向 Host 則讓每個人同時拿到
+    各自的理論下限 `2 × d(i, H)`。**沒有人因此變差，故無需權衡。**
+    ⚠ Host 自己不付這筆延遲（它是權威，自身互動本地結算），所以最佳化的目標是
+    **所有 client 的延遲**，Host 不計入。
+
+    **推論：誰當房主，決定了房裡所有人的延遲。** 若一群人多數在歐洲卻由台灣的人開房，
+    全體都被綁在 `2 × d(自己, 台灣)` 上，而換一個歐洲的人開房即可消除。
+    這是 Lobby UI 應該讓玩家知道的資訊（AC22a），也是 OQ#18（host migration）
+    在 MVP 之後的一個實際用途。
+
+    ⚠ **時區必須用 `.jslib` 讀 `Intl.DateTimeFormat().resolvedOptions().timeZone`，
+    不可用 .NET `TimeZoneInfo`**——Unity Web 的時區資料庫不完整。
+    `.jslib` 橋接在 IL2CPP ＋ Managed Stripping High 下的存活已於 W1 第 2 批證實。
+    ⚠ VPN 與旅居者會被判到錯的區。這是**接受的誤差**：後果是延遲較高，不是連不上，
+    且有覆寫出口。
+
 ### 狀態 × Core Rule 適用性矩陣（r3 結構前置 #1；r4 擴充）
 
 Y＝適用、N＝明確不適用、–＝該狀態下無此概念（N.A.）。空格即未裁決，不得留白。
@@ -661,6 +727,7 @@ InShift／Disc（Disconnected）／Settle（Settlement）。
 | **#25 Lobby 的 Host 離開偵測（MPS 事件）** | – | – | – | – | – | **Y** | **Y** | – | – | – | – |
 | **#26 「開始上班」轉場** | – | – | – | – | – | **Y** | – | – | – | – | – |
 | **#27 冷啟動 stall 偵測** | **Y** | – | – | – | – | – | – | – | – | – | – |
+| **#28 Relay region 貼著 Host 選** | – | – | – | **Y**（協定於建 session 時定） | – | **Y**（region 於 #26 建 allocation 時定） | **Y** | – | – | – | – |
 
 ### States and Transitions
 
@@ -1078,11 +1145,12 @@ game-designer／`/ux-design`；客製 Web Template 視覺→`/ux-design`；Web �
 | ⑤ | `heartbeat_timeout_sec ≤ UnityTransport.DisconnectTimeoutMS` | ✅ **`[P-9]` 已回填（2026-09-13）：`DisconnectTimeoutMS` 預設 30000ms＝30s ≫ 8s，約束成立**，app 層心跳確實是更早的判定者。欄位名 1.x→2.x **無更名**。⚠ 另有兩個獨立逾時須注意：`ClientConnectionBufferTimeout`＝10s（approval 握手上限，影響 #9 的閘門）、`MaxConnectAttempts × ConnectTimeoutMS`＝60s（建立連線階段總逾時，重連流程應調小） |
 | ⑥ | `grace_window_sec > 0 ∧ patience_mult > 1.0`（**嚴格不等式**） | 任一為下限值即等同關閉留守者保護。range 下界已相應上移 |
 | ⑦ | **`late_join_cutoff_sec ≥ 更衣室上限 + min_meaningful_play_sec`** | r4 修正：原約束 `≥ 更衣室上限 5s` 是**必要非充分**——取 cutoff=5 時，剩 5.1s 點擊→通過閘門→更衣室 3-5s→進場只剩 0.1~2.1s，仍是「進場即結算」。預設 30 ≥ 5+15=20 ✓ |
-| ⑧ | **`RTT + 2 幀 + 處理時間 ≤ interact_rtt_p95_ms`**，且**互動請求／回應一律走 RPC，不得以 NetworkVariable 承載結果** | ✅ **`[P-3]` 已回填（2026-09-13），原約束的前提是錯的**：**RPC 完全不受 network tick 影響**——每**幀**於 `PostLateUpdate` 批次送出（`MessageManager.ProcessSendQueues()` 非 tick-gated），接收端每幀 `EarlyUpdate` 處理。受 tick 影響的是 **NetworkVariable**（每 tick 收集一次）與 **NetworkTransform**。<br>**新預算（60fps、節流 RTT 200ms）**：16.6ms ＋ 100ms ＋ ≤1 幀 ＋ 100ms ＋ 16.6ms ≈ **235-250ms ≤ 300ms，餘裕 50-65ms**。**AC22 在 10Hz 下可達成，先前「必然不可達」的判斷解除。**<br>⚠ **但這條的後半是硬規則**：若改用 NetworkVariable 承載互動結果，10Hz 下單邊即 +100ms → 逼近 350ms 超標。<br>⚠ 最大未知數已轉移到 **server 端 frame rate**（若 server 跑 30fps，單幀成本 +33ms）與 **WebSocket 丟包下的 P95 尾端**，兩者須實機量測 |
+| ⑧ | **`RTT + 2 幀 + 處理時間 ≤ interact_rtt_p95_ms`**，且**互動請求／回應一律走 RPC，不得以 NetworkVariable 承載結果**（🔴 **2026-09-16 起本條後半為正確性要求，不再只是效能考量** —— 見下方 `[P-20]`(b)：越權的 owner-write delta 會讓伺服器 `No more variables can be read`，**中止解析整則訊息的其餘部分**，連同物件上其他無關的 NetworkVariable 一起掉） | ✅ **`[P-3]` 已回填（2026-09-13），原約束的前提是錯的**：**RPC 完全不受 network tick 影響**——每**幀**於 `PostLateUpdate` 批次送出（`MessageManager.ProcessSendQueues()` 非 tick-gated），接收端每幀 `EarlyUpdate` 處理。受 tick 影響的是 **NetworkVariable**（每 tick 收集一次）與 **NetworkTransform**。<br>**新預算（60fps、節流 RTT 200ms）**：16.6ms ＋ 100ms ＋ ≤1 幀 ＋ 100ms<br>🟢 **已由實測直接證實（W1 第 4 批，2026-09-15）**：雙進程經 Relay WSS 量 20 樣本往返，**tick 改十倍、RTT 一毫秒未動**——10Hz：median 331.1／p95 335.8ms；1Hz：median 330.7／p95 333.0ms。若 RPC 受 tick 閘門控制，1Hz 下每筆須等最長 1 秒，p95 必落在秒級。**推論與量測一致，本約束的原前提正式作廢。**<br>🔴 **但量測同時暴露一個原設計沒算進去的項**：上表的 RTT 並非「網路成本」的全部，`interact_rtt_p95_ms` 的分母**受 Relay region 選擇支配**，見約束⑮ ＋ 16.6ms ≈ **235-250ms ≤ 300ms，餘裕 50-65ms**。**AC22 在 10Hz 下可達成，先前「必然不可達」的判斷解除。**<br>⚠ **但這條的後半是硬規則**：若改用 NetworkVariable 承載互動結果，10Hz 下單邊即 +100ms → 逼近 350ms 超標。<br>⚠ 最大未知數已轉移到 **server 端 frame rate**（若 server 跑 30fps，單幀成本 +33ms）與 **WebSocket 丟包下的 P95 尾端**，兩者須實機量測 |
 | ⑫ | **`1 + background_disconnect_threshold_sec / catchup_duration_sec ≤ 3.5`** | r4 二次修訂新增：公式③的 `rate` 分母 `catchup_duration_sec` **本身也是旋鈕**（範圍 1-3），而約束⑪只鎖了分子。取 threshold=5（合法）∧ catchup=1（合法）→ `rate = 6.0×`，正是 ⑪ 用來否決 threshold=10 的那個數字。預設 `1 + 5/2 = 3.5` ✓（等號） |
 | ⑬ | **`session_end_worstcase_sec ≥ heartbeat_timeout_sec + heartbeat_interval_sec + relay_disconnect_propagation_sec`** | r4 二次修訂新增：該關係先前只寫在 AC6b 的括號裡。調動 `heartbeat_timeout_sec`（合法範圍可至 30）會讓 AC6b／AC13b／AC28 寫死的 12 靜默失效。預設 12 ≥ 8+2+2 ✓（等號） |
 | ⑭ | **凡「經網路傳播才得知」的事件，其 AC 須拆成兩段計時：`得知時刻`（＝傳播延遲，依 `[P-8]`／`[P-10]`）＋`得知後的 UI 回饋`（≤`ui_feedback_sec`）。兩者不得混為單一上界。** | r4 二次修訂新增（**非數值不等式**）：`ui_feedback_sec`（本地操作到畫面）與 `relay_disconnect_propagation_sec`（網路傳播）量的是**不同區段**，用不等式綁它們是錯的。真正的缺陷是**把端到端上限寫成只含其中一段**——AC37a 原寫「過場 ≤1s 中止」而傳播下界就是 2s，即為此類。已修正的有 AC37a；撰寫新 AC 時一律套用本條 |
 | ⑨ | **`npc_milestone_catchup_sec ≤ npc_event_min_interval_sec`** | r4 新增：原值 0.3 > 0.2，補位永遠被下一筆 milestone 打斷，兩常數互斥 |
+| ⑮ | **`RTT_i = 2 × (d(i, R) + d(R, H))`；Relay region `R` 必須顯式指定且貼著 Host（見 #28）。同區房間須滿足 `RTT_i ≤ interact_rtt_p95_ms`；跨區房間改由 AC22a 的降級契約承接** | 🔴 **W1 第 4 批實測後新增，全表唯一「不寫程式就會違反」的約束**。量測（20 樣本／組、Relay WSS、雙進程同置於台灣，故 `RTT = 4 × d(台灣, R)`）：<br>｜region｜median｜p95｜反推單程｜<br>｜`asia-northeast1`｜88.8｜**94.5**｜22.2ms｜<br>｜預設（美國中部）｜331.1｜**335.8**｜82.8ms｜<br>｜`europe-west4`｜434.3｜**437.8**｜108.6ms｜<br>三點皆吻合線性模型 → **模型可用來推未量測的組合**。<br>**預設值下 p95 335.8ms > `interact_rtt_p95_ms`(300ms)，即遊戲邏輯一行都還沒跑，AC22 就已經失敗。** 之所以不能留空靠引擎自選：Relay 的 QoS（自動挑最近 region）在 Web 上拋 `PlatformNotSupportedException: QoS SDK does not support WebGL`，而本作 Web-only。<br>**跨洲房間的推算（arlong 裁決「讓國外的人也可以參與」後的核心數字）**：歐洲玩家加入台灣 Host 的房、`R = asia-northeast1` 時，`RTT = 2 × (d(歐,東京) + 22.2)`。`d(歐,東京)` 無法自本地量得，但由已測兩值夾擠：`108.6 − 22.2 ≤ d(歐,東京) ≤ 108.6 + 22.2`（下界取差的絕對值） → **`RTT ∈ [217, 306] ms`**。→ **跨洲可玩，但正好壓在 300ms 邊緣，不是有餘裕地達標**。故 AC22 拆為同區（必達）與跨區（降級契約）兩條，見 AC22／AC22a。<br>⚠ 上述皆為**裸傳輸往返**，未含 server frame rate、節流與遊戲處理時間。<br>⚠ **region 的固定範圍是「一個班次」而非「整局」**：它傳給 `StartRelayNetworkAsync`，而依 #23 那是「開始上班」才呼叫、依 #23a 局間會 `StopNetworkAsync` 拆掉。故**理論上每個班次可重選 region**——若日後啟用 host migration（OQ#18），region 得以跟著新 Host 走。⚠ **此為由 API 形狀推得的推論，尚未實測**（未驗證 stop→start 是否真能換到不同 region），列為 W1 結案後的待驗項。<br>可用 region（實機列舉）：`asia-southeast1`、`asia-northeast1`、`asia-south1`、`us-central1`、`us-east1`、`us-west1`、`europe-north1`、`europe-west4`、`europe-central2`、`australia-southeast1`、`southamerica-east1`。**無台灣／香港節點**，東亞最近為東京。 |
 | ⑩ | **`grace_window_sec ≥ heartbeat_timeout_sec`** | r4 新增：拔線後 Host 要 6-8s 才判定，留守者在判定前**完全沒有保護**。若 grace < timeout，裸撐窗口會佔滿甚至超過整個寬限期，支柱 5 對留守者失效。預設 15 ≥ 8 ✓（裸撐仍佔 53%，屬已知接受，以 `[P-13]` 的優雅路徑縮短） |
 | ⑪ | **`background_disconnect_threshold_sec ≤ 5`**（由公式③反推） | `rate = 1 + T_bg / catchup_duration_sec`，threshold=10 → 6.0×，違反「不瞬移」鐵律 |
 
@@ -1274,7 +1342,9 @@ Relay 中繼的純網路成本 ≥400ms，AC22 的 300ms 在數學上不可能�
 |---|---|---|
 | 20 | GIVEN 兩玩家同幀對同一機台 claim（腳本驅動），WHEN 同時到達，THEN 僅一方成功，另一方收到明確拒絕事件並播撲空動畫（非靜默失敗） | MVP |
 | 21 | GIVEN 玩家 claim 後 Host 未回應，WHEN 達 claim lock 逾時 5s，THEN 站台強制解鎖；逾時後才抵達的原請求被拒（`ClaimGeneration` 不符），不得覆蓋新持有者 | MVP |
-| 22 | GIVEN **節流只套用於受測 client 單側**（Host 走標準網路；雙側節流下純網路成本 ≥400ms，數學上不可能達標），WHEN 玩家對機台送出 claim，THEN 按下→收到成功/撲空結果的往返 P95 ≤`interact_rtt_p95_ms`（300ms，20 次取樣）；超過即顯示等待狀態，不卡死無回饋。✅ **`[P-3]` 已回填（2026-09-13）：本條可達成，先前的「不可達」判斷解除。** RPC 不受 network tick 影響（每幀 `PostLateUpdate` 送出），預算約 235-250ms，餘裕 50-65ms。**但 GIVEN 須追加硬前提：互動請求與結果一律走 RPC，不得以 NetworkVariable 承載**——後者受 tick 批次，10Hz 下單邊 +100ms 即超標。⚠ 餘裕的最大未知數已轉移到 server 端 frame rate 與 WebSocket 丟包下的 P95 尾端 | MVP |
+| 22 | GIVEN **節流只套用於受測 client 單側**（Host 走標準網路；雙側節流下純網路成本 ≥400ms，數學上不可能達標），**且房內所有人與 Host 同大區**（依 #28，relay 貼著 Host），WHEN 玩家對機台送出 claim，THEN 按下→收到成功/撲空結果的往返 P95 ≤`interact_rtt_p95_ms`（300ms，20 次取樣）；超過即顯示等待狀態，不卡死無回饋。✅ **`[P-3]` 已回填（2026-09-13）：本條可達成，先前的「不可達」判斷解除。** RPC 不受 network tick 影響（每幀 `PostLateUpdate` 送出），預算約 235-250ms，餘裕 50-65ms。**但 GIVEN 須追加硬前提：互動請求與結果一律走 RPC，不得以 NetworkVariable 承載**——後者受 tick 批次，10Hz 下單邊 +100ms 即超標。🟢 **W1 第 4 批已實測（2026-09-15）**：雙進程經 Relay WSS、20 樣本，tick 10Hz 與 1Hz 的往返**完全一致**（p95 335.8 vs 333.0ms）→ 不受 tick 閘門控制的推論成立。<br>🔴 **但 GIVEN 必須再追加一條，否則本條在預設設定下必定失敗**：**Relay region 須顯式指定為玩家所在大區**。同一組量測中，預設 region 的 p95 = **335.8ms（已超標）**，指定 `asia-northeast1` 後為 **94.5ms**，餘裕從負值變成約 205ms。區別純粹來自 region，與 tick、與遊戲邏輯無關（見約束⑮、OQ#20）。<br>⚠ 上述為**裸傳輸往返**，尚未含 server 端 frame rate、節流、與遊戲處理時間；餘裕的最大未知數仍是 WebSocket 丟包下的 P95 尾端 🟢 **同區已實測達標**：`asia-northeast1` 下裸傳輸往返 p95 = 94.5ms，餘裕約 205ms 供 server frame rate、節流與遊戲處理使用。 | MVP |
+| 22a | GIVEN 房內存在**與 Host 不同大區**的玩家（arlong 2026-09-15 裁決「讓國外的人也可以參與」後新增），WHEN 該玩家送出 claim，THEN (1) 互動**仍必須得出正確且最終一致的結果**，不得因逾時而卡死或落入錯誤狀態；(2) 按下後 ≤`ui_feedback_sec` 內必須出現**本地的「處理中」回饋**，不得靜默等待網路；(3) **不得給出會被推翻的樂觀結果**——`claim` 的成功／撲空只能由 Host 宣告（此為 #2 權威模型的直接後果，跨區只是讓它更容易被看見）。<br>**本條不設 300ms 上限，因為那是光速問題不是實作問題**：依約束⑮ 的模型，歐洲玩家在台灣 Host 房中的裸往返落在 **217–306ms**，再加 server frame rate 與遊戲處理必定超過 `interact_rtt_p95_ms`。把跨區也綁 300ms 等於寫一條**注定失敗且無法靠實作補救**的 AC。<br>改以**降級契約**承接：慢，但正確、有回饋、不卡死。<br>⚠ 量測邊界：217–306ms 是由兩組實測值夾擠推得，**非直接量測**（本地兩個進程都在台灣，量不到歐洲↔東京）。真實跨洲數字須待有海外測試者時補量，列入 W1 結案後的待辦。 | MVP |
+| 22b | GIVEN Host 建立房間，WHEN 建立 Relay allocation 前，THEN 依 `relay_region_by_timezone` 查得 region 並顯式傳入（查不到則用 `relay_region_offset_fallback`），**且建房介面提供覆寫**；WHEN 玩家覆寫，THEN 以覆寫值建立。<br>驗證方式：以偽造時區（`.jslib` 可注入）逐一覆蓋表中每個 region 值，斷言傳入 `RelayNetworkOptions` 的 region 與查表結果一致；另斷言未知時區會落到 offset fallback 而非拋例外或留空。<br>**留空即為缺陷**：留空會落到預設 region，實測 p95 335.8ms，直接違反 AC22。 | MVP |
 | 23 | GIVEN **節流只套用於受測 client 單側**，WHEN 觀察其他 client 的角色 60s，THEN 插值（緩衝 `interpolation_buffer_ms`＝150ms）後單幀位移超過**第一人稱控制器 GDD 所定義之移動速度上限**的次數＝0。**⚠ 該常數目前不存在**（第一人稱控制器 GDD 未撰寫）——本條在該 GDD 定案前**無法執行**，列為 `blocked-by: 第一人稱控制器 GDD` | MVP |
 | 24 | GIVEN NPC 以里程碑事件同步，WHEN 任一里程碑觸發，THEN 全 client（含中途加入者）於 `state_convergence_sec`（1s）內顯示相同 NPC 狀態；Host 凍結後恢復時只套用最新一筆並於 `npc_milestone_catchup_sec`（**0.2s**，r4 修正）內補位，不瞬跳。**r4 修正理由**：原值 0.3s > `npc_event_min_interval_sec`（0.2s），補位永遠被下一筆 milestone 打斷，兩常數互斥（約束⑨） | MVP `[P-12]` |
 | 25 | GIVEN 同一 NPC 連續狀態變化，WHEN 事件送出，THEN 同一 NPC 兩事件間隔 ≥0.2s（log 驗證） | MVP |
@@ -1451,7 +1521,7 @@ Relay 中繼的純網路成本 ≥400ms，AC22 的 300ms 在數學上不可能�
 |---|---|---|---|---|---|
 | ~~P-1~~ ✅✅ **已實測回填 2026-09-13（W1 第 1 批）** | **固定 6 碼、全大寫英數，字集 `689BCDFGHJKLMPQRTW`（6 樣本）——無母音、無 0/O/1/I/L。** 假設成立且優於預期：**fallback 不需要，#8 的正規化規則已刪除**。~~原假設~~ `session.Code` 為短、可口述的碼，且字集不含或可正規化 0/O、1/I/l | 原型直接取值列印 | 碼太長/不可讀/字集不受控 → 自建短碼對照表映射到 session id | AC1、AC2 的可用性。**fallback 可行**（自建短碼表），非 blocking。註：此 fallback 同時是 P-10 服務層 fallback 的前置——只有短碼與 session id 解耦，才可能在 session 被服務端回收後用**同一個房間碼**重建 | 原型 W1 |
 | P-2 | 30s slot-hold 可與 Relay/MPS 服務端逾時共存，且能靠自建 GUID 表恢復原位 | 原型斷線 29s/31s 實測 | 服務端更早釋放 → 縮短 W 至服務端上限；或砍掉原位恢復（本就是 Post-MVP） | **拆兩半（r4 二次修訂）**：**(a) 30s slot-hold 與原位恢復**＝AC17／AC18／AC19，全為 Post 層級，fallback 可行，非 blocking。**(b) 跨重連的 session-level player 身分** ✅✅ **已實測回填（W1 第 1 批）**：`session.CurrentPlayer.Id` **等同** `AuthenticationService.Instance.PlayerId`（實測皆為 `lEYLoSNzPcbDMI7OnZij79CxFKGp`）。因此**只要匿名帳號不變，身分就跨 session 延續**，#15a 的離線次數計數與 AC50 有可靠依據。`ISession.ReconnectAsync()` 亦存在。⚠ 殘留：匿名帳號本身綁在本機憑證上，**清快取／換瀏覽器會換身分**（與 OQ#5 的 PlayerPrefs 儲存分割同源）——這是設計可接受的限制，但應在 #15a 註明「換裝置即重新計數」。＝**AC50（MVP）** 與 **#15a 的全部目的**——若身分不可得，離線次數只能用 NGO ClientId 計數，而重連會配發新 ClientId，**每次都算「第一次」，「用 alt-tab 調低難度」的漏洞原封復活**。**(b) 目前無 fallback，且應移入 W1**（先前整條排 W2 是層級誤判） | 原型 W2 |
-| ~~P-3~~ ✅✅ **已回填並實機複驗通過 2026-09-13（W1 第 0 批）** | ~~玩家同步 10Hz 可獨立於全域 tick 調整~~ → **假設為假，但後果與預期相反（是好消息）**。NetworkTransform 送出頻率**＝全域 `NetworkConfig.TickRate`，無 per-instance 設定**（預設 30）。**但 RPC 完全不受 tick 影響**（每幀 `PostLateUpdate` 送出），受影響的只有 NetworkVariable 與 NetworkTransform。→ **AC22 可達成**（≈235-250ms），約束⑧ 已重寫。殘留實機項：server frame rate、WebSocket 丟包 P95 尾端、`InterpolationBufferTickOffset` 實際預設值 | 查 NGO 2.13 API＋原型實測，**必須與 AC22／OQ#1 同一次量測** | 實為全域 tick → **必須先驗證 tick rate 對 AC22 的影響**，必要時把 tick 拉高至 20-30Hz 並改用 interpolation／send-threshold 降低單物件發送頻率（tick rate 與「每個物件多久送一次」本來就是兩件事） | **AC22（MVP）**、AC23、AC46、約束⑧、registry 的 `interact_rtt_p95_ms`。⚠ **裸 fallback 不可行**——「改為統一 tick 值」若沿用 10Hz，往返多 200ms，AC22 數學上必敗。fallback 必須附帶「拉高 tick」才成立 | 原型 W1 |
+| ~~P-3~~ ✅✅✅ **已回填、實機複驗、並於 2026-09-15 完成雙進程實測（W1 第 0＋4 批）——本項結案** | ~~玩家同步 10Hz 可獨立於全域 tick 調整~~ → **假設為假，但後果與預期相反（是好消息）**。NetworkTransform 送出頻率**＝全域 `NetworkConfig.TickRate`，無 per-instance 設定**（預設 30）。**但 RPC 完全不受 tick 影響**（每幀 `PostLateUpdate` 送出），受影響的只有 NetworkVariable 與 NetworkTransform。→ **AC22 可達成**（≈235-250ms），約束⑧ 已重寫。🟢 **第 4 批雙進程實測直接驗證（20 樣本、Relay WSS、經真實網路）**：**tick=10Hz → p95 335.8ms；tick=1Hz → p95 333.0ms**。tick 改十倍、往返一毫秒未動，「RPC 非 tick-gated」由原始碼推論升格為**實測事實**。<br>🔴 **同一次量測意外掀出一個原設計完全沒有的變數：Relay region**。上面兩組都是預設 region；改指定 `asia-northeast1` 後 **p95 = 94.5ms**。**AC22 的成敗實際上由 region 決定，不是由 tick 決定**——這是本項最重要的產出，已升為約束⑮ 與 OQ#20。<br>殘留實機項：server frame rate、WebSocket 丟包 P95 尾端、`InterpolationBufferTickOffset` 實際預設值 | 查 NGO 2.13 API＋原型實測，**必須與 AC22／OQ#1 同一次量測** | 實為全域 tick → **必須先驗證 tick rate 對 AC22 的影響**，必要時把 tick 拉高至 20-30Hz 並改用 interpolation／send-threshold 降低單物件發送頻率（tick rate 與「每個物件多久送一次」本來就是兩件事） | **AC22（MVP）**、AC23、AC46、約束⑧、registry 的 `interact_rtt_p95_ms`。⚠ **裸 fallback 不可行**——「改為統一 tick 值」若沿用 10Hz，往返多 200ms，AC22 數學上必敗。fallback 必須附帶「拉高 tick」才成立 | 原型 W1 |
 | ~~P-4~~ ✅ **已實測回填 2026-09-13（W1 第 2 批，真實部署）** | **假設為假，但找到唯一可行路徑**。實測 itch.io 部署（草稿頁）：<br>• `location.search` ＝ **`?v=1789400690`**（itch.io 自己的版本參數，**原始 `?code=` 完全不見**）<br>• `parent.location.search` ＝ **`__CROSS_ORIGIN_BLOCKED__`**（iframe 來自 `html-classic.itch.zone`，與 `itch.io` 跨域）<br>• **`document.referrer` ＝ `https://arlong666.itch.io/w1-netcode-probe-internal-test?code=…`（原始 URL 含 query，可讀）** ← **唯一可行路徑**<br>**結論**：帶碼連結**仍可實作**，但必須改從 `document.referrer` 解析，不能讀 `location.search`。⚠ referrer 可能被使用者的瀏覽器隱私設定或 `Referrer-Policy` 削減，故 **#8 的輸碼備援絕不可砍**（AC2 已保底） | **實際部署一次測**（10 分鐘），與 P-6／P-19 同一次 | 不轉發 → 輸碼路徑成為唯一入口（AC2 已保底），並改用「短碼優先」的分享文案 | AC3 的前半。**fallback 是全表最健康的一條**——#8 已把輸碼釘成必備備援，AC2 已保底，非 blocking | 原型 W1 |
 | P-5 | NGO **跨 channel**（本專案實際使用的 reliable/unreliable 組合）可能亂序，需單物件 sequence 保護 | 原型以實際 channel 組合壓測（**不是**單 reliable channel——TCP 本就有序，會得偽陰性） | 證實有序 → **移除**通用 sequence 層，**但保留 `ClaimGeneration`**（防遲到請求，與有序性無關） | AC26。**fallback 可行**（移除是簡化，非損失），非 blocking | 原型 W2 |
 | ~~P-6~~ 🔴 **已實測回填 2026-09-13：假設為假，且後果比預期嚴重** | **itch.io 不支援 Brotli `Content-Encoding`，且會把上傳的 `.br` 解壓後重新提供**，實際傳輸量 **正好 2.00 倍**：<br><br>｜檔案｜我們的 Brotli｜itch.io 實際傳輸｜倍數｜<br>｜`Web.wasm.br`｜5,741,298｜8,108,255（`content-encoding: gzip`）｜1.41｜<br>｜`Web.data.br`｜1,506,949｜6,522,513（**無 content-encoding**）｜**4.32**｜<br>｜`Web.framework.js.br`｜78,508｜92,753｜1.18｜<br>｜`Web.loader.js`｜26,983｜9,514｜0.35｜<br>｜**合計**｜**7,353,738**｜**14,733,035**｜**2.00**｜<br><br>機制已確認：`Web.data.br` 下載後前 4 位元組為 `UnityFS` 明文 → **itch.io 解壓了 Brotli**，存原始內容後以 gzip（wasm/js）或不壓縮（data）提供。遊戲能跑是因為 Unity 收到的本來就是可用資料。<br>🔴 **對公式⑤ 的衝擊**：`T_load ≤25s` 建立在「50MB Brotli ÷ 20Mbps」之上；在 itch.io 上那會變成 **≈100MB 傳輸 → T_load ≈50s**，**60 秒硬標直接破，支柱 4 不成立**。<br>✅ **解法已實測成立**：把 `PlayerSettings.WebGL.decompressionFallback` 設為 **`true`**。<br>副檔名隨之從 `.br` 變為 **`.unityweb`**——itch.io 不認得它是壓縮檔，因此**原樣提供**（`content-encoding: none`），改由 Unity 的 loader 自行解壓。<br><br>｜建置方式｜本地｜itch.io 傳輸｜倍數｜<br>｜`.br`（fallback=false）｜7,353,738｜**14,733,035**｜2.00｜<br>｜`.unityweb`（fallback=true）｜7,444,699｜**7,416,748**｜**0.99**｜<br><br>**傳輸量減半，回到 Brotli 水準，公式⑤ 的 `T_load` 預算恢復。** 部署後實測遊戲正常運作。<br>**代價**：`Web.loader.js` 由 26,983 → 117,894 bytes（+90KB，內含 JS Brotli 解壓器），
@@ -1477,7 +1547,7 @@ Relay 中繼的純網路成本 ≥400ms，AC22 的 300ms 在數學上不可能�
 | ~~P-17~~ ✅✅ **已實測回填 2026-09-13（W1 第 1 批）** | **callback 確實被呼叫、`ConnectionApproval` 未被 Sessions 覆蓋、`ConnectionData` payload 完整傳遞**（實測 `payload=w1-proto-v1`）→ **#9 的截止閘門與 AC54 的版本閘都有可用載體，先前「fallback 殺掉 AC54」的 blocking 解除**。⚠ 殘留：拒絕原因如何呈現給**遠端** client 待雙進程確認。~~原假設~~ Host 的 `ConnectionApprovalCallback` 在 Sessions API 封裝下仍可用 | 原型：以 Sessions API 建連，嘗試註冊 approval callback 並拒絕一個 client，觀察 client 端收到什麼 | 不可用 → 截止判定改由 Host 於 NGO 連線建立**後**立即踢出並附原因（體驗較差，玩家會閃一下才被退），版本閘同理 | AC5、AC35、AC54、#9 的「唯一執行點」。另影響 **AC51**、Lobby\* 的進入條件、#9 的版本閘、UI 翻譯表兩列、常數 `late_join_cutoff_sec`。⚠ **fallback 不可行，本項為 blocking（r4 二次修訂）**：fallback 是「連線建立**後**立即踢出」，但 **AC54（MVP-必達）** 的 THEN 明寫「不得靜默進入造成 desync」——fallback 下 client **一定先建立 NGO 連線**才被踢，在那個窗口內舊 build 已開始收發 NetworkVariable／RPC，**正是版本閘要防的事**；若序列化格式不相容，連線建立本身就可能讓 Host 收到畸形封包。**版本閘的全部意義是「在任何資料交換之前」擋下**，fallback 在語義上做不到。另 AC5／AC35 的 THEN 與取樣點須連帶改寫（AC35 的 0.5s 級鑑別會被連線建立的抖動侵蝕）。**查證成本近乎為零——與 P-10(b) 是同一次原型操作**，不應排在最後一批 | **原型 W1（與 P-10 同批）** |
 | **P-18** | `beforeunload` 可從 WebGL build 經 `.jslib` 觸發確認框；`sendBeacon`／`keepalive` 語義的離開通知可在 unload 時送達 | 原型：Release build 實測關分頁攔阻與離開通知到達率 | 攔不住 → #12 已明寫 best-effort，維持現狀；beacon 送不出 → 離開通知退回心跳路徑 | AC42、**AC6c**、**#25**（Lobby 的唯一偵測來源）、#12 的攔阻與離開通知。⚠ **fallback 在 Lobby 情境不成立（r4 二次修訂）**：fallback 寫「beacon 送不出 → 離開通知退回心跳路徑」，但 **Lobby 依 #20／#23 根本不跑心跳**——實際退路只剩 MPS 服務端 TTL（#23b 推測數十秒量級），於是 #25 自述的「留在 Lobby 的人會盯著一個說謊的 roster 數十秒，穩定觸發支柱 5」原封不動復活。**AC42 的桌面攔阻部分 fallback 仍可行**（best-effort 已明示），但 **AC6c 的離開通知部分不可行**。查證併入 P-7 的同一次 Release build（**因此應與 P-7 同批，而非排最後**） | **原型 W1（與 P-7 同批）** |
 | ~~P-19~~ 🔴 **已實測回填 2026-09-13：iframe 情境為假** | **本地（非 iframe）實測 `clipboard result = OK`**——Clipboard API 在 Release Web build ＋ user gesture 下可用。🔴 **itch.io 的 iframe `allow` 屬性實測沒有 `clipboard-write`**：<br>`autoplay; fullscreen *; geolocation; microphone; camera; midi; monetization; xr-spatial-tracking; gamepad; gyroscope; accelerometer; xr; cross-origin-isolated; web-share`<br>→ **Clipboard API 在 itch.io 上會被 permissions policy 擋掉，#23 的「複製邀請連結」必須走 fallback**（顯示可全選的連結文字框＋提示手動複製）。本地非 iframe 情境仍為 `OK`，故此限制**專屬於 iframe 部署平台** | 與 P-4／P-6 同一次 itch.io 部署實測 | 不可用 → 「複製邀請連結」退化為「顯示可全選的連結文字框」＋提示手動複製 | #23 的**必做配套**（複製邀請連結按鈕）——而該按鈕是 #23 替代設計 (c) 的核心，也是降低 Host 切分頁必要性的唯一不依賴引擎行為的手段。**fallback 可行但削弱 #23 的保護** | 原型 W1 |
-| ~~P-20~~ ✅✅ **(a) 已回填並實機複驗通過；(b) 已回填（原始碼層級，未實機）** 2026-09-13（W1 第 0 批） | **(a)** `NetworkObject.DontDestroyWithOwner` 是 **public bool field，預設 `false`＝預設銷毀**，Inspector 可勾選；**銷毀發生在 `OnClientDisconnectCallback` 之前、同一 call stack** → #24 的前置條件已補（原序列第 2 步隱含「物件還在」的假設為假）。⚠ `RemoveOwnership()` **不做 unparent**，「掉落在原地」須自行實作。⚠ 版本陷阱：2.4.0 前該欄位是壞的，2.13.2 已修，網路上 2025 上半年討論不可信。**(b)** `ChangeOwnership(ulong)` 在 client-server **同步原子、無 pending 窗口** → **#6 的「單一真相時刻」定義成立**；但回傳 void 失敗靜默（須回讀 `OwnerClientId`）、兩次變更需隔 6 tick、只有 server 能發起；`OwnershipStatus` 那套**只在 DA 有效** | 查 NGO 2.13 API＋原型：owner 斷線後觀察其 owned NetworkObject 是否被銷毀 | 預設為銷毀 → **顯式設定為不隨 owner 銷毀**（NGO 約定段已要求，本來就要做） | **拆兩半（r4 二次修訂）**：**(a) `DontDestroyWithOwner` 名稱與預設值**＝AC10、#24 步驟 2。修法（顯式設定）無論預設為何都安全 → **非 blocking**；且這是**查 API 文件**而非原型項，應排第 0 批。⚠ 註：NGO 約定段給的兩條路中，「Host 在掉落前先收回 ownership」**在時序上脆弱**（斷線不可預測，若銷毀發生在 `OnClientDisconnectCallback` 之前或同幀則來不及），真正安全的只有顯式設定那一條。**(b) ownership transfer 在 NGO 2.x 的 API 與限制**＝**#6 的「單一真相時刻」與 AC14（MVP）**——若 transfer 是非同步、存在 pending 窗口，則「Host 提交的那一刻」不存在，AC14 的二分無法成立。**(b) 目前無 fallback** | 原型 W1 |
+| ~~P-20~~ ✅✅✅ **(a)(b) 皆已回填並實機驗證完畢 —— 本項結案**（(a) 2026-09-13 第 0 批；(b) 2026-09-16 第 4 批雙進程實測） | **(a)** `NetworkObject.DontDestroyWithOwner` 是 **public bool field，預設 `false`＝預設銷毀**，Inspector 可勾選；**銷毀發生在 `OnClientDisconnectCallback` 之前、同一 call stack** → #24 的前置條件已補（原序列第 2 步隱含「物件還在」的假設為假）。⚠ `RemoveOwnership()` **不做 unparent**，「掉落在原地」須自行實作。⚠ 版本陷阱：2.4.0 前該欄位是壞的，2.13.2 已修，網路上 2025 上半年討論不可信。**(b)** `ChangeOwnership(ulong)` 在 client-server **同步原子、無 pending 窗口** → **#6 的「單一真相時刻」定義成立**；但回傳 void 失敗靜默（須回讀 `OwnerClientId`）、只有 server 能發起；`OwnershipStatus` 那套**只在 DA 有效**。<br>🟢 **(b) 已於 2026-09-16 完成雙進程實機掃描，並推翻「需隔 6 tick」的描述**：<br>① **引擎並不「要求」間隔**。`k_MaximumTickOwnershipChangeMultiplier = 6` 只出現在 `NetworkSpawnManager` 的**一則警告**裡，且被 `LogLevel == Developer` 擋著，**不延遲也不阻擋任何交接**。<br>② **交接本身約 100ms，且不受 tick 影響**：實測 handoff（交接傳播＋寫入＋回報，一個往返量級）tick=10 為 100-104ms、tick=1 為 101-105ms —— 與同 region 實測 RTT（median 88.8、max 104.4ms）同量級。**「10Hz → 600ms 可感知交接延遲」的推論為假。**<br>③ **真正存在的是 NetworkVariable 的遺失窗口，且它 ≈ 一個 tick 週期**（非 6 個）。掃描「client 寫入後、所有權被收回前」的等待時間，各 3 次：<br>｜delay ms｜0｜40｜80｜120｜160｜240｜400｜700｜<br>｜**tick=10**｜0/3｜1/3｜**3/3**｜3/3｜3/3｜3/3｜3/3｜3/3｜<br>｜**tick=1**｜0/3｜0/3｜0/3｜0/3｜1/3｜1/3｜1/3｜2/3｜<br>存活率近乎 `delay ÷ tick 週期`（10Hz@40ms→40%→1/3；1Hz@700ms→70%→2/3），正是「寫入落在 tick 週期內的隨機相位」該有的分布。機制：送出端在**下一個 tick 序列化時**才評估 `CanWrite()`（`NetworkVariableDeltaMessage`），屆時若已非 owner 則該筆 delta 不再送出。<br>④ 🔴 **後果比原設計假設的嚴重**：伺服器端收到越權 delta 時記錄 `Client wrote to NetworkVariable without permission. **No more variables can be read. This is critical.**` —— 它**中止解析該訊息的其餘部分**，故**同一物件上其他無關的 NetworkVariable 也會一起掉**，不是只掉那一筆。這使約束⑧「互動結果一律走 RPC，不得以 NetworkVariable 承載」從**效能考量升格為正確性要求**。<br>→ **OQ#17 因此消解**，見該條 | 查 NGO 2.13 API＋原型：owner 斷線後觀察其 owned NetworkObject 是否被銷毀 | 預設為銷毀 → **顯式設定為不隨 owner 銷毀**（NGO 約定段已要求，本來就要做） | **拆兩半（r4 二次修訂）**：**(a) `DontDestroyWithOwner` 名稱與預設值**＝AC10、#24 步驟 2。修法（顯式設定）無論預設為何都安全 → **非 blocking**；且這是**查 API 文件**而非原型項，應排第 0 批。⚠ 註：NGO 約定段給的兩條路中，「Host 在掉落前先收回 ownership」**在時序上脆弱**（斷線不可預測，若銷毀發生在 `OnClientDisconnectCallback` 之前或同幀則來不及），真正安全的只有顯式設定那一條。**(b) ownership transfer 在 NGO 2.x 的 API 與限制**＝**#6 的「單一真相時刻」與 AC14（MVP）**——若 transfer 是非同步、存在 pending 窗口，則「Host 提交的那一刻」不存在，AC14 的二分無法成立。~~**(b) 目前無 fallback**~~ → **(b) 已結案：`ChangeOwnership` 同步原子且約 100ms，#6 的「單一真相時刻」與 AC14 皆成立，不需要 fallback。**唯一的實作要求是 **攜帶物的狀態不得放在 owner-write NetworkVariable**（約束⑧已涵蓋）。 | 原型 W1 ✅ 已完成 |
 
 ## Open Questions
 
@@ -1499,10 +1569,11 @@ Relay 中繼的純網路成本 ≥400ms，AC22 的 300ms 在數學上不可能�
 | 12 | **頻寬預算與 relevancy／priority 規則**：全文無任何頻寬上限或 relevancy 規則。粗估 4 人 × 10Hz NetworkTransform ＋ 10 NPC × 5 events/s，經 client-as-host 星狀轉發，Host 上行約 15-25 KB/s、每場 1 小時約 60-90MB 經過 Relay——對 3GiB/CCU 的免費額度**綽綽有餘**（結論是不必擔心成本，但這個結論應該被寫下來而不是靠沒人問）。真正該定的是 Host 上行的**上限**與 send queue 深度監控門檻 | 原型量測（與 `[P-16]` 同一次）＋ web-platform ADR | 原型 W2 |
 | 13 | **行動瀏覽器的 WebGL context loss**：iOS Safari 切 App 回來可能是 `webglcontextlost`——畫布死亡，**這不是「背景 >5s」可以涵蓋的分支**（沒有可恢復的 client 可以 teardown）。是否加規則「偵測到 context loss → 視同離開 session → 引導重新整理頁面」？ | 原型於 iOS Safari 實測（與 OQ#10 併問） | 原型 W2 |
 | 14 | **`settlement_timeout_sec` = 20s 是否打斷 Fellowship**：concept 把「結算檢討直接變成『剛剛那波我們應該…』的重開動力」列為 Short-Term Loop 的核心，而 Fellowship 是第一優先 aesthetic。20s 對認真檢討的朋友團可能太短，尤其首次遇到細項清單。tuning 範圍 10-60 已留夠彈性，但**預設值的依據看不出對齊過 concept** | playtest 時特別驗證「是否打斷檢討」，不只驗「有沒有自動推進」 | 原型後 playtest |
+| ~~20~~ ✅ **已裁決 2026-09-15（arlong：「讓國外的人也可以參與」）** | **Relay region 要怎麼選？**（W1 第 4 批實測後提出）。原本的三選一（寫死東亞／Host 端量測／依時區推測）在裁決後**變成不是三選一**：既然不能犧牲海外玩家，就不能寫死任一大區。<br>**裁決後的解法（Core Rule #28）**：relay **貼著 Host** 選，由時區查表決定、可覆寫。這條之所以成立而非折衷，是因為它可證明——`RTT_i = 2 × (d(i,R) + d(R,H))`，由三角不等式，`R = H` 讓**每個 client 同時**拿到各自的理論下限，移向任一 client 只會讓其他人變差。**沒有人因此變差，所以沒有取捨要做。**<br>原本擔心的「Host 端量測會吃掉 `T_load` 預算」也隨之消失：查時區是本地的、零延遲。<br>殘留代價已如實記錄於 AC22a：跨洲裸往返 217–306ms，**能玩但壓在 300ms 邊緣**，故跨區改以降級契約（慢但正確、有回饋、不卡死）承接，而非硬綁一條注定失敗的 300ms。 | technical-director ＋ arlong | ✅ 已結案，產出 #28／⑮／AC22a／AC22b ＋ 兩張 registry 對照表 |
 | 15 | **更衣室 3-5s 對重連者是否為無回報的時間稅**：`#10` 的「推門進店的動作節奏」理由只對**第一次**進店成立。對一個 6 秒前才掉線、系統把他當全新員工對待的玩家，這 3-5s 是純等待。是否在**演出上**區隔（維持定長，但改為「回到崗位」而非「新人報到」）？ | game-designer ＋ `/ux-design` | Pre-Production Phase 4 |
 | 19 | **Lobby 階段「Host 被強制終止」的 132 秒偵測延遲，要怎麼對玩家呈現？**（W1 第 1 批實測後新增）。實測已把問題縮小：**優雅離開只要 1.14 秒**（`Deleted` 事件），**只有強制終止／當機才是 132.61 秒**。因此方向已明確——**#12 的 `beforeunload` ＋ 主動 `DeleteAsync()` 升格為關鍵機制**，覆蓋最常見的關分頁情境。**剩下的裁決只有一個：那條罕見的 132 秒路徑要怎麼呈現？** 選項：✅ **arlong 已裁決（2026-09-13）：採本地逾時提示**——Lobby 自最後一次 session 事件起計時，超過 `lobby_host_silence_timeout_sec`（30s）即顯示店語提示＋可離開按鈕，**不等服務端**。新增常數 `lobby_host_silence_timeout_sec`。文案歸 `/ux-design`。註：host migration（OQ#18）**解決不了這個延遲**——瓶頸是服務端判定 host 消失的時間，migration 只改變判定之後做什麼 | 已裁決 | 已納入 #25 |
 | 18 | **MVP 是否仍要維持「無 host migration」？**（W1 第 1 批發現後新增）。GDD 從 r1 起就把「房主關分頁＝本局結束」當成 MVP 的既定限制，#12 的 UI 也對玩家明示。但 MPS 2.3.1 的 API 顯示 **host migration 是一等公民**：`IHostSession.GetHostMigrationDataAsync`／`SetHostMigrationDataAsync`、`IHostSession.Host` 可指派、`ISession.SessionMigrated` 事件、`NetworkState.Migrating` 狀態、`IClientSessionNetwork.MigrationFailed` 事件。也就是說「無 migration」是**選擇**而非引擎限制。是否至少列入 Post-MVP？（影響 #12、#21、AC6b、AC13b、UI 翻譯表的「店長把鐵門拉下來了」整條敘事，以及 Relay 情境 B 的 10s 回收問題） | creative-director 裁決 ＋ 實機評估遷移成本 | 原型 W1 後 |
-| 17 | **`network_tick_rate` 的第三個考量：交接冷卻**（W1 第 0 批查證後新增）。引擎要求兩次 ownership 變更間隔 ≥6 個 network tick。代入本專案：**10Hz → 600ms**、20Hz → 300ms、30Hz → 200ms。600ms 對一款 Overcooked-like 的快節奏合作遊戲是**可感知的**交接延遲，而「借過！把東西丟給你」正是核心樂趣之一。先前選 10Hz 只考慮了移動平滑度與頻寬；現在它還牽動交接手感。是否為此把 tick 提到 20-30Hz？（提高會增加 NetworkTransform 與 NetworkVariable 流量，須與 OQ#12 的頻寬預算一起看） | 原型 W1 量測 ＋ 攜帶與交付 GDD | 原型 W1 |
+| ~~17~~ ✅ **已消解 2026-09-16（W1 第 4 批雙進程實測，非裁決）** | **`network_tick_rate` 的第三個考量：交接冷卻**（W1 第 0 批查證後提出）。原文為「引擎要求兩次 ownership 變更間隔 ≥6 個 network tick，10Hz → **600ms**，對 Overcooked-like 的快節奏合作是**可感知的**交接延遲」。**兩個前提都不成立**：<br>① **引擎沒有「要求」**。那個 `6` 只存在於 `NetworkSpawnManager` 的一則警告字串裡，且被 `LogLevel == Developer` 擋著，**不延遲也不阻擋任何交接**。<br>② **交接本身約 100ms 且不受 tick 影響**（tick=10 量得 100-104ms、tick=1 量得 101-105ms，與同 region RTT 同量級）。**沒有 600ms 這回事**，`network_tick_rate = 10` 不因交接而受威脅。<br>真正存在的是**另一件事**：owner-write NetworkVariable 的遺失窗口 ≈ **一個** tick 週期（10Hz 下 ~100ms，實測門檻落在 40-80ms 之間；1Hz 下連 700ms 都仍在掉）。而它**只影響 owner-write NetworkVariable**，約束⑧ 早已規定互動結果一律走 RPC —— 只要攜帶物的狀態不放在 owner-write NetworkVariable，本項風險完全不存在。<br>⚠ 但該實測也讓約束⑧ 的地位改變：越權 delta 會讓伺服器**中止解析整則訊息的其餘部分**（`No more variables can be read. This is critical.`），故約束⑧ 從效能考量**升格為正確性要求**。詳見 `[P-20]`(b)。 | 實測取代裁決，無需 arlong 介入 | ✅ 已結案，產出見 [P-20](b) 與約束⑧ |
 | 16 | **Host 獨留長時間續戰時是否主動引導補位**：#21 給了「提前收班」出口，但沒有「開放補位」的引導（例如提示 Host 再貼一次連結）。若班次才過 1/4 隊友就全掛，Host 要撐 6 分鐘以上 | 波次導演 GDD ＋ playtest（與 OQ#9 併問） | 原型後 playtest |
 
 **已解決（首次修訂）**：更衣室過場約束定案（Core Rules #10，**僅 mid-join**；視覺歸

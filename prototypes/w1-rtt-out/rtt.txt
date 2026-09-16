@@ -1,0 +1,1 @@
+samples=20;min=432.0;median=434.3;p95=437.8;max=438.7;tick=10;region=europe-west4

@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Passed" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-16 16:32:18Z" end-time="2026-09-16 16:33:30Z" duration="71.3956775">
+  <test-suite type="TestSuite" id="1028" name="w1-netcode" fullname="w1-netcode" runstate="Runnable" testcasecount="12" result="Passed" start-time="2026-09-16 16:32:18Z" end-time="2026-09-16 16:33:30Z" duration="71.395678" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <test-suite type="Assembly" id="1024" name="W1.Tests.PlayMode.dll" fullname="/Users/arlong/Projects/Claude-Code-Game-Studios/prototypes/w1-netcode/Library/ScriptAssemblies/W1.Tests.PlayMode.dll" runstate="Runnable" testcasecount="12" result="Passed" start-time="2026-09-16 16:32:18Z" end-time="2026-09-16 16:33:30Z" duration="71.392246" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="22512" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <test-suite type="TestSuite" id="1025" name="W1" fullname="W1" runstate="Runnable" testcasecount="12" result="Passed" start-time="2026-09-16 16:32:18Z" end-time="2026-09-16 16:33:30Z" duration="71.392036" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1026" name="Tests" fullname="W1.Tests" runstate="Runnable" testcasecount="12" result="Passed" start-time="2026-09-16 16:32:18Z" end-time="2026-09-16 16:33:30Z" duration="71.391885" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1027" name="PlayMode" fullname="W1.Tests.PlayMode" runstate="Runnable" testcasecount="12" result="Passed" start-time="2026-09-16 16:32:18Z" end-time="2026-09-16 16:33:30Z" duration="71.391731" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1005" name="W1OwnHost" fullname="W1.Tests.PlayMode.W1OwnHost" classname="W1.Tests.PlayMode.W1OwnHost" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-09-16 16:32:18Z" end-time="2026-09-16 16:33:30Z" duration="71.391098" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1006" name="RunOwnHost" fullname="W1.Tests.PlayMode.W1OwnHost.RunOwnHost" methodname="RunOwnHost" classname="W1.Tests.PlayMode.W1OwnHost" runstate="Runnable" seed="1152361567" result="Passed" start-time="2026-09-16 16:32:18Z" end-time="2026-09-16 16:33:30Z" duration="71.386138" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[
+IgnoreFailingMessages:true
+[W1H] signed in as lEYLoSNzPcbDMI7OnZij79CxFKGp
+[W1OWN] NetworkManager 建立 TickRate=1 prefabHash=5715C0DE
+[Netcode]  StartHost
+[Netcode]  Initialize
+[Netcode] [Server-Side] Pending Client-0 connection approved!
+[Netcode] [ServerSpawnSceneObjectsOnStartSweep] Skipping W1Carryable as it is the actual prefab asset itself!
+[W1OWN][host] spawned id=1 owner=0 Code=PH9K97 tick=1
+[W1H] wrote code.txt: PH9K97
+[W1H] wrote host-ready.txt: 2026-09-16T16:32:23.5875200Z
+[Netcode] [Host-Side] Transport connection established with pending Client-1.
+[Netcode] [Server-Side] Pending Client-1 connection approved!
+[W1OWN][host] client=1 已連上，開始掃描
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=0;rep=0;marker=1;value=-1;survived=False;handoff_ms=105
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=0;rep=1;marker=2;value=-1;survived=False;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=0;rep=2;marker=3;value=-1;survived=False;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=40;rep=0;marker=4;value=-1;survived=False;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=40;rep=1;marker=5;value=-1;survived=False;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=40;rep=2;marker=6;value=-1;survived=False;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=80;rep=0;marker=7;value=-1;survived=False;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=80;rep=1;marker=8;value=-1;survived=False;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=80;rep=2;marker=9;value=-1;survived=False;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=120;rep=0;marker=10;value=-1;survived=False;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=120;rep=1;marker=11;value=-1;survived=False;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=120;rep=2;marker=12;value=-1;survived=False;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=160;rep=0;marker=13;value=13;survived=True;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=160;rep=1;marker=14;value=-1;survived=False;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=160;rep=2;marker=15;value=-1;survived=False;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=240;rep=0;marker=16;value=-1;survived=False;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=240;rep=1;marker=17;value=-1;survived=False;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=240;rep=2;marker=18;value=18;survived=True;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=400;rep=0;marker=19;value=-1;survived=False;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] Client wrote to NetworkVariable`1 without permission. No more variables can be read. This is critical. => NetworkObjectId: 1 - GetNetworkBehaviourOrderIndex(): 0 - VariableIndex: 0
+[Netcode] [NetworkVariable`1]
+[W1OWN][host] delay=400;rep=1;marker=20;value=-1;survived=False;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=400;rep=2;marker=21;value=21;survived=True;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=700;rep=0;marker=22;value=22;survived=True;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=700;rep=1;marker=23;value=-1;survived=False;handoff_ms=101
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[Netcode] [Rapid Ownership Change Detected][Potential Loss in State] Detected a rapid change in ownership that exceeds a frequency less than 6x the current network tick rate! Provide at least 6x the current network tick rate between ownership changes to avoid NetworkVariable state loss.
+[W1OWN][host] delay=700;rep=2;marker=24;value=24;survived=True;handoff_ms=101
+[W1H] wrote ownership.txt: delay=0;rep=0;marker=1;value=-1;survived=False;handoff_ms=105
+delay=0;rep=1;marker=2;value=-1;survived=False;handoff_ms=101
+delay=0;rep=2;marker=3;value=-1;survived=False;handoff_ms=101
+delay=40;rep=0;marker=4;value=-1;survived=False;handoff_ms=101
+delay=40;rep=1;marker=5;value=-1;survived=False;handoff_ms=101
+delay=40;rep=2;marker=6;value=-1;survived=False;handoff_ms=101
+delay=80;rep=0;marker=7;value=-1;survived=False;handoff_ms=101
+delay=80;rep=1;marker=8;value=-1;survived=False;handoff_ms=101
+delay=80;rep=2;marker=9;value=-1;survived=False;handoff_ms=101
+delay=120;rep=0;marker=10;value=-1;survived=False;handoff_ms=101
+delay=120;rep=1;marker=11;value=-1;survived=False;handoff_ms=101
+delay=120;rep=2;marker=12;value=-1;survived=False;handoff_ms=101
+delay=160;rep=0;marker=13;value=13;survived=True;handoff_ms=101
+delay=160;rep=1;marker=14;value=-1;survived=False;handoff_ms=101
+delay=160;rep=2;marker=15;value=-1;survived=False;handoff_ms=101
+delay=240;rep=0;marker=16;value=-1;survived=False;handoff_ms=101
+delay=240;rep=1;marker=17;value=-1;survived=False;handoff_ms=101
+delay=240;rep=2;marker=18;value=18;survived=True;handoff_ms=101
+delay=400;rep=0;marker=19;value=-1;survived=False;handoff_ms=101
+delay=400;rep=1;marker=20;value=-1;survived=False;handoff_ms=101
+delay=400;rep=2;marker=21;value=21;survived=True;handoff_ms=101
+delay=700;rep=0;marker=22;value=22;survived=True;handoff_ms=101
+delay=700;rep=1;marker=23;value=-1;survived=False;handoff_ms=101
+delay=700;rep=2;marker=24;value=24;survived=True;handoff_ms=101
+[W1OWN][host] 掃描完成
+[Netcode]  Shutdown
+[Netcode] [Disconnect Event][Client-1][TransportClientId-4294967296][TransportShutdown] Disconnected due to host shutting down. 
+[Netcode]  ShutdownInternal
+[Netcode] [Disconnect Event][Client-0][TransportClientId-0][TransportShutdown] NetworkConnectionManager was shutdown. The transport was shutdown.
+[Netcode] NetworkConnectionManager.Shutdown() -> IsListening && NetworkTransport != null -> NetworkTransport.Shutdown()
+[Netcode]  ShutdownInternal
+Saving results to: /Users/arlong/Library/Application Support/DefaultCompany/w1-netcode/TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

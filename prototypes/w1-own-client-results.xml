@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Passed" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-16 16:32:30Z" end-time="2026-09-16 16:33:30Z" duration="59.7531157">
+  <test-suite type="TestSuite" id="1028" name="w1-client" fullname="w1-client" runstate="Runnable" testcasecount="12" result="Passed" start-time="2026-09-16 16:32:30Z" end-time="2026-09-16 16:33:30Z" duration="59.753116" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <test-suite type="Assembly" id="1024" name="W1.Tests.PlayMode.dll" fullname="/Users/arlong/Projects/Claude-Code-Game-Studios/prototypes/w1-client/Library/ScriptAssemblies/W1.Tests.PlayMode.dll" runstate="Runnable" testcasecount="12" result="Passed" start-time="2026-09-16 16:32:30Z" end-time="2026-09-16 16:33:30Z" duration="59.749327" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="22583" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <test-suite type="TestSuite" id="1025" name="W1" fullname="W1" runstate="Runnable" testcasecount="12" result="Passed" start-time="2026-09-16 16:32:30Z" end-time="2026-09-16 16:33:30Z" duration="59.749061" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1026" name="Tests" fullname="W1.Tests" runstate="Runnable" testcasecount="12" result="Passed" start-time="2026-09-16 16:32:30Z" end-time="2026-09-16 16:33:30Z" duration="59.748916" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1027" name="PlayMode" fullname="W1.Tests.PlayMode" runstate="Runnable" testcasecount="12" result="Passed" start-time="2026-09-16 16:32:30Z" end-time="2026-09-16 16:33:30Z" duration="59.748758" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1007" name="W1OwnClient" fullname="W1.Tests.PlayMode.W1OwnClient" classname="W1.Tests.PlayMode.W1OwnClient" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-09-16 16:32:30Z" end-time="2026-09-16 16:33:30Z" duration="59.748089" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1008" name="RunOwnClient" fullname="W1.Tests.PlayMode.W1OwnClient.RunOwnClient" methodname="RunOwnClient" classname="W1.Tests.PlayMode.W1OwnClient" runstate="Runnable" seed="518742225" result="Passed" start-time="2026-09-16 16:32:30Z" end-time="2026-09-16 16:33:30Z" duration="59.743208" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[
+IgnoreFailingMessages:true
+[W1H] signed in as F0gmYEHeuhHsfIc5VFS5NTX5nbuY
+[W1OWN] NetworkManager 建立 TickRate=1 prefabHash=5715C0DE
+[Netcode]  StartClient
+[Netcode]  Initialize
+[Netcode] [Approval Pending][Client] Transport connection with server established! Awaiting connection approval...
+[Netcode] [Client-1] Connection approved! Synchronizing...
+[Netcode] [Client-1][Scene Management Disabled] Synchronization complete!
+[W1OWN][client] joined Code=PH9K97 tick=1
+[W1OWN][client] 取得所有權，寫入 1
+[W1OWN][client] 取得所有權，寫入 2
+[W1OWN][client] 取得所有權，寫入 3
+[W1OWN][client] 取得所有權，寫入 4
+[W1OWN][client] 取得所有權，寫入 5
+[W1OWN][client] 取得所有權，寫入 6
+[W1OWN][client] 取得所有權，寫入 7
+[W1OWN][client] 取得所有權，寫入 8
+[W1OWN][client] 取得所有權，寫入 9
+[W1OWN][client] 取得所有權，寫入 10
+[W1OWN][client] 取得所有權，寫入 11
+[W1OWN][client] 取得所有權，寫入 12
+[W1OWN][client] 取得所有權，寫入 13
+[W1OWN][client] 取得所有權，寫入 14
+[W1OWN][client] 取得所有權，寫入 15
+[W1OWN][client] 取得所有權，寫入 16
+[W1OWN][client] 取得所有權，寫入 17
+[W1OWN][client] 取得所有權，寫入 18
+[W1OWN][client] 取得所有權，寫入 19
+[W1OWN][client] 取得所有權，寫入 20
+[W1OWN][client] 取得所有權，寫入 21
+[W1OWN][client] 取得所有權，寫入 22
+[W1OWN][client] 取得所有權，寫入 23
+[W1OWN][client] 取得所有權，寫入 24
+[Netcode]  Shutdown
+[Netcode]  ShutdownInternal
+[Netcode] [Disconnect Event][Client-1][TransportClientId-4294967296][TransportShutdown] NetworkConnectionManager was shutdown. The transport was shutdown.
+[Netcode] Disconnect Event From 0
+[Netcode] NetworkConnectionManager.Shutdown() -> IsListening && NetworkTransport != null -> NetworkTransport.Shutdown()
+[Netcode]  ShutdownInternal
+Saving results to: /Users/arlong/Library/Application Support/DefaultCompany/w1-client/TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>
