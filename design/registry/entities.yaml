@@ -528,7 +528,7 @@ constants:
       - design/gdd/netcode-session.md
     value: 16.3
     unit: mb_per_sec_decompressed_output
-    notes: "Unity 的 JS Brotli 解壓器吞吐（以**解壓後**位元組計）。🔴 本常數的存在本身就是一次公式修正：公式⑤ 原本只有 build_size÷bandwidth ＋ TTFB，**沒有任何 CPU 項**，而 decompressionFallback=true（第 2 批為繞過 itch.io 不支援 Brotli 而定的強制設定）帶來一筆與頻寬無關的解壓成本。W1 第 4 批實測（8 核桌機、localhost、配對法：同一分頁先後載入壓縮版與預先解壓版，差值即解壓成本）：6.98MB 壓縮 → 34.13MB 解壓（4.89×），JS 解壓約 2.0-2.2s；同一份資料原生 C brotli 僅 86ms（397 MB/s），故 JS 慢約 23 倍。對照：wasm 編譯（27.5MB 模組）單獨計時 346ms、預先解壓版總 CPU 僅 331-412ms —— 解壓是大頭。⚠ 8 核桌機為樂觀硬體，低階裝置更慢。⚠ 為相加模型，尚未驗證解壓能否與下載重疊（localhost 下載太快看不出），須以節流網路複驗 —— 那筆量測最可能翻案。外推 50MB 硬標 → 約 15s 解壓 → T_load≈40.4s，AC7a 破，有效 build 天花板降至約 28MB。見 OQ#21、公式⑤、[P-6]。"
+    notes: "Unity 的 JS Brotli 解壓器吞吐（以**解壓後**位元組計）。🔴 本常數的存在本身就是一次公式修正：公式⑤ 原本只有 build_size÷bandwidth ＋ TTFB，**沒有任何 CPU 項**，而 decompressionFallback=true（第 2 批為繞過 itch.io 不支援 Brotli 而定的強制設定）帶來一筆與頻寬無關的解壓成本。W1 第 4 批實測（8 核桌機、localhost、配對法：同一分頁先後載入壓縮版與預先解壓版，差值即解壓成本）：6.98MB 壓縮 → 34.13MB 解壓（4.89×），JS 解壓約 2.0-2.2s；同一份資料原生 C brotli 僅 86ms（397 MB/s），故 JS 慢約 23 倍。對照：wasm 編譯（27.5MB 模組）單獨計時 346ms、預先解壓版總 CPU 僅 331-412ms —— 解壓是大頭。⚠ 8 核桌機為樂觀硬體，低階裝置更慢。✅ 相加模型已以限速伺服器複驗（2026-09-17）：下載窗口由 0.03s 拉到 9.35s（300 倍，5Mbps），而資料在手後的 CPU 維持 2.5-3.2s 不動 —— **解壓不與下載重疊，相加成立**。逐檔時序亦一致：5Mbps 下 wasm 於 198→9380ms 下載，t_ready 落在 12052ms。外推 50MB 硬標 → 約 15s 解壓 → T_load≈40.4s，AC7a 破，有效 build 天花板降至約 28MB。見 OQ#21、公式⑤、[P-6]。"
     added: 2026-09-17
     revised: ""
 
