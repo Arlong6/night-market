@@ -538,9 +538,9 @@ constants:
     referenced_by:
       - design/gdd/netcode-session.md
       - .claude/docs/technical-preferences.md
-    value: 33
-    unit: mb_gzip_compressed
-    notes: "Web build 壓縮後大小上限（**gzip**，非 brotli）。2026-09-18 由 50MB 下修，arlong 裁決。原本的 50MB 只算了下載，而 T_load 還有一項與頻寬無關的解壓 CPU，當初完全沒算進公式⑤。回推：下載 S×1.338÷2.5 ＋ TTFB 5s ＋ 解壓 S×4.89÷85 ＋ wasm編譯與引擎初始化 0.37s ≤ 25s → S ≤ 33.1MB。扣掉 7.0MB 地板（netcode＋IL2CPP，W1 實測）後**內容預算約 26MB**。⚠ 本值綁定「gzip ＋ 原生解壓 ＋ itch.io」這組前提；若改用支援 brotli 的主機（GitLab Pages 已驗證可行，但需後處理 index.html 去掉 URL 的 .br）上限可回到約 45MB，那需要重新裁決發行通路。見 OQ#21、公式⑤、modules/web.md。"
+    value: 44
+    unit: mb_actual_shipped_gzip_bytes
+    notes: "Web build 大小上限，以**實際出貨的 gzip 位元組**計（`Build/` 底下 `.gz` 檔加 `loader.js` 的總和）。2026-09-18 由 50MB 修訂，arlong 裁決。⚠ **單位務必看清楚**：換算成 brotli 等效約 33MB —— 那是另一個單位，不是本硬標。（本常數首次寫入時即因混用這兩個單位而少估 34%，2026-09-18 當日修正。）原本的 50MB 只算了下載，而 T_load 還有一項與頻寬無關的解壓 CPU，當初完全沒算進公式⑤。回推（全為 W1 實測常數）：S÷2.5（20Mbps 下載）＋ 5s（TTFB）＋ S×3.641÷85（原生 gzip 解壓）＋ 0.37s（wasm 編譯與引擎初始化）≤ 25s → S ≤ 44.3MB。其中 3.641 是 **gzip** 的解壓膨脹比，與 build_decompressed_ratio(4.89，那是 **brotli** 的) **不可互換**。扣掉 9.4MB 地板（netcode＋IL2CPP，gzip 版實測）後**內容預算約 35MB**。驗算：探針 build 9.38MB → 3.75＋5＋0.40＋0.37 ＝ 9.5s，其解壓＋固定項預測 0.77s 而本機實測 CPU 770ms，模型吻合。⚠ 綁定「gzip ＋ 原生解壓 ＋ itch.io」這組前提。見 OQ#21、公式⑤、modules/web.md。"
     added: 2026-09-18
     revised: ""
 
@@ -562,7 +562,7 @@ constants:
       - design/gdd/netcode-session.md
     value: 4.89
     unit: ratio_decompressed_over_compressed
-    notes: "Web build 的 Brotli 解壓膨脹比，用於把 build_size 換算成解壓工作量（配合 js_brotli_decompress_rate_mbps 估 T_load 的 CPU 項）。W1 第 4 批實測 7MB 探針 build：Web.wasm 5.47→27.48MB(5.02×)、Web.data 1.44→6.22MB(4.33×)、Web.framework.js 0.07→0.43MB(5.75×)，合計 6.98→34.13MB。⚠ 本值隨內容組成變動：wasm（程式碼）壓縮比高，而已壓縮的資產（貼圖、音訊）壓縮比低。藝術聖經第 5 章的商品圖集採 ASTC（已壓縮）會拉低本值，對 T_load 有利。見公式⑤。"
+    notes: "Web build 的 Brotli 解壓膨脹比，用於把 build_size 換算成解壓工作量（配合 js_brotli_decompress_rate_mbps 估 T_load 的 CPU 項）。W1 第 4 批實測 7MB 探針 build：Web.wasm 5.47→27.48MB(5.02×)、Web.data 1.44→6.22MB(4.33×)、Web.framework.js 0.07→0.43MB(5.75×)，合計 6.98→34.13MB。🔴 **本值是 brotli 的膨脹比。gzip 版實測為 3.641**（9,836,334 → 35,811,393），算 T_load 的解壓項時**必須用與出貨格式相符的那一個**，混用會讓結果差三成以上。⚠ 兩者都隨內容組成變動：wasm（程式碼）壓縮比高，而已壓縮的資產（貼圖、音訊）壓縮比低。藝術聖經第 5 章的商品圖集採 ASTC（已壓縮）會拉低本值，對 T_load 有利。見公式⑤。"
     added: 2026-09-17
     revised: ""
 

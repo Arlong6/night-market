@@ -544,7 +544,7 @@ Task: 第 0-4 批完成（9/20 假設結案）→ W1 結案後開正式 Unity �
 URP render-graph only（Compatibility Mode 在 6.3 移除）；NGO 2.13.2 ＋ Multiplayer Services
 2.3.1 ＋ UTP **2.7.4**；Sessions API 的 `session.Code` 自帶房間碼（固定 6 碼全大寫，字集
 `689BCDFGHJKLMPQRTW`，已無易混淆字元）；Web 需 `UseWebSockets = true` ＋ Relay 協定 WSS；
-Relay 免費額度 50 平均 CCU 免綁卡；**Web build 強制 `compressionFormat = Gzip` ＋ `decompressionFallback = false`**（2026-09-18 定案，取代原本的 fallback=true）；**build size 硬標 ≤33MB**（由 50MB 下修）；
+Relay 免費額度 50 平均 CCU 免綁卡；**Web build 強制 `compressionFormat = Gzip` ＋ `decompressionFallback = false`**（2026-09-18 定案，取代原本的 fallback=true）；**build size 硬標 ≤44MB（以實際出貨的 gzip 位元組計；brotli 等效約 33MB——兩個單位不可混用）**（由 50MB 修訂）；
 **Unity 預設字型無 CJK，必須打包子集化字型**。
 
 

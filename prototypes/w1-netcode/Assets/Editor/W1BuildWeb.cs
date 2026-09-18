@@ -44,7 +44,7 @@ public static class W1BuildWeb
         PlayerSettings.SetManagedStrippingLevel(NamedBuildTarget.WebGL, ManagedStrippingLevel.High);
         PlayerSettings.stripEngineCode = true;
         // 壓縮方式由命令列 -w1compress 指定，讓三種方案跑**同一份建置腳本**：
-        //   brotli-fallback（現況）：itch.io 不認 .br → Unity 的 JS 解壓器處理，代價是 CPU
+        //   brotli-fallback（已廢止）：itch.io 不認 .br → Unity 的 JS 解壓器處理，代價 2.1s CPU
         //   gzip-native：itch.io 是**看內容偵測** gzip（.br 只能靠副檔名，而那條路壞了），
         //                故 gzip 應能拿到 content-encoding 並由瀏覽器原生解壓，CPU 幾乎為零
         //   brotli-native：需要能自訂 header 的主機
@@ -56,10 +56,13 @@ public static class W1BuildWeb
 
         PlayerSettings.WebGL.compressionFormat =
             mode.StartsWith("gzip") ? WebGLCompressionFormat.Gzip : WebGLCompressionFormat.Brotli;
-        // [P-6] 第一次建置刻意設 false，為的是測出**伺服器真實行為**——結果測到 itch.io
-        // 不支援 Brotli：它把 .br 解壓後以 gzip/無壓縮重新提供，實際傳輸量變成 2.00 倍，
-        // 直接打穿公式⑤ 的 T_load 預算。改為 true 後由 Unity 內建的 JS 解壓器處理 Brotli，
-        // 不再依賴伺服器 header，傳輸量應回到 Brotli 水準（代價是解壓的 CPU 時間）。
+        // [P-6] 歷經三次修訂才定案，順序值得留著：
+        //   ① Brotli + fallback=false → itch.io 把 .br 解壓後重送，傳輸量 2.00 倍。
+        //   ② Brotli + fallback=true  → 傳輸量回到 0.99 倍，但**成本搬到 CPU**：
+        //      Unity 的 JS 解壓器只有 16.3 MB/s，7MB build 就要 2.1 秒，且與頻寬無關。
+        //   ③ Gzip + fallback=false  ✅ 定案：itch.io 對 gzip 是**看內容偵測**（可靠），
+        //      對 brotli 只能靠副檔名（而那條路是壞的）。瀏覽器原生解壓 85 MB/s，
+        //      實測 CPU 僅 770ms；代價是體積 1.338 倍。部署後 curl 驗證原樣轉發。
         PlayerSettings.WebGL.decompressionFallback = mode.EndsWith("fallback");
         PlayerSettings.WebGL.template = "APPLICATION:Default";
         PlayerSettings.WebGL.memorySize = 512;             // GDD 記憶體天花板
@@ -73,7 +76,7 @@ public static class W1BuildWeb
             options = BuildOptions.None,                   // Release
         };
 
-        Debug.Log("[W1BUILD] 開始建置 Web（IL2CPP / Stripping High / Brotli）…");
+        Debug.Log($"[W1BUILD] 開始建置 Web（IL2CPP / Stripping High / {PlayerSettings.WebGL.compressionFormat}／fallback={PlayerSettings.WebGL.decompressionFallback}）…");
         var report = BuildPipeline.BuildPlayer(opts);
         var s = report.summary;
         Debug.Log($"[W1BUILD] result={s.result} size={s.totalSize / (1024f * 1024f):F1}MB " +

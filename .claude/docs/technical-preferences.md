@@ -49,14 +49,20 @@
 - **Frame Budget**: 16.6 ms
 - **Draw Calls**: ≤ 300 per frame (Web target; low-poly + URP batching should stay well under)
 - **Memory Ceiling**: ≤ 512 MB heap (WebGL memory is fixed-size; mobile browsers are strict)
-- **Build Size**: **≤ 33 MB gzip 壓縮後**（2026-09-18 由 ≤50MB 下修，W1 實測後 arlong 裁決）
+- **Build Size**: **≤ 44 MB**，以**實際出貨的 gzip 位元組**計（2026-09-18 由 ≤50MB 修訂，W1 實測後 arlong 裁決）
+  - ⚠ **單位一定要講清楚，否則會算錯 34%**：本值指 `Build/` 底下 `.gz` 檔加 `loader.js`
+    的實際大小總和。若換算成 brotli 等效約 33 MB——**那是另一個單位，不是本硬標**。
   - 原本的 50MB 是**只算下載**推出來的，而 `T_load` 還有一項與頻寬無關的**解壓 CPU**，
-    當初完全沒算進去。補上之後 50MB 在 20Mbps 下是 `T_load ≈ 35s`，破 25s 硬閘門。
-  - 33MB 是以實測常數回推的：下載 `S×1.338÷2.5` ＋ TTFB 5s ＋ 解壓 `S×4.89÷85`
-    ＋ wasm 編譯與引擎初始化 0.37s ≤ 25s。
-  - **扣掉 7.0MB 的地板（netcode ＋ IL2CPP 執行環境，W1 實測），內容預算約 26 MB。**
+    當初完全沒算進去。
+  - 44MB 的來源（全為 W1 實測常數）：
+    `S÷2.5`（20Mbps 下載）＋ `5s`（多資源 TTFB）＋ `S×3.641÷85`（原生 gzip 解壓）
+    ＋ `0.37s`（wasm 編譯與引擎初始化）≤ 25s。
+    其中 3.641 是 **gzip** 的解壓膨脹比（brotli 是 4.89，**兩者不可互換**）。
+  - **扣掉 9.4 MB 的地板（netcode ＋ IL2CPP 執行環境，W1 gzip 版實測），內容預算約 35 MB。**
+  - 驗算：現有探針 build 9.38MB → `3.75 ＋ 5 ＋ 0.40 ＋ 0.37 = 9.5s`，
+    而其解壓＋固定項預測 0.77s、本機實測 CPU **770ms**，模型吻合。
   - ⚠ 此值綁定「gzip ＋ 原生解壓 ＋ itch.io」這組前提。若日後改用支援 brotli 的主機
-    （已驗證 GitLab Pages 可行），上限可回到約 45MB——但那需要重新裁決發行通路。
+    （已驗證 GitLab Pages 可行），可再放寬——但那需要重新裁決發行通路。
 
 ## Testing
 

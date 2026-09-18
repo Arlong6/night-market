@@ -106,7 +106,10 @@ wasm 另得 `application/wasm`，`WebAssembly.instantiateStreaming` 可用。
 下載窗口拉長 300 倍而該 CPU 項不動 → 相加，不重疊）。
 附帶代價：`loader.js` 由 26,983 膨脹為 117,894 bytes（內含 JS 解壓器）。
 
-🔴 **絕對不要用預設的 Brotli `.br` 上 itch.io**：50MB 的 build 等於約 100MB 傳輸。
+🔴 **絕對不要用預設的 Brotli `.br` 上 itch.io**：實測傳輸量正好 **2.00 倍**，
+頂到硬標的 44MB build 會變成約 88MB 傳輸，`T_load` 直接翻倍。
+
+**現行 build size 硬標：≤44MB，以實際出貨的 gzip 位元組計**（brotli 等效約 33MB——**兩個單位不可混用**）。來源與算式見 technical-preferences.md。
 
 ## Build size 參考值（2026-09-13 W1 原型實測）
 
