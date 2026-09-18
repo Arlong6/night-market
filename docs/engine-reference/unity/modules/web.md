@@ -59,24 +59,54 @@
 ⚠ 也不要據此假設「幀率敏感的邏輯在背景仍正確」——1 Hz 意味著 `deltaTime` 會是約 1 秒，
 任何以每幀為單位累加的模擬都會在背景期間行為異常。
 
-## ⚠ itch.io 的壓縮陷阱（2026-09-14 W1 原型實測，強制建置規範）
+## ⚠ itch.io 的壓縮設定（2026-09-18 定案，**強制建置規範**）
 
-**itch.io 不支援 Brotli `Content-Encoding`，而且會把上傳的 `.br` 檔解壓後重新提供**
-（`Web.data.br` 下載後前 4 位元組是 `UnityFS` 明文即為證據）。
-遊戲照樣能跑——**壞消息全在傳輸量裡，功能上看不出來**。
+```
+PlayerSettings.WebGL.compressionFormat    = WebGLCompressionFormat.Gzip
+PlayerSettings.WebGL.decompressionFallback = false
+```
 
-| 建置設定 | 副檔名 | 本地 | itch.io 實際傳輸 | 倍數 |
-|---|---|---|---|---|
-| `decompressionFallback = false` | `.br` | 7,353,738 | **14,733,035** | **2.00** |
-| `decompressionFallback = true` | `.unityweb` | 7,444,699 | **7,416,748** | **0.99** |
+**三種組合都實測過，gzip ＋ 不用 fallback 是唯一沒有隱藏代價的那個。**
 
-**強制設定：`PlayerSettings.WebGL.decompressionFallback = true`。**
-副檔名變成 `.unityweb` 後 itch.io 不認得它是壓縮檔，原樣提供，改由 Unity 的 loader
-自行解壓。代價是 `Web.loader.js` 由約 27KB 增為約 118KB（內含 JS Brotli 解壓器），
-外加解壓的 CPU 時間。
+| 建置設定 | 副檔名 | 本地 | itch.io 實際傳輸 | 傳輸倍數 | 解壓 CPU |
+|---|---|---|---|---|---|
+| Brotli, fallback=false | `.br` | 7,353,738 | **14,733,035** | **2.00** | – |
+| Brotli, fallback=true | `.unityweb` | 7,444,699 | 7,416,748 | 0.99 | 🔴 **2268-2590 ms** |
+| **Gzip, fallback=false** ✅ | `.gz` | 9,836,334 | **9,818,865** | 1.33 | **770 ms** |
 
-🔴 **若誤用預設的 `.br`，50MB 的 build 在 itch.io 上等於約 100MB 傳輸。**
-逐檔看更清楚：`Web.data.br` 的膨脹率是 **4.32 倍**（完全未壓縮送出）。
+### 為什麼 `.br` 會壞而 `.gz` 不會
+
+itch.io 自己的文件講明了原因：
+
+> "Brotli encoding **can not be detected** like gzip, so we must depend on the `.br` extension"
+
+**gzip 由內容偵測（可靠），brotli 只能靠副檔名（壞的就是這條路）。**
+`.br` 上傳後會被 itch.io 解壓，再依它自己的規則重新處理——`.wasm` 在它的自動 gzip
+清單裡所以被重壓，`.data` 不在清單裡所以裸送（膨脹 4.32 倍）。
+佐證：把那份 wasm 自己 gzip 一遍得 8,103,680 bytes，而 itch.io 實際送出 8,108,255，
+差不到 5KB。
+
+### `.gz` 的實測回應（部署後 curl）
+
+| 檔案 | content-encoding | content-type | content-length |
+|---|---|---|---|
+| `Web.wasm.gz` | **gzip** | **application/wasm** | 7,805,140 |
+| `Web.data.gz` | **gzip** | application/octet-stream | 1,913,539 |
+| `Web.framework.js.gz` | **gzip** | text/javascript | 90,672 |
+| `Web.loader.js` | gzip | text/javascript | 9,514 |
+
+**每個 `content-length` 都與上傳位元組數完全相同**——未被解壓也未被重壓。
+wasm 另得 `application/wasm`，`WebAssembly.instantiateStreaming` 可用。
+
+### 不要用 `decompressionFallback = true`
+
+它讓 Unity 的 **JS** 解壓器接手，吞吐只有 **16.3 MB/s**，
+而瀏覽器原生 gzip 是 **85 MB/s**（差 5.2 倍）。
+7MB 的 build 就要付 2.1 秒 CPU，且**與頻寬完全無關**（限速 20/5 Mbps 實測，
+下載窗口拉長 300 倍而該 CPU 項不動 → 相加，不重疊）。
+附帶代價：`loader.js` 由 26,983 膨脹為 117,894 bytes（內含 JS 解壓器）。
+
+🔴 **絕對不要用預設的 Brotli `.br` 上 itch.io**：50MB 的 build 等於約 100MB 傳輸。
 
 ## Build size 參考值（2026-09-13 W1 原型實測）
 

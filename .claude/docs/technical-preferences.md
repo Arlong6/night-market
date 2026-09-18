@@ -21,10 +21,16 @@
 - **Primary Input**: Keyboard/Mouse (first-person movement + interact)
 - **Gamepad Support**: Partial (browser Gamepad API; optional bonus)
 - **Touch Support**: Partial (mobile browsers are secondary — desktop browser first)
-- **Platform Notes**: Web build size is a first-class constraint (target <50MB compressed;
-  Unity Web builds are inherently larger than Godot's). Networking must use WebSocket
-  transport — WebGL has no UDP. No autoplay audio before first user gesture. Compression:
-  Brotli. Strip engine code + managed stripping High where safe.
+- **Platform Notes**: Web build size is a first-class constraint (see Build Size below —
+  the ceiling is set by load time, not by storage). Unity Web builds are inherently larger
+  than Godot's. Networking must use WebSocket transport — WebGL has no UDP. No autoplay
+  audio before first user gesture. Strip engine code + managed stripping High where safe.
+- **Compression（2026-09-18 定案，實測後由 Brotli 改為 Gzip）**：
+  `compressionFormat = Gzip` ＋ **`decompressionFallback = false`**。
+  Brotli 體積較小，但 itch.io 只能靠 `.br` 副檔名辨識而那條路是壞的（會被解壓後重送）；
+  改用 fallback 則讓 Unity 的 **JS** 解壓器接手，吞吐僅 16.3 MB/s，
+  而瀏覽器原生 gzip 有 85 MB/s。gzip 多 1.34 倍體積，換掉 5.2 倍的解壓 CPU，划算。
+  詳見 `docs/engine-reference/unity/modules/web.md`。
 
 ## Naming Conventions
 
@@ -43,7 +49,14 @@
 - **Frame Budget**: 16.6 ms
 - **Draw Calls**: ≤ 300 per frame (Web target; low-poly + URP batching should stay well under)
 - **Memory Ceiling**: ≤ 512 MB heap (WebGL memory is fixed-size; mobile browsers are strict)
-- **Build Size**: ≤ 50 MB compressed download（支柱「開連結就開玩」的硬指標）
+- **Build Size**: **≤ 33 MB gzip 壓縮後**（2026-09-18 由 ≤50MB 下修，W1 實測後 arlong 裁決）
+  - 原本的 50MB 是**只算下載**推出來的，而 `T_load` 還有一項與頻寬無關的**解壓 CPU**，
+    當初完全沒算進去。補上之後 50MB 在 20Mbps 下是 `T_load ≈ 35s`，破 25s 硬閘門。
+  - 33MB 是以實測常數回推的：下載 `S×1.338÷2.5` ＋ TTFB 5s ＋ 解壓 `S×4.89÷85`
+    ＋ wasm 編譯與引擎初始化 0.37s ≤ 25s。
+  - **扣掉 7.0MB 的地板（netcode ＋ IL2CPP 執行環境，W1 實測），內容預算約 26 MB。**
+  - ⚠ 此值綁定「gzip ＋ 原生解壓 ＋ itch.io」這組前提。若日後改用支援 brotli 的主機
+    （已驗證 GitLab Pages 可行），上限可回到約 45MB——但那需要重新裁決發行通路。
 
 ## Testing
 

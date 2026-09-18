@@ -986,3 +986,74 @@ S ＝ 50MB → 50÷2.5 ＋ 5 ＋ 0.30×50 ＋ 0.4 ＝ 20 ＋ 5 ＋ 15 ＋ 0.4 �
 **方法論註記**：我原本把 (a) 標成「最可能翻案」並要求先做——結果它反而把結論釘死了。
 這個標記本身沒有白費：**先做最可能推翻自己的那一項，通過了，後面的裁決才站得穩**。
 若當初跳過它直接建議下修硬標，這個建議會一直帶著一個沒人驗過的假設。
+
+### 前置二：不換主機能不能解決？能，而且已部署驗證（2026-09-18）
+
+OQ#21 原本的三條路裡沒有這一條——它是查免費主機時，從 itch.io 自己的文件裡掉出來的。
+
+itch.io 文件明寫「`.br` 結尾就會設 `content-encoding: br`」，但第 2 批實測是相反的。
+矛盾的解答藏在同一段的括號裡：
+
+> "Brotli encoding **can not be detected** like gzip, so we must depend on the `.br` extension"
+
+**gzip 是看內容偵測，brotli 只能靠副檔名——而靠副檔名那條路壞了。**
+順帶一提，把第 2 批那份 wasm 自己 gzip 一遍得到 **8,103,680** bytes，
+而當時量到 itch.io 實際送出 **8,108,255** bytes，差不到 5KB：
+**itch.io 就是把我們的 brotli 解掉再 gzip 一遍**，機制至此完全對上。
+
+於是改建 gzip ＋ `decompressionFallback = false` 版本並實機部署。curl 結果：
+
+| 檔案 | content-encoding | content-type | content-length |
+|---|---|---|---|
+| `Web-gzip-native.wasm.gz` | **gzip** | **application/wasm** | 7,805,140 |
+| `Web-gzip-native.data.gz` | **gzip** | application/octet-stream | 1,913,539 |
+| `Web-gzip-native.framework.js.gz` | **gzip** | text/javascript | 90,672 |
+| `Web-gzip-native.loader.js` | gzip | text/javascript | 9,514 |
+
+**每個 `content-length` 都與上傳的位元組數完全相同**——沒有被解壓、也沒有被重壓。
+wasm 另外拿到 `application/wasm`，`WebAssembly.instantiateStreaming` 可用。遊戲正常運作。
+
+附帶好處：`loader.js` 從 117,894 掉回 26,983 bytes——那 90KB 的 JS 解壓器一起消失。
+
+### 三條路的完整實測
+
+本機以正確 header 服務 gzip 版，量「資料在手後的 CPU」：
+
+| 解壓方式 | CPU |
+|---|---|
+| Unity 的 JS brotli | 2268-2590 ms（暖）／3227-4323 ms（冷） |
+| **瀏覽器原生 gzip** | **770 ms** |
+| 完全不解壓（對照組） | 331-412 ms |
+
+推得吞吐：**瀏覽器原生 gzip ≈ 85 MB/s，Unity 的 JS brotli ≈ 16.3 MB/s，差 5.2 倍。**
+體積代價：gzip 為 brotli 的 **1.338** 倍（實測建置 9,836,334 vs 7,353,738）。
+
+| 方案 | S=50MB 的 T_load | 25s 下最大 build | **內容預算** |
+|---|---|---|---|
+| (a) 現況 brotli＋JS 解壓 @itch | 40.4 s | 28.0 MB | **21.0 MB** |
+| **(b) gzip 原生 @itch（已驗證）** | 35.0 s | 33.1 MB | **26.1 MB** |
+| (c) brotli 原生 @GitLab Pages | 27.1 s | 45.2 MB | **38.2 MB** |
+
+### 免費主機的部分（curl 複驗過，非只讀文件）
+
+- **GitLab Pages：可行**。`Accept-Encoding: br,gzip → content-encoding: br`。
+  但機制是**同名檔協商**而非自訂 header，**Unity 預設會踩死**：
+  顯式請求 `.br`（Unity 的 `index.html` 正是這樣寫）拿到的是裸 brotli 且**無 `content-encoding`**，
+  瀏覽器解不開，而且沒有錯誤訊息。**必須後處理 `index.html` 把 URL 的 `.br` 拿掉、檔案留著。**
+- **GitHub Pages：不行**。Fastly 只吐 gzip，給它 `Accept-Encoding: br` 也不回 br。
+  抓到的真實 Unity 部署，其 `.br` 檔開頭是 `0061 736d`（`\0asm`）——**有人把檔案解壓了卻留著 `.br` 檔名**，
+  那是「在這裡放棄 brotli」的指紋。
+- **Surge.sh：幾乎確定不行**，無 header 設定介面，同樣問題的 issue 掛了十一年。
+- **Netlify／Cloudflare Pages／Vercel／Firebase：未驗證**（負責該部分的 agent 中途卡死）。
+
+### 方法論註記
+
+這一輪的收穫不是「查到了哪些主機」，而是**查的過程推翻了問題本身**。
+原問題是「哪個免費主機支援 brotli」，隱含前提是「必須換主機」。
+而答案是：**不必**——把壓縮格式從 brotli 換成 gzip，就能用上 itch.io **本來就可靠**的那條路
+（內容偵測），代價只是 1.338 倍體積，換掉 5.2 倍的解壓 CPU。
+
+⚠ 一併記錄一個沒守住的地方：`design/gdd/netcode-session.md` 的 `[P-6]` 當初寫
+「itch.io **不支援** Brotli」。更精確的說法是「itch.io 的 **`.br` 副檔名路徑**不可靠，
+但 gzip 的內容偵測路徑可靠」。當時的結論在**當時的建置設定下**是對的，
+但它把一個「設定問題」寫成了「主機能力問題」，因而讓後續三批都沒想到要試 gzip。

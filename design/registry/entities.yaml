@@ -521,6 +521,29 @@ constants:
     added: 2026-09-13
     revised: "2026-09-15：W1 第 4 批雙進程實測直接驗證 —— tick=10Hz 往返 p95 335.8ms、tick=1Hz p95 333.0ms，tick 改十倍而往返不動。『RPC 非 tick-gated』自此為實測事實而非原始碼推論。同時發現主導 AC22 的其實是 relay_region 而非本值，見該常數。 | 2026-09-16：OQ#17（交接冷卻）實測後消解，**本值不因 ownership 交接而受威脅**。ownership 交接實測約 100ms 且不受 tick 影響（tick=10 為 100-104ms、tick=1 為 101-105ms），先前『引擎要求間隔 6 tick → 10Hz 即 600ms 可感知延遲』的說法有誤：那個 6 只是一則被 LogLevel.Developer 擋著的警告，不延遲也不阻擋交接。真正存在的是 owner-write NetworkVariable 的遺失窗口 ≈ **一個** tick 週期（本值 10Hz 下約 100ms，實測門檻落在 40-80ms 之間；對照組 tick=1 時連 700ms 都仍在掉，證明窗口隨 tick 週期縮放）。存活率近乎 delta_delay ÷ tick 週期。⚠ 調高本值會縮短該窗口，但那不是調整本值的理由 —— 約束⑧ 已規定互動結果一律走 RPC，只要攜帶物狀態不放在 owner-write NetworkVariable，本項風險不存在。見 [P-20](b)。"
 
+  - name: native_gzip_decompress_rate_mbps
+    status: active
+    source: design/gdd/netcode-session.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+    value: 85
+    unit: mb_per_sec_decompressed_output
+    notes: "瀏覽器**原生** gzip 解壓吞吐（以解壓後位元組計）。2026-09-18 定案採用 gzip 的依據：同一份探針 build，Unity 的 JS brotli 解壓器需 2268-2590ms，瀏覽器原生 gzip 僅 **770ms**，完全不解壓的對照組為 331-412ms —— 故原生 gzip 的解壓本身約 400ms，約 85 MB/s，是 js_brotli_decompress_rate_mbps(16.3) 的 **5.2 倍**。代價是 gzip 體積為 brotli 的 1.338 倍（實測建置 9,836,334 vs 7,353,738）。⚠ 8 核桌機為樂觀硬體。見 build_size_max_mb、公式⑤、OQ#21。"
+    added: 2026-09-18
+    revised: ""
+
+  - name: build_size_max_mb
+    status: active
+    source: .claude/docs/technical-preferences.md
+    referenced_by:
+      - design/gdd/netcode-session.md
+      - .claude/docs/technical-preferences.md
+    value: 33
+    unit: mb_gzip_compressed
+    notes: "Web build 壓縮後大小上限（**gzip**，非 brotli）。2026-09-18 由 50MB 下修，arlong 裁決。原本的 50MB 只算了下載，而 T_load 還有一項與頻寬無關的解壓 CPU，當初完全沒算進公式⑤。回推：下載 S×1.338÷2.5 ＋ TTFB 5s ＋ 解壓 S×4.89÷85 ＋ wasm編譯與引擎初始化 0.37s ≤ 25s → S ≤ 33.1MB。扣掉 7.0MB 地板（netcode＋IL2CPP，W1 實測）後**內容預算約 26MB**。⚠ 本值綁定「gzip ＋ 原生解壓 ＋ itch.io」這組前提；若改用支援 brotli 的主機（GitLab Pages 已驗證可行，但需後處理 index.html 去掉 URL 的 .br）上限可回到約 45MB，那需要重新裁決發行通路。見 OQ#21、公式⑤、modules/web.md。"
+    added: 2026-09-18
+    revised: ""
+
   - name: js_brotli_decompress_rate_mbps
     status: active
     source: design/gdd/netcode-session.md
@@ -528,7 +551,7 @@ constants:
       - design/gdd/netcode-session.md
     value: 16.3
     unit: mb_per_sec_decompressed_output
-    notes: "Unity 的 JS Brotli 解壓器吞吐（以**解壓後**位元組計）。🔴 本常數的存在本身就是一次公式修正：公式⑤ 原本只有 build_size÷bandwidth ＋ TTFB，**沒有任何 CPU 項**，而 decompressionFallback=true（第 2 批為繞過 itch.io 不支援 Brotli 而定的強制設定）帶來一筆與頻寬無關的解壓成本。W1 第 4 批實測（8 核桌機、localhost、配對法：同一分頁先後載入壓縮版與預先解壓版，差值即解壓成本）：6.98MB 壓縮 → 34.13MB 解壓（4.89×），JS 解壓約 2.0-2.2s；同一份資料原生 C brotli 僅 86ms（397 MB/s），故 JS 慢約 23 倍。對照：wasm 編譯（27.5MB 模組）單獨計時 346ms、預先解壓版總 CPU 僅 331-412ms —— 解壓是大頭。⚠ 8 核桌機為樂觀硬體，低階裝置更慢。✅ 相加模型已以限速伺服器複驗（2026-09-17）：下載窗口由 0.03s 拉到 9.35s（300 倍，5Mbps），而資料在手後的 CPU 維持 2.5-3.2s 不動 —— **解壓不與下載重疊，相加成立**。逐檔時序亦一致：5Mbps 下 wasm 於 198→9380ms 下載，t_ready 落在 12052ms。外推 50MB 硬標 → 約 15s 解壓 → T_load≈40.4s，AC7a 破，有效 build 天花板降至約 28MB。見 OQ#21、公式⑤、[P-6]。"
+    notes: "Unity 的 JS Brotli 解壓器吞吐（以**解壓後**位元組計）。🔴 本常數的存在本身就是一次公式修正：公式⑤ 原本只有 build_size÷bandwidth ＋ TTFB，**沒有任何 CPU 項**，而 decompressionFallback=true（第 2 批為繞過 itch.io 不支援 Brotli 而定的強制設定）帶來一筆與頻寬無關的解壓成本。W1 第 4 批實測（8 核桌機、localhost、配對法：同一分頁先後載入壓縮版與預先解壓版，差值即解壓成本）：6.98MB 壓縮 → 34.13MB 解壓（4.89×），JS 解壓約 2.0-2.2s；同一份資料原生 C brotli 僅 86ms（397 MB/s），故 JS 慢約 23 倍。對照：wasm 編譯（27.5MB 模組）單獨計時 346ms、預先解壓版總 CPU 僅 331-412ms —— 解壓是大頭。⚠ 8 核桌機為樂觀硬體，低階裝置更慢。✅ 相加模型已以限速伺服器複驗（2026-09-17）：下載窗口由 0.03s 拉到 9.35s（300 倍，5Mbps），而資料在手後的 CPU 維持 2.5-3.2s 不動 —— **解壓不與下載重疊，相加成立**。逐檔時序亦一致：5Mbps 下 wasm 於 198→9380ms 下載，t_ready 落在 12052ms。外推 50MB 硬標 → 約 15s 解壓 → T_load≈40.4s，AC7a 破。✅ **2026-09-18 已定案不再使用 decompressionFallback**：改 gzip ＋ 瀏覽器原生解壓（見 native_gzip_decompress_rate_mbps），本常數自此僅作為「為何不走 fallback」的證據保留，不再出現在建置規範裡。見 OQ#21、公式⑤、[P-6]、build_size_max_mb。"
     added: 2026-09-17
     revised: ""
 

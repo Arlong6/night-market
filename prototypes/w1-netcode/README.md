@@ -112,8 +112,10 @@ cd .. && ./w1-p14-run.sh
   → 輸碼備援不可砍。
 - 🔴 **itch.io 不支援 Brotli**，還會把 `.br` 解壓後重送 → 傳輸量 **2.00 倍**
   （資料檔膨脹 4.32 倍）。**遊戲照樣能跑，壞消息全在傳輸量裡。**
-  解法已驗證：`decompressionFallback = true`（產出 `.unityweb`）→ 回到 **0.99 倍**。
-  **這是強制建置規範。**
+  當時的解法是 `decompressionFallback = true`（產出 `.unityweb`）→ 傳輸回到 **0.99 倍**。
+  ⚠ **但那個結論在第 4 批被推翻了**：它只是把成本從網路搬到 CPU。
+  **最終定案（2026-09-18）：`compressionFormat = Gzip` ＋ `decompressionFallback = false`**，
+  已部署 curl 驗證。詳見下方第 4 批與 `docs/engine-reference/unity/modules/web.md`。
 - 🔴 **iframe 的 `allow` 沒有 `clipboard-write`** → 複製邀請連結必須降級為可全選文字框。
 - ⚠ **這三項在本地全是綠的**：兩項測過通過，第三項在本地根本觀察不到（伺服器是自己寫的）。
   「必須真的部署」這件事本身就是結論。
@@ -258,6 +260,28 @@ OQ#21 至此無技術前置，剩下純粹是產品取捨。
 
 順帶修掉量測自身的一個缺陷：原本用「各檔 duration 加總」當網路時間，但檔案是**並行**
 下載的，加總會重複計算；改成牆鐘窗口才對。localhost 上看不出差別，一限速就差很多。
+
+### 第 4 批（續）— 壓縮方式定案（2026-09-18）
+
+查免費主機的過程推翻了問題本身。itch.io 文件自承「brotli **無法像 gzip 那樣偵測**，
+只能靠 `.br` 副檔名」——而壞的正是副檔名那條路。改用 **gzip ＋ `decompressionFallback = false`**
+並實機部署，curl 結果：四個檔案的 `content-length` 與上傳位元組**完全相同**
+（未解壓也未重壓），皆帶 `content-encoding: gzip`，wasm 另得 `application/wasm`。
+
+| 解壓方式 | CPU |
+|---|---|
+| Unity 的 JS brotli | 2268-2590 ms |
+| **瀏覽器原生 gzip** | **770 ms** |
+| 完全不解壓（對照） | 331-412 ms |
+
+原生 gzip **85 MB/s** vs Unity JS brotli **16.3 MB/s**（差 5.2 倍），
+代價是體積 1.338 倍。**arlong 裁決採用，build size 硬標由 ≤50MB 下修為 ≤33MB。**
+附帶好處：`loader.js` 由 117,894 回到 26,983 bytes。
+
+免費主機的部分（curl 複驗）：**GitLab Pages 可行**但靠同名檔協商而非自訂 header，
+Unity 預設會默默失敗（顯式請求 `.br` 得到裸 brotli 且無 `content-encoding`），
+需後處理 `index.html`；GitHub Pages 不行；Surge 幾乎確定不行；
+Netlify／Cloudflare／Vercel／Firebase 未驗證。**留作內容預算不夠時的後路。**
 
 ### 尚未回答
 

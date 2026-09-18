@@ -13,7 +13,12 @@ class H(http.server.SimpleHTTPRequestHandler):
         super().__init__(*a, directory=ROOT, **kw)
     def end_headers(self):
         p = self.path.split("?")[0]
-        if p.endswith(".br"):
+        if p.endswith(".gz"):
+            self.send_header("Content-Encoding", "gzip")
+            if p.endswith(".js.gz"):     self.send_header("Content-Type", "application/javascript")
+            elif p.endswith(".wasm.gz"): self.send_header("Content-Type", "application/wasm")
+            else:                        self.send_header("Content-Type", "application/octet-stream")
+        elif p.endswith(".br"):
             self.send_header("Content-Encoding", "br")
             if p.endswith(".js.br"):     self.send_header("Content-Type", "application/javascript")
             elif p.endswith(".wasm.br"): self.send_header("Content-Type", "application/wasm")
