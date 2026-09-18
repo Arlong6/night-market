@@ -64,6 +64,7 @@ public class W1WebProbe : MonoBehaviour
     // ── [P-18] 離開通知 ──────────────────────────────────────────
     // 送達率由**伺服器端**數，本地這份只是「我以為送出了幾筆」。
     // 兩邊對不上才是真正要知道的事。
+    private W1WebClient m_WebClient;
     private string m_BeaconLog = "(未安裝)";
     private string m_BeaconTag = "?";
 
@@ -90,6 +91,15 @@ public class W1WebProbe : MonoBehaviour
             W1_InstallUnloadBeacon(UnityWebRequest.UnEscapeURL(beaconUrl), m_BeaconTag);
             m_BeaconLog = "(已安裝，尚未觸發)";
             Debug.Log($"[W1WEB] beacon 已安裝 tag={m_BeaconTag} url={beaconUrl}");
+        }
+
+        // [P-13]：帶 ?code= 時順便當一個真的 NGO client，好讓外部關分頁來測 close frame。
+        // 用 AddComponent 而非改場景，是因為場景檔已存在、CreateScene 不會重跑。
+        var joinCode = ParseQuery(q, "code");
+        if (!string.IsNullOrEmpty(joinCode))
+        {
+            m_WebClient = gameObject.AddComponent<W1WebClient>();
+            m_WebClient.Begin(joinCode.ToUpperInvariant());
         }
 
         m_BootMs = W1_Now();
@@ -186,6 +196,11 @@ public class W1WebProbe : MonoBehaviour
         GUILayout.Space(6);
         GUILayout.Label($"[P-19] clipboard 結果 : {m_CopyResult}", mono);
         GUILayout.Label($"[P-18] beacon tag      : {m_BeaconTag}", mono);
+        if (m_WebClient != null)
+        {
+            GUILayout.Label($"[P-13] NGO 連線狀態    : {m_WebClient.Status}", mono);
+            GUILayout.Label($"[P-13] 細節            : {Shorten(m_WebClient.Detail, 70)}", mono);
+        }
         GUILayout.Label($"[P-18] 本地送出記錄    : {Shorten(m_BeaconLog, 70)}", mono);
         GUILayout.Space(10);
 

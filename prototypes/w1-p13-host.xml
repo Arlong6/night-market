@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Failed(Child)" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-18 13:31:32Z" end-time="2026-09-18 13:34:32Z" duration="180.0306265">
+  <test-suite type="TestSuite" id="1034" name="w1-netcode" fullname="w1-netcode" runstate="Runnable" testcasecount="15" result="Failed" site="Child" start-time="2026-09-18 13:31:32Z" end-time="2026-09-18 13:34:32Z" duration="180.030627" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <failure>
+      <message><![CDATA[One or more child tests had errors]]></message>
+    </failure>
+    <test-suite type="Assembly" id="1030" name="W1.Tests.PlayMode.dll" fullname="/Users/arlong/Projects/Claude-Code-Game-Studios/prototypes/w1-netcode/Library/ScriptAssemblies/W1.Tests.PlayMode.dll" runstate="Runnable" testcasecount="15" result="Failed" site="Child" start-time="2026-09-18 13:31:32Z" end-time="2026-09-18 13:34:32Z" duration="180.027210" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="30926" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <failure>
+        <message><![CDATA[One or more child tests had errors]]></message>
+      </failure>
+      <test-suite type="TestSuite" id="1031" name="W1" fullname="W1" runstate="Runnable" testcasecount="15" result="Failed" site="Child" start-time="2026-09-18 13:31:32Z" end-time="2026-09-18 13:34:32Z" duration="180.026964" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <failure>
+          <message><![CDATA[One or more child tests had errors]]></message>
+        </failure>
+        <test-suite type="TestSuite" id="1032" name="Tests" fullname="W1.Tests" runstate="Runnable" testcasecount="15" result="Failed" site="Child" start-time="2026-09-18 13:31:32Z" end-time="2026-09-18 13:34:32Z" duration="180.026784" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <failure>
+            <message><![CDATA[One or more child tests had errors]]></message>
+          </failure>
+          <test-suite type="TestSuite" id="1033" name="PlayMode" fullname="W1.Tests.PlayMode" runstate="Runnable" testcasecount="15" result="Failed" site="Child" start-time="2026-09-18 13:31:32Z" end-time="2026-09-18 13:34:32Z" duration="180.026600" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <failure>
+              <message><![CDATA[One or more child tests had errors]]></message>
+            </failure>
+            <test-suite type="TestFixture" id="1009" name="W1WebHostRole" fullname="W1.Tests.PlayMode.W1WebHostRole" classname="W1.Tests.PlayMode.W1WebHostRole" runstate="Runnable" testcasecount="1" result="Failed" site="Child" start-time="2026-09-18 13:31:32Z" end-time="2026-09-18 13:34:32Z" duration="180.025898" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <failure>
+                <message><![CDATA[One or more child tests had errors]]></message>
+              </failure>
+              <test-case id="1010" name="RunWebHost" fullname="W1.Tests.PlayMode.W1WebHostRole.RunWebHost" methodname="RunWebHost" classname="W1.Tests.PlayMode.W1WebHostRole" runstate="Runnable" seed="1447506111" result="Failed" start-time="2026-09-18 13:31:32Z" end-time="2026-09-18 13:34:32Z" duration="180.021419" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <failure>
+                  <message><![CDATA[Timeout value of 180000 ms was exceeded. If this is intended, increase the timeout value using a TimeoutAttribute.]]></message>
+                  <stack-trace><![CDATA[]]></stack-trace>
+                </failure>
+                <output><![CDATA[
+IgnoreFailingMessages:true
+[W1H] signed in as lEYLoSNzPcbDMI7OnZij79CxFKGp
+[W1DISC] NM 建立 tick=10 DisconnectTimeoutMS=30000 HeartbeatTimeoutMS=500 ConnectTimeoutMS=1000
+[Netcode]  StartHost
+[Netcode]  Initialize
+[Netcode] [Server-Side] Pending Client-0 connection approved!
+[W1H] wrote code.txt: MTLJ9F
+[W1H] wrote host-ready.txt: 2026-09-18T13:31:38.9946400Z
+[W1WEBHOST] 等瀏覽器加入 Code=MTLJ9F
+[Netcode] [Host-Side] Transport connection established with pending Client-1.
+[Netcode] [Server-Side] Pending Client-1 connection approved!
+[W1H] wrote client-connected.txt: 2026-09-18T13:33:54.6611850Z
+[W1WEBHOST] 瀏覽器已連線 clientId=1 —— 可以關分頁了
+[Netcode]  Shutdown
+[Netcode]  ShutdownInternal
+[Netcode] [Disconnect Event][Client-0][TransportClientId-0][TransportShutdown] NetworkConnectionManager was shutdown. The transport was shutdown.
+[W1WEBHOST] client 消失：OnClientDisconnectCallback(id=1) @ 2026-09-18T13:34:32.9517160Z
+[Netcode] NetworkConnectionManager.Shutdown() -> IsListening && NetworkTransport != null -> NetworkTransport.Shutdown()
+Saving results to: /Users/arlong/Library/Application Support/DefaultCompany/w1-netcode/TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

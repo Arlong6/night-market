@@ -229,4 +229,69 @@ namespace W1.Tests.PlayMode
             }
         }
     }
+
+    /// [P-13] 專用：等一個**瀏覽器**的 NGO client 連上，然後量它消失得多快。
+    /// 時間基準借用 [P-18] 的 beacon —— 它在 beforeunload 送出，伺服器記下時刻，
+    /// 本端記下偵測時刻，兩者同機可直接相減。
+    public class W1WebHostRole
+    {
+        private GameObject m_Go;
+
+        [TearDown] public void TearDown()
+        {
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+                NetworkManager.Singleton.Shutdown();
+            if (m_Go != null) UnityEngine.Object.DestroyImmediate(m_Go);
+        }
+
+        [UnityTest]
+        public IEnumerator RunWebHost()
+        {
+            var t = RunAsync();
+            while (!t.IsCompleted) yield return null;
+            if (t.IsFaulted) throw t.Exception!.GetBaseException();
+
+            async Task RunAsync()
+            {
+                LogAssert.ignoreFailingMessages = true;
+                await W1Io.SignInAsync();
+                W1Disc.Spawn(out m_Go, W1Rtt.Tick);
+
+                var session = await MultiplayerService.Instance.CreateSessionAsync(W1Own.HostOpts());
+                await session.Network.StartRelayNetworkAsync(W1Rtt.RelayOpts());
+                var nm = NetworkManager.Singleton;
+                W1Io.Write("code.txt", session.Code);
+                W1Io.Write("host-ready.txt", DateTime.UtcNow.ToString("O"));
+                Debug.Log($"[W1WEBHOST] 等瀏覽器加入 Code={session.Code}");
+
+                // 等瀏覽器的 NGO client 連上
+                ulong cid = 0;
+                for (int i = 0; i < 1800 && cid == 0; i++)
+                {
+                    cid = nm.ConnectedClientsIds.FirstOrDefault(c => c != NetworkManager.ServerClientId);
+                    await Task.Delay(200);
+                }
+                Assert.AreNotEqual(0UL, cid, "瀏覽器 client 未連上。");
+                W1Io.Write("client-connected.txt", DateTime.UtcNow.ToString("O"));
+                Debug.Log($"[W1WEBHOST] 瀏覽器已連線 clientId={cid} —— 可以關分頁了");
+
+                // 量它消失
+                string sig = null; DateTime at = default;
+                nm.OnClientDisconnectCallback += id =>
+                {
+                    if (sig != null || id == NetworkManager.ServerClientId) return;
+                    sig = $"OnClientDisconnectCallback(id={id})"; at = DateTime.UtcNow;
+                    Debug.Log($"[W1WEBHOST] client 消失：{sig} @ {at:O}");
+                };
+
+                var sw = Stopwatch.StartNew();
+                while (sw.Elapsed.TotalSeconds < 240 && sig == null) await Task.Delay(50);
+
+                W1Io.Write("result.txt", sig == null
+                    ? "signal=NONE;timeout=240"
+                    : $"signal={sig};detected_at={at:O}");
+                try { await session.AsHost().DeleteAsync(); } catch { }
+            }
+        }
+    }
 }
