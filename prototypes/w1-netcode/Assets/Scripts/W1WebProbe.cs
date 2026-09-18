@@ -14,6 +14,7 @@
 
 using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.Scripting;
 
 public class W1WebProbe : MonoBehaviour
@@ -27,6 +28,8 @@ public class W1WebProbe : MonoBehaviour
     [DllImport("__Internal")] private static extern string W1_GetVisibility();
     [DllImport("__Internal")] private static extern int    W1_GetOnline();
     [DllImport("__Internal")] private static extern float  W1_Now();
+    [DllImport("__Internal")] private static extern void   W1_InstallUnloadBeacon(string url, string tag);
+    [DllImport("__Internal")] private static extern string W1_GetBeaconLog();
 #else
     private static string W1_GetOwnQuery() => "(editor)";
     private static string W1_GetParentQuery() => "(editor)";
@@ -36,6 +39,8 @@ public class W1WebProbe : MonoBehaviour
     private static string W1_GetVisibility() => "(editor)";
     private static int W1_GetOnline() => 1;
     private static float W1_Now() => Time.realtimeSinceStartup * 1000f;
+    private static void W1_InstallUnloadBeacon(string u, string t) { }
+    private static string W1_GetBeaconLog() => "(editor)";
 #endif
 
     private const string ObjectName = "W1WebProbe";
@@ -56,6 +61,12 @@ public class W1WebProbe : MonoBehaviour
     // 是完全停止，還是只是被節流？** MPS 的 lobby heartbeat 掛在 PlayerLoop 上、
     // 間隔 10 秒。若瀏覽器只節流到 1Hz，heartbeat 照樣送得出去，session 根本不會
     // 被回收；若完全停止，heartbeat 才會斷。這一格數字就決定了整條 #23b 的成立與否。
+    // ── [P-18] 離開通知 ──────────────────────────────────────────
+    // 送達率由**伺服器端**數，本地這份只是「我以為送出了幾筆」。
+    // 兩邊對不上才是真正要知道的事。
+    private string m_BeaconLog = "(未安裝)";
+    private string m_BeaconTag = "?";
+
     private int m_UpdateCount;
     private float m_LastUpdateMs;
     private float m_MaxGapMs;
@@ -69,11 +80,34 @@ public class W1WebProbe : MonoBehaviour
 
     private void Start()
     {
+        // beacon 的目標位址與標籤由 query 帶入（?beacon=<url>&tag=<id>），
+        // 讓外部腳本每次載入都給一個獨立 tag，才數得出到達率。
+        var q = W1_GetOwnQuery();
+        m_BeaconTag = ParseQuery(q, "tag");
+        var beaconUrl = ParseQuery(q, "beacon");
+        if (!string.IsNullOrEmpty(beaconUrl))
+        {
+            W1_InstallUnloadBeacon(UnityWebRequest.UnEscapeURL(beaconUrl), m_BeaconTag);
+            m_BeaconLog = "(已安裝，尚未觸發)";
+            Debug.Log($"[W1WEB] beacon 已安裝 tag={m_BeaconTag} url={beaconUrl}");
+        }
+
         m_BootMs = W1_Now();
         m_LastUpdateMs = m_BootMs;
         Refresh();
         Debug.Log($"[W1WEB] boot ownQuery='{m_OwnQuery}' parentQuery='{m_ParentQuery}' " +
                   $"iframe={m_InIframe} referrer='{m_Referrer}'");
+    }
+
+    private static string ParseQuery(string q, string key)
+    {
+        if (string.IsNullOrEmpty(q)) return "";
+        foreach (var kv in q.TrimStart('?').Split('&'))
+        {
+            var i = kv.IndexOf('=');
+            if (i > 0 && kv.Substring(0, i) == key) return kv.Substring(i + 1);
+        }
+        return "";
     }
 
     private void Refresh()
@@ -84,6 +118,8 @@ public class W1WebProbe : MonoBehaviour
         m_InIframe = W1_IsInIframe();
         m_Visibility = W1_GetVisibility();
         m_Online = W1_GetOnline();
+        var bl = W1_GetBeaconLog();
+        if (!string.IsNullOrEmpty(bl)) m_BeaconLog = bl;
     }
 
     private void Update()
@@ -149,6 +185,8 @@ public class W1WebProbe : MonoBehaviour
         GUILayout.Label($"[P-7] .jslib 回呼存活 : {(m_CopyResult == "(未測試)" ? "待測（按下方按鈕）" : "是 —— 收到回呼")}", mono);
         GUILayout.Space(6);
         GUILayout.Label($"[P-19] clipboard 結果 : {m_CopyResult}", mono);
+        GUILayout.Label($"[P-18] beacon tag      : {m_BeaconTag}", mono);
+        GUILayout.Label($"[P-18] 本地送出記錄    : {Shorten(m_BeaconLog, 70)}", mono);
         GUILayout.Space(10);
 
         if (GUILayout.Button("測試 clipboard（這一下就是 user gesture）", GUILayout.Height(42)))

@@ -53,11 +53,20 @@ Relay region 不選就直接違反 AC22。
   是**選擇**而非限制）
 - **OQ#10**：行動瀏覽器的背景回收行為（桌面 Chrome 已實測為只節流到 1Hz）
 
-## W1 剩餘（都不是存亡問題，是量測）
+## W1 剩餘（2026-09-18 盤點訂正：**尚有四項未測**）
 
-`[P-18]` sendBeacon 在 unload 的可靠性、JS 解壓的 CPU 成本、`[P-20](b)` ownership
-transfer 實機行為。另有兩項由 API 形狀推得但**未實測**：跨班次能否重選 region、
-真實跨洲往返值（本地兩進程都在台灣，量不到）。
+✅ **第 4 批已完成**：`[P-18]` sendBeacon（8/8 送達，含 iframe 父分頁關閉）、
+JS 解壓 CPU（→ 壓縮改 gzip，build 硬標 44MB）、`[P-20](b)` ownership（→ OQ#17 消解）。
+
+⚠ **但 W1 沒做完。盤點後仍有四項未測，全屬 NGO／WebSocket 傳輸層**——
+第 1 批測的是 MPS session 層（Lobby，依 #23 尚無 NGO 連線），兩層語義不同，不能互相代答：
+**`[P-8]`**（Relay 斷線傳播 ≤2s）、**`[P-13]`**（關分頁時 WebSocket close frame 是否可靠，
+今天測的 sendBeacon 走 HTTP 是不同機制）、**`[P-14]`**（行程被強制終止 → 心跳路徑 ≤12s）、
+**`[P-15]`**（`Shutdown()` 在 WebGL 是否即時 flush close frame）。
+器材已齊：雙進程 harness 可共用於 P-8／P-14／P-15；P-13 需瀏覽器端。
+
+另有五項本來就屬 W2（P-2／P-5／P-11／P-12／P-16）。
+行動端缺口需真實裝置：OQ#10 ＋ `[P-18]` 的 visibilitychange 路徑。
 
 ---
 

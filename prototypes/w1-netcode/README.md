@@ -283,9 +283,56 @@ Unity 預設會默默失敗（顯式請求 `.br` 得到裸 brotli 且無 `conten
 需後處理 `index.html`；GitHub Pages 不行；Surge 幾乎確定不行；
 Netlify／Cloudflare／Vercel／Firebase 未驗證。**留作內容預算不夠時的後路。**
 
+### 第 4 批（完）— `[P-18]` 離開通知（2026-09-18）
+
+跑法：`./w1-beacon-server.py 8130 <build>`（同時服務 build 與收 beacon，同源），
+build 經 `.jslib` 在 `beforeunload`／`pagehide`／`visibilitychange` 各掛一次 `sendBeacon`。
+**送達數由伺服器端數**——`sendBeacon` 回傳 `true` 只代表排進佇列，不代表送達。
+
+**8/8 試驗、16/16 筆送達。**
+
+| 情境 | beforeunload | pagehide |
+|---|---|---|
+| 頂層導航離開 | ✅ | ✅ |
+| **直接關分頁** | ✅ | ✅ |
+| iframe 被換掉（×5） | ✅ | ✅ |
+| **關掉包著 iframe 的父分頁** | ✅ | ✅ |
+
+最後一列是要害:**那正是 itch.io 的形狀**——遊戲在 iframe 裡，玩家關的是 itch.io 分頁。
+
+這一項本來沒有退路（GDD 自述 fallback 在 Lobby 情境不成立，因為 Lobby 不跑心跳），
+現在主路徑實測可用，`#12`／`AC6c`／`#25` 都成立。
+
+🔴 **順手掉出的實作要求**：兩個事件**都會**觸發，間隔 1-24 ms →
+**每次離開送出兩筆**，離開通知的處理**必須冪等**，否則「離開一次、roster 掉兩人」。
+
+⚠ 未測到：`visibilitychange` 路徑（自動化分頁一載入就是 hidden，無轉換事件）——
+**行動端切 App 只有這條路**，併入 OQ#10；確認框那半（AC42）**刻意未測**
+（瀏覽器 modal 會卡死自動化，且 #12 已明寫 best-effort）。
+
 ### 尚未回答
 
-`[P-18]` `sendBeacon` 在 unload 的可靠性（需重建 build，尚未做）——**W1 只剩這一項**。
+⚠ **訂正**：本節一度寫成「W1 的假設表已全部回填」，**那是錯的**。盤點後的實況：
+
+**W1 仍有四項未測，而且它們有個共同點——全部屬於 NGO／WebSocket 傳輸層**，
+而第 1 批測的是 **MPS session 層**（當時在 Lobby，依 #23 根本還沒有 NGO 連線）。
+兩層的斷線語義不同，第 1 批的 132.61s／1.14s **不能拿來回答這四項**。
+
+| 項 | 假設 | 為何還沒測 |
+|---|---|---|
+| `[P-8]` | Relay 偵測 Host socket 斷開並傳播至其餘 client ≤2s | 需 InShift 的三方連線 |
+| `[P-13]` | 關分頁時 WebSocket close frame **可靠**送達（AC6a 前提） | 今天測的 `sendBeacon` 走 HTTP，**是不同機制**，不能代答 |
+| `[P-14]` | 行程被強制終止 → 退化心跳路徑且 ≤12s 全員得知（AC6b） | 第 1 批量的是 Lobby 情境，非本項 |
+| `[P-15]` | `NetworkManager.Shutdown()` 在 WebGL 即時 flush close frame（#17a 前提） | 需 Web build ＋ 真實連線 |
+
+好消息是**器材已經齊了**：今天的雙進程 harness（`w1-rtt-run.sh`／`w1-own-run.sh`）
+已能在兩個進程間建立 Relay WSS 的 NGO 連線，`[P-8]`／`[P-14]`／`[P-15]` 可共用它；
+`[P-13]` 需要瀏覽器端（關分頁時觀察 close frame）。
+
+**另有五項本來就屬 W2**（`[P-2]`／`[P-5]`／`[P-11]`／`[P-12]`／`[P-16]`），不在 W1 範圍。
+
+**跨批次的行動端缺口**（需真實裝置）：OQ#10（行動瀏覽器背景回收）＋
+`[P-18]` 的 `visibilitychange` 路徑；另有真實跨洲往返值需海外測試者。
 OQ#10（行動瀏覽器的背景回收）與 OQ#18（是否啟用 host migration）待裁決。
 另有兩項由 API 形狀推得但未實測：跨班次能否重選 region（`StopNetworkAsync` →
 `StartRelayNetworkAsync(另一個 region)`）、以及真實跨洲往返的實測值。
