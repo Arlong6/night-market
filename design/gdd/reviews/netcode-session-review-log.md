@@ -1181,3 +1181,75 @@ AC6c、#25 成立；「Lobby 沒有退路」的擔憂不再觸發。**
 已能在兩進程間建立 Relay WSS 的 NGO 連線，`[P-8]`／`[P-14]`／`[P-15]` 可共用；
 `[P-13]` 需要瀏覽器端（關分頁時觀察 close frame 是否送達 Host）。
 四項可併為**第 5 批：傳輸層斷線語義**。
+
+---
+
+## W1 第 5 批 — 傳輸層的斷線語義（2026-09-18）
+
+補的是第 1 批漏掉的那一層。第 1 批量的 132.61s／1.14s 是 **MPS session 層**
+（當時在 Lobby，依 #23 還沒有 NGO 連線）；本批量的是 **InShift 時 Relay 上的 WebSocket**。
+
+一套 harness、兩種「Host 怎麼消失」：`./w1-disc-run.sh graceful|kill`。
+兩個進程同機，故雙方各寫 `UtcNow`，相減即延遲。
+
+### 結果
+
+| 情境 | client 端第一個訊號 | 延遲 | 對照預算 |
+|---|---|---|---|
+| **Host 呼叫 `Shutdown()`** | `OnClientDisconnectCallback` | **0.08 s** | `relay_disconnect_propagation_sec` 2s ✅ |
+| **Host 被 `kill -9`** | `OnClientDisconnectCallback` | **約 87 s** | `session_end_worstcase_sec` 12s 🔴 **超標 7.3 倍** |
+
+`Shutdown()` 本身**回傳只要 2 ms**。
+
+### `[P-15]` 為真 —— close frame 確實即時 flush
+
+2ms 回傳、80ms 端到端。而 80ms 差不多就是到 `asia-northeast1` 的一個 RTT（median 88.8ms），
+代表 close frame 是**以網路速度傳播**的，沒有額外的伺服器端延遲。
+**#17a 的 teardown 前提成立**，#23a 的局間 teardown 可以放心依賴 `Shutdown()` 的同步語義。
+
+### `[P-14]` 為假 —— 而且連我的悲觀預測都不夠悲觀
+
+跑之前我先立了一個預測：第 0 批查到 `UnityTransport.DisconnectTimeoutMS = 30000`，
+若傳輸層只靠它，偵測就是 30 秒 ≫ 12 秒。
+
+**實測 87 秒 —— 是那個常數的近三倍。**
+
+推測原因：**client↔Relay 的連線根本沒斷**。Relay 還在、還可達，
+斷掉的是 host↔Relay。client 看不到自己的 socket 逾時，
+所以 `DisconnectTimeoutMS` 這個常數在這個情境下**根本不會被觸發**，
+只能等服務層判定 —— 那就回到第 1 批 132.61s 的同一個量級。
+
+🔴 **設計後果：#20 的應用層心跳從「機制」升格為「唯一救命索」。**
+它是唯一能把 87 秒壓進 12 秒的東西，AC6b 的達成完全依賴它。
+已寫進 #20 本文，並註明適用範圍——#20 只在 InShift 跑，
+Lobby 階段沒有心跳，那裡靠 #12 的 `beforeunload`（`[P-18]` 已證實送得出去）。
+
+**兩層的分工至此才完整**：Lobby 靠主動通知，InShift 靠心跳，
+而**傳輸層的逾時常數在兩邊都救不了**。
+
+### 撞到 UGS 的速率限制，而它的錯誤訊息會騙人
+
+`kill` 模式只取得 **n=1**。第二、三、四次嘗試都失敗，六次重試也全敗，
+錯誤訊息一律是：
+
+```
+Unity.Services.Multiplayer.SessionException : lobby not found
+```
+
+我一度診斷成「前幾次 kill -9 留下的孤兒 session 污染了帳號」——**那是錯的**。
+跑一次 graceful 當對照（它先前是通的）發現也壞了，翻日誌才看到真正的原因：**`429`**。
+
+**我們今天跨批次建了太多 session，撞上 UGS Lobby 的速率限制。**
+而限流時 `JoinSessionByCodeAsync` 拋的是 **`lobby not found`**，不是 429 —— 
+**錯誤訊息指向一個不存在的原因**，害我往孤兒 session 的方向查。
+
+這條值得記進設計：第 1 批已經記過「不能高頻輪詢 session（500ms → 429）」，
+本次擴充為 **session 的建立與加入同樣受限，且限流時的錯誤訊息會誤導**。
+玩家端的意義：**尖峰時大量開房／加入可能拿到「房間不存在」，而房間其實存在**，
+#8 的輸碼失敗提示不該直接說「房號錯誤」。
+
+### n=1 的誠實聲明
+
+`kill` 只有一個樣本，我不打算假裝它是三個。但 **87s vs 12s 的差距遠大於任何合理變異**，
+結論（#20 心跳為必需）不因 n=1 而動搖。
+待 UGS 限流冷卻後應補 2-3 個樣本，把 87 秒這個數字本身釘準一點。

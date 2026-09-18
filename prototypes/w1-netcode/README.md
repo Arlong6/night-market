@@ -310,6 +310,34 @@ build 經 `.jslib` 在 `beforeunload`／`pagehide`／`visibilitychange` 各掛�
 **行動端切 App 只有這條路**，併入 OQ#10；確認框那半（AC42）**刻意未測**
 （瀏覽器 modal 會卡死自動化，且 #12 已明寫 best-effort）。
 
+### 第 5 批 — 傳輸層的斷線語義（2026-09-18）
+
+補第 1 批漏掉的那一層：第 1 批量的是 **MPS session 層**（Lobby，依 #23 尚無 NGO 連線），
+本批量的是 **InShift 時 Relay 上的 WebSocket**。跑法 `./w1-disc-run.sh graceful|kill`。
+
+| 情境 | client 第一個訊號 | 延遲 | 預算 |
+|---|---|---|---|
+| Host 呼叫 `Shutdown()` | `OnClientDisconnectCallback` | **0.08 s** | 2s ✅ |
+| Host 被 `kill -9` | `OnClientDisconnectCallback` | **約 87 s** | 12s 🔴 **超標 7.3 倍** |
+
+- **`[P-15]` 為真**：`Shutdown()` **回傳 2 ms**、端到端 80 ms —— close frame 即時 flush，
+  且 80ms ≈ 到東京的一個 RTT，代表它以**網路速度**走。#17a／#23a 的 teardown 前提成立。
+- **`[P-8]` 優雅路徑通過**（80ms ≪ 2s），**強制終止路徑為假**（87s ≫ 2s）。
+- 🔴 **`[P-14]` 為假，連我的悲觀預測都不夠悲觀**。跑之前依第 0 批的
+  `DisconnectTimeoutMS = 30000` 預測 30 秒，**實測 87 秒是它的近三倍**。
+  推測原因：**client↔Relay 的連線根本沒斷**（斷的是 host↔Relay），
+  client 看不到自己的 socket 逾時，那個常數**根本不會被觸發**，只能等服務層判定。
+  → **#20 的應用層心跳從「機制」升格為「唯一救命索」**，AC6b 完全依賴它。
+  兩層的分工至此才完整：**Lobby 靠 #12 的主動通知、InShift 靠 #20 的心跳，
+  而傳輸層的逾時常數在兩邊都救不了。**
+
+⚠ **`kill` 只有 n=1**。第二、三、四次嘗試皆失敗，錯誤訊息一律是
+`SessionException: lobby not found` —— 我一度診斷成「孤兒 session 污染帳號」，**那是錯的**。
+跑 graceful 當對照（先前是通的）發現也壞了，翻日誌才看到真因：**`429`，UGS 速率限制**。
+**限流時拋的卻是「lobby not found」，錯誤訊息指向一個不存在的原因。**
+這條擴充了第 1 批的「不能高頻輪詢」：**建立與加入 session 同樣受限，且錯誤訊息會誤導**——
+玩家端的意義是**尖峰時可能拿到「房間不存在」而房間其實存在**，#8 的失敗提示不該直接說「房號錯誤」。
+
 ### 尚未回答
 
 ⚠ **訂正**：本節一度寫成「W1 的假設表已全部回填」，**那是錯的**。盤點後的實況：

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Failed(Child)" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-18 12:02:55Z" end-time="2026-09-18 12:05:56Z" duration="180.6435209">
+  <test-suite type="TestSuite" id="1032" name="w1-client" fullname="w1-client" runstate="Runnable" testcasecount="14" result="Failed" site="Child" start-time="2026-09-18 12:02:55Z" end-time="2026-09-18 12:05:56Z" duration="180.643521" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <failure>
+      <message><![CDATA[One or more child tests had errors]]></message>
+    </failure>
+    <test-suite type="Assembly" id="1028" name="W1.Tests.PlayMode.dll" fullname="/Users/arlong/Projects/Claude-Code-Game-Studios/prototypes/w1-client/Library/ScriptAssemblies/W1.Tests.PlayMode.dll" runstate="Runnable" testcasecount="14" result="Failed" site="Child" start-time="2026-09-18 12:02:55Z" end-time="2026-09-18 12:05:56Z" duration="180.633744" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="99850" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <failure>
+        <message><![CDATA[One or more child tests had errors]]></message>
+      </failure>
+      <test-suite type="TestSuite" id="1029" name="W1" fullname="W1" runstate="Runnable" testcasecount="14" result="Failed" site="Child" start-time="2026-09-18 12:02:55Z" end-time="2026-09-18 12:05:56Z" duration="180.632960" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <failure>
+          <message><![CDATA[One or more child tests had errors]]></message>
+        </failure>
+        <test-suite type="TestSuite" id="1030" name="Tests" fullname="W1.Tests" runstate="Runnable" testcasecount="14" result="Failed" site="Child" start-time="2026-09-18 12:02:55Z" end-time="2026-09-18 12:05:56Z" duration="180.632527" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <failure>
+            <message><![CDATA[One or more child tests had errors]]></message>
+          </failure>
+          <test-suite type="TestSuite" id="1031" name="PlayMode" fullname="W1.Tests.PlayMode" runstate="Runnable" testcasecount="14" result="Failed" site="Child" start-time="2026-09-18 12:02:55Z" end-time="2026-09-18 12:05:56Z" duration="180.632050" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <failure>
+              <message><![CDATA[One or more child tests had errors]]></message>
+            </failure>
+            <test-suite type="TestFixture" id="1007" name="W1DiscClient" fullname="W1.Tests.PlayMode.W1DiscClient" classname="W1.Tests.PlayMode.W1DiscClient" runstate="Runnable" testcasecount="1" result="Failed" site="Child" start-time="2026-09-18 12:02:55Z" end-time="2026-09-18 12:05:56Z" duration="180.630194" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <failure>
+                <message><![CDATA[One or more child tests had errors]]></message>
+              </failure>
+              <test-case id="1008" name="RunDiscClient" fullname="W1.Tests.PlayMode.W1DiscClient.RunDiscClient" methodname="RunDiscClient" classname="W1.Tests.PlayMode.W1DiscClient" runstate="Runnable" seed="1877877289" result="Failed" start-time="2026-09-18 12:02:55Z" end-time="2026-09-18 12:05:56Z" duration="180.605266" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <failure>
+                  <message><![CDATA[Timeout value of 180000 ms was exceeded. If this is intended, increase the timeout value using a TimeoutAttribute.]]></message>
+                  <stack-trace><![CDATA[]]></stack-trace>
+                </failure>
+                <output><![CDATA[
+IgnoreFailingMessages:true
+[W1H] signed in as F0gmYEHeuhHsfIc5VFS5NTX5nbuY
+[W1DISC] NM 建立 tick=10 DisconnectTimeoutMS=30000 HeartbeatTimeoutMS=500 ConnectTimeoutMS=1000
+[Netcode]  ShutdownInternal
+Saving results to: /Users/arlong/Library/Application Support/DefaultCompany/w1-client/TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>
