@@ -37,7 +37,7 @@
 #   Each entry: name, status, source, referenced_by[], attributes{}, added, revised
 
 version: 1
-last_updated: 2026-05-29
+last_updated: 2026-09-19
 
 # ─── ENTITIES ────────────────────────────────────────────────────────────────
 # Named game-world objects: enemies, NPCs, characters, factions, bosses.
@@ -78,6 +78,9 @@ entities: []
 #   modifiers that another system (e.g., economy, crafting) might reference.
 
 items: []
+  # 大夜班 (Night Shift) 的商品 SKU 尚未登錄：design/gdd/product-database.md 定義了
+  # schema（sku_id / network_index / display_label / machine_family / nameable）
+  # 與准入門檻，但具體品項清單屬內容製作，尚未裁決。內容定案後在此登錄。
 
 # Example:
 #
@@ -107,6 +110,26 @@ items: []
 # Optional: expression (the actual formula), notes
 
 formulas:
+  - name: product_matches
+    status: active
+    source: design/gdd/product-database.md
+    referenced_by:
+      - design/gdd/product-database.md
+      # Future dependents (add when designed):
+      # - design/gdd/scoring.md          # #15 — aggregates per-slot results into stars
+      # - design/gdd/station-interactions.md  # #5 — may show live "right/wrong" feedback
+      # - design/gdd/carry-deliver.md    # #4 — delivery-point adjudication
+    variables:
+      - instance.network_index
+      - instance.is_spoiled
+      - demand.kind
+      - demand.family
+      - demand.network_index
+    output_range: [0, 1]
+    expression: "(!instance.is_spoiled) AND (demand.kind == Family ? Get(instance.network_index).machine_family == demand.family : instance.network_index == demand.network_index)"
+    notes: "Boolean, deliberately binary — no partial credit, no fuzzy matching (Player Fantasy admission threshold #3 already guarantees SKUs are unmistakable). Slot-allocation when one item satisfies multiple slots (Named before Family, lower index first) is specified in the GDD but owned by #15/#4, not by this predicate."
+    added: 2026-09-19
+    revised: ""
   - name: unresolved_count
     status: active
     source: design/gdd/game-session-state.md
@@ -175,6 +198,61 @@ formulas:
 # Required fields: name, status, source, referenced_by, value, unit, added
 
 constants:
+  - name: machine_family_values
+    status: active
+    source: design/gdd/product-database.md
+    referenced_by:
+      - design/gdd/product-database.md
+      # Future dependents (add when designed):
+      # - design/gdd/station-interactions.md  # #5 — each station queries its own menu
+      # - design/gdd/customer-system.md       # #7 — family-level demands
+      # - design/gdd/wave-director.md         # #8 — per-station load weighting
+      # - design/gdd/hud.md                   # #11 — family demand icon lookup key
+    value:
+      - Shelf
+      - Oden
+      - Microwave
+      - CoffeeMachine
+    unit: enum_values
+    notes: "Product source families. NOT isomorphic to the art bible §3.3 demand icon set (碗/杯/條碼/箱) — 條碼 is the shared checkout action and 箱 is parcel pickup, neither a product demand; Microwave and Shelf currently have no icon. See product-database.md OQ-P1."
+    added: 2026-09-19
+    revised: ""
+
+  - name: sku_network_index_type
+    status: active
+    source: design/gdd/product-database.md
+    referenced_by:
+      - design/gdd/product-database.md
+      # Future dependents: netcode RPC payloads, #4/#5/#7/#15
+    value: "byte"
+    unit: wire_type
+    notes: "SKU identity on the wire. 0-255, assigned sequentially, never reused after deprecation. Raising the ceiling = swap to ushort, a one-line wire-format change with no data migration."
+    added: 2026-09-19
+    revised: ""
+
+  - name: sku_display_label_max_chars
+    status: active
+    source: design/gdd/product-database.md
+    referenced_by:
+      - design/gdd/product-database.md
+      # Future dependents (add when designed):
+      # - design/gdd/settlement-screen.md  # #13 — per-item list layout
+    value: 6
+    unit: han_characters
+    notes: "display_label is the name players shout across the aisle; Player Fantasy's four admission thresholds apply to this field. Customer NPC dialogue is NOT this field (owned by #7/#14)."
+    added: 2026-09-19
+    revised: ""
+
+  - name: sku_count_target
+    status: active
+    source: design/gdd/product-database.md
+    referenced_by:
+      - design/gdd/product-database.md
+    value: "[20, 40]"
+    unit: sku_entries_mvp
+    notes: "ESTIMATED, not derived — see product-database.md OQ-P4. The real criterion is how many items per family give variety without confusion, measurable only when #7/#8 are designed. Hard floor per family is 1 active entry (build fails at 0)."
+    added: 2026-09-19
+    revised: ""
   - name: total_semantic_slots
     status: active
     source: design/gdd/game-session-state.md

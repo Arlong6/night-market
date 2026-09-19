@@ -20,16 +20,16 @@ Web transport 未驗證），因此設計與原型順序以網路層優先。MVP
 | 1 | Session／房間系統 | Core | MVP | **Revised r4 (2026-09-13) — 待原型驗證，不再散文複審**（併入 netcode GDD） | [netcode-session.md](netcode-session.md) | — |
 | 2 | 網路同步層 | Core | MVP | **Revised r4 (2026-09-13) — 待原型驗證，不再散文複審** | [netcode-session.md](netcode-session.md) | Session |
 | 3 | 第一人稱控制器 | Core | MVP | Not Started | — | 網路同步層 |
-| 4 | 攜帶與交付 | Gameplay | MVP | Not Started | — | FP控制器, 機台互動組, 客人系統 |
+| 4 | 攜帶與交付 | Gameplay | MVP | Not Started | — | FP控制器, 機台互動組, 客人系統, **商品資料庫** |
 | 5 | 機台互動組 | Gameplay | MVP | Not Started | — | 網路同步層, 商品資料庫 |
-| 6 | 商品資料庫 | Core | MVP | Not Started | — | — |
+| 6 | 商品資料庫 | Core | MVP | **Designed (2026-09-19)** — 待 /design-review | [product-database.md](product-database.md) | — |
 | 7 | 客人系統 | Gameplay | MVP | Not Started | — | 網路同步層, 商品資料庫 |
-| 8 | 波次導演 | Gameplay | MVP | Not Started | — | 客人系統, 遊戲時鐘 |
+| 8 | 波次導演 | Gameplay | MVP | Not Started | — | 客人系統, 遊戲時鐘, **商品資料庫**（軟） |
 | 9 | 遊戲時鐘 | Core | MVP | Not Started | — | — |
 | 10 | 窗外天色系統 | UI/Presentation | Vertical Slice | Not Started | — | 遊戲時鐘 |
-| 11 | HUD 與需求 icon | UI | MVP | Not Started | — | 機台互動組, 客人系統 |
+| 11 | HUD 與需求 icon | UI | MVP | Not Started | — | 機台互動組, 客人系統, **商品資料庫** |
 | 12 | 大廳 UI 與流程 | UI | MVP(輸碼加入)/VS(完整) | Not Started | — | Session |
-| 13 | 結算畫面 | UI | MVP | Not Started | — | 評分邏輯 |
+| 13 | 結算畫面 | UI | MVP | Not Started | — | 評分邏輯, **商品資料庫**（軟） |
 | 14 | 音效系統 | Audio | MVP(機台音效)/VS(全套) | Not Started | — | 機台互動組, 客人系統 |
 | 15 | 評分邏輯 | Gameplay | MVP | Not Started | — | 商品資料庫 |
 | 16 | 進度與解鎖 | Progression | Alpha/Full | Not Started | — | 評分邏輯 |
@@ -61,15 +61,15 @@ Web transport 未驗證），因此設計與原型順序以網路層優先。MVP
 5. 評分邏輯 — depends on: 商品資料庫（純邏輯，EditMode 可測）
 
 ### Feature Layer
-1. 攜帶與交付 — depends on: FP控制器, 機台互動組, 客人系統
-2. 波次導演 — depends on: 客人系統, 遊戲時鐘
+1. 攜帶與交付 — depends on: FP控制器, 機台互動組, 客人系統, 商品資料庫（搬運 ProductInstance）
+2. 波次導演 — depends on: 客人系統, 遊戲時鐘, 商品資料庫（依站台配重抽樣，軟依賴）
 3. 單人練習縮放 — depends on: 波次導演
 
 ### Presentation Layer
-1. HUD 與需求 icon — depends on: 機台互動組, 客人系統
+1. HUD 與需求 icon — depends on: 機台互動組, 客人系統, 商品資料庫（icon 查詢鍵）
 2. 窗外天色系統 — depends on: 遊戲時鐘
 3. 大廳 UI 與流程 — depends on: Session
-4. 結算畫面 — depends on: 評分邏輯
+4. 結算畫面 — depends on: 評分邏輯, 商品資料庫（display_label，軟依賴）
 5. 音效系統 — depends on: 機台互動組, 客人系統
 
 ### Polish Layer
@@ -111,7 +111,7 @@ Web transport 未驗證），因此設計與原型順序以網路層優先。MVP
 
 ## Progress Tracker
 
-19 systems: 2 Revised r4 (待原型) / 0 Approved / 17 Not Started
+19 systems: 2 Revised r4 (待原型) / 1 Designed (待 review) / 0 Approved / 16 Not Started
 （#1 Session＋#2 網路同步層 → netcode-session.md，2026-09-04 首版；r3 修訂 2026-09-06；
 r4 修訂 2026-09-13，698→1224 行）
 

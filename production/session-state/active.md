@@ -1,6 +1,6 @@
 # Active Session State
 
-> Last Updated: 2026-09-16
+> Last Updated: 2026-09-19
 > Purpose: Living checkpoint. Read this first after compaction or new session.
 
 **目前唯一在推進的專案＝大夜班 (Night Shift)。** Road Rage 與其他遊戲皆為已完成／暫停
@@ -22,7 +22,7 @@
 | 引擎決策與環境 | ✅ 完成 — Unity 6.3 LTS（arlong 指定），參考文件已建 |
 | 美術聖經 | ✅ 第 1-4、8 節 — `design/art/art-bible-night-shift.md`（5/6/7/9 刻意延到原型後） |
 | 系統索引 | ✅ 19 系統盤點，MVP 14 項 — `design/gdd/systems-index.md` |
-| **GDD** | **19 份完成 1 份** — `netcode-session.md`（涵蓋系統 #1 Session、#2 網路同步層），經 r1-r4 四輪評審 |
+| **GDD** | **19 份完成 2 份** — `netcode-session.md`（#1 Session、#2 網路同步層，經 r1-r4 四輪評審）＋ `product-database.md`（#6 商品資料庫，2026-09-19，待 /design-review） |
 | W1 原型 | 第 0-4 批；20 條假設**結案 9 條** |
 | **正式程式碼** | **0 行。大夜班沒有 Unity 專案。** |
 
@@ -42,10 +42,36 @@ GDD 一份都沒有：第一人稱控制器、攜帶與交付、機台互動組�
 權威模型寫反、斷線處置序列建立在假前提上、itch.io 解壓 Brotli 導致傳輸量兩倍、
 Relay region 不選就直接違反 AC22。
 
-## 下一步（W1 結案後同時要做兩件事）
+## 下一步
 
-1. **開大夜班的正式 Unity 專案**，把網路層依 GDD **重寫**成生產程式碼
-2. **開始寫剩下 17 個系統的 GDD** —— 依系統索引的設計順位，下一份是 **②商品資料庫**
+1. **`/design-review design/gdd/product-database.md`** —— 必須在**全新 session** 跑，
+   不可與 /design-system 同場（評審必須獨立於撰寫脈絡）
+2. **開大夜班的正式 Unity 專案**，把網路層依 GDD **重寫**成生產程式碼
+3. **繼續寫 GDD** —— 依系統索引設計順位，下一份是 **③第一人稱控制器**
+
+### 2026-09-19：②商品資料庫 GDD 完成（514 行，12 節）
+
+`design/gdd/product-database.md`。四位專家（creative-director／systems-designer／
+unity-specialist／gameplay-programmer／qa-lead）逐節投入，arlong 逐節核准。
+
+**關鍵裁決**：
+- 範圍只收**互動層 SKU**（估 20-40 筆）；貨架背景排面是共享圖集貼圖，不進資料
+- **需求分兩級**：家族級為主（`machine_family` 4 值）＋指名為輔（僅 `nameable == true`
+  者，每個必須配專屬 icon＝內容配額的天然剎車）。此裁決源於一個硬矛盾：
+  美術聖經 §3.3 的需求 icon 只有 4 個且綁「需求類別」，而嚴格 SKU 比對會讓玩家
+  在尖峰看不出黑輪與米血的差別
+- **兩層 ID**：`sku_id`(string, 永不改名) ＋ `network_index`(byte, 永不重用)
+- **加工狀態機歸 #5**，DB 只定義 `ProductInstance { network_index, is_spoiled }`
+- 數量用**重複槽位**表達，不做 qty 欄位；修飾語若有玩法效果就做成獨立原子 SKU
+- `Matches()` 雙模式純函式＋槽位分配規則（**Named 優先於 Family**，理由：稀缺先鎖定）
+
+**發現的既有文件問題**：美術聖經 §8.2 poly 表**沒有「手持商品」這一列**（400 vs 150
+差 2.7 倍）；需求 icon **缺兩個**（Microwave、Shelf）；`RequestHandoff` 的 `itemId`
+語義未標型別，可能與 SKU 混淆（OQ-P7，七條懸案裡唯一會造成返工的）。
+
+**Registry 已登錄**：`product_matches` 公式 ＋ 4 常數（`machine_family_values`、
+`sku_network_index_type`、`sku_display_label_max_chars`、`sku_count_target`）。
+`items:` 仍空——具體 SKU 清單屬內容製作，尚未裁決。
 
 ## 待 arlong 裁決（皆不擋進度）
 
@@ -545,8 +571,8 @@ shoot-down the heli (needs vertical aim), more environment variety.
 
 <!-- STATUS -->
 Epic: 大夜班 Pre-production
-Feature: W1 網路原型
-Task: 第 0-4 批完成（9/20 假設結案）→ W1 結案後開正式 Unity 專案 ＋ 寫②商品資料庫 GDD
+Feature: GDD 撰寫
+Task: ②商品資料庫完成（待 /design-review，須新 session）→ 下一份 ③第一人稱控制器
 <!-- /STATUS -->
 
 **Unity KEY FACTS**（每次動 Unity 程式碼前重讀）：C# 9.0 only；`[SerializeField]` fields-only；
