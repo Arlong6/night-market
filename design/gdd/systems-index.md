@@ -22,7 +22,7 @@ Web transport 未驗證），因此設計與原型順序以網路層優先。MVP
 | 3 | 第一人稱控制器 | Core | MVP | Not Started | — | 網路同步層 |
 | 4 | 攜帶與交付 | Gameplay | MVP | Not Started | — | FP控制器, 機台互動組, 客人系統, **商品資料庫** |
 | 5 | 機台互動組 | Gameplay | MVP | Not Started | — | 網路同步層, 商品資料庫 |
-| 6 | 商品資料庫 | Core | MVP | **Designed (2026-09-19)** — 待 /design-review | [product-database.md](product-database.md) | — |
+| 6 | 商品資料庫 | Core | MVP | **In Review (r1 修訂完 2026-09-20)** — 首審 NEEDS REVISION，30 blocking 已全數處理，待複審 | [product-database.md](product-database.md) | — |
 | 7 | 客人系統 | Gameplay | MVP | Not Started | — | 網路同步層, 商品資料庫 |
 | 8 | 波次導演 | Gameplay | MVP | Not Started | — | 客人系統, 遊戲時鐘, **商品資料庫**（軟） |
 | 9 | 遊戲時鐘 | Core | MVP | Not Started | — | — |
@@ -111,7 +111,7 @@ Web transport 未驗證），因此設計與原型順序以網路層優先。MVP
 
 ## Progress Tracker
 
-19 systems: 2 Revised r4 (待原型) / 1 Designed (待 review) / 0 Approved / 16 Not Started
+19 systems: 2 Revised r4 (待原型) / 1 In Review (r1 修訂完) / 0 Approved / 16 Not Started
 （#1 Session＋#2 網路同步層 → netcode-session.md，2026-09-04 首版；r3 修訂 2026-09-06；
 r4 修訂 2026-09-13，698→1224 行）
 

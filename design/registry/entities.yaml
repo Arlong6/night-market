@@ -125,11 +125,11 @@ formulas:
       - demand.kind
       - demand.family
       - demand.network_index
-    output_range: [0, 1]
-    expression: "(!instance.is_spoiled) AND (demand.kind == Family ? Get(instance.network_index).machine_family == demand.family : instance.network_index == demand.network_index)"
-    notes: "Boolean, deliberately binary — no partial credit, no fuzzy matching (Player Fantasy admission threshold #3 already guarantees SKUs are unmistakable). Slot-allocation when one item satisfies multiple slots (Named before Family, lower index first) is specified in the GDD but owned by #15/#4, not by this predicate."
+    output_range: [0, 3]
+    expression: "MatchResult enum {Match=0, WrongFamily=1, WrongSku=2, Spoiled=3}; Get() is called before both branches so the Named path cannot bypass fail-fast"
+    notes: "Returns an enum, not a bool (revised r1 2026-09-20). Only Match satisfies a slot; the other three values exist so #13/#15 can give differentiated feedback — WrongFamily means go to another machine, WrongSku means grab another item from the same pot. Rationale is precedent consistency: the slot-allocation rule lives in this table to stop #15 reinventing it, and failure classification is the identical situation. Still deliberately exact — no partial credit, no fuzzy matching."
     added: 2026-09-19
-    revised: ""
+    revised: 2026-09-20  # r1 review: bool -> MatchResult enum; Get() now called before both branches
   - name: unresolved_count
     status: active
     source: design/gdd/game-session-state.md
@@ -209,14 +209,15 @@ constants:
       # - design/gdd/wave-director.md         # #8 — per-station load weighting
       # - design/gdd/hud.md                   # #11 — family demand icon lookup key
     value:
-      - Shelf
-      - Oden
-      - Microwave
-      - CoffeeMachine
-    unit: enum_values
-    notes: "Product source families. NOT isomorphic to the art bible §3.3 demand icon set (碗/杯/條碼/箱) — 條碼 is the shared checkout action and 箱 is parcel pickup, neither a product demand; Microwave and Shelf currently have no icon. See product-database.md OQ-P1."
+      - Invalid = 0
+      - Shelf = 1
+      - Oden = 2
+      - Microwave = 3
+      - CoffeeMachine = 4
+    unit: enum_values_explicit
+    notes: "Product source families. Integer values MUST be explicit and may only be appended — never reordered, never renumbered: Unity serializes enum fields as the underlying integer, so reordering the declaration silently remaps every existing asset (Oden could become Microwave) with no compile error and no exception. Invalid=0 is a sentinel and must never be assigned. Guarded by AC15. NOT isomorphic to the art bible §3.3 demand icon set (碗/杯/條碼/箱) — those were drawn for service types, not for machine_family; only 碗 and 杯 overlap, and Microwave/Shelf have no icon. See OQ-P1. The 4-vs-5 gap against the concept doc's 'five stations' is resolved in Core Rules 3b: checkout is a delivery/verification action, not a product source."
     added: 2026-09-19
-    revised: ""
+    revised: 2026-09-20  # r1 review: explicit integer values + Invalid sentinel
 
   - name: sku_network_index_type
     status: active
@@ -226,9 +227,9 @@ constants:
       # Future dependents: netcode RPC payloads, #4/#5/#7/#15
     value: "byte"
     unit: wire_type
-    notes: "SKU identity on the wire. 0-255, assigned sequentially, never reused after deprecation. Raising the ceiling = swap to ushort, a one-line wire-format change with no data migration."
+    notes: "SKU identity on the wire. Assigned sequentially from 1; 0 is permanently reserved as Invalid so that an unassigned/default-initialised value can never masquerade as a legitimate SKU. Never reused after deprecation. Raising the ceiling = swap to ushort, a one-line wire-format change with no data migration."
     added: 2026-09-19
-    revised: ""
+    revised: 2026-09-20  # r1 review: assignment starts at 1, 0 reserved as Invalid
 
   - name: sku_display_label_max_chars
     status: active
@@ -239,8 +240,19 @@ constants:
       # - design/gdd/settlement-screen.md  # #13 — per-item list layout
     value: 6
     unit: han_characters
-    notes: "display_label is the name players shout across the aisle; Player Fantasy's four admission thresholds apply to this field. Customer NPC dialogue is NOT this field (owned by #7/#14)."
+    notes: "UI ceiling only — serves #13 settlement-screen list layout. This is NOT the admission threshold: see sku_holler_max_chars. Counting uses StringInfo.LengthInTextElements."
     added: 2026-09-19
+    revised: 2026-09-20  # r1 review: scope narrowed to UI layout; admission threshold split out
+
+  - name: sku_holler_max_chars
+    status: active
+    source: design/gdd/product-database.md
+    referenced_by:
+      - design/gdd/product-database.md
+    value: 4
+    unit: han_characters
+    notes: "Admission threshold 1 — the label must be shoutable across the aisle in 2-3 syllables. Split from sku_display_label_max_chars in the r1 review: the 6-char ceiling came from #13 settlement layout and was twice as loose as the threshold it was standing in for, so '特濃黑咖啡' (5 chars) passed the automated check while plainly failing the threshold. This is the tighter of the two and the one that actually binds. Counting uses StringInfo.LengthInTextElements."
+    added: 2026-09-20
     revised: ""
 
   - name: sku_count_target

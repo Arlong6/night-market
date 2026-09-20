@@ -1,6 +1,6 @@
 # Active Session State
 
-> Last Updated: 2026-09-19
+> Last Updated: 2026-09-20
 > Purpose: Living checkpoint. Read this first after compaction or new session.
 
 **目前唯一在推進的專案＝大夜班 (Night Shift)。** Road Rage 與其他遊戲皆為已完成／暫停
@@ -22,7 +22,7 @@
 | 引擎決策與環境 | ✅ 完成 — Unity 6.3 LTS（arlong 指定），參考文件已建 |
 | 美術聖經 | ✅ 第 1-4、8 節 — `design/art/art-bible-night-shift.md`（5/6/7/9 刻意延到原型後） |
 | 系統索引 | ✅ 19 系統盤點，MVP 14 項 — `design/gdd/systems-index.md` |
-| **GDD** | **19 份完成 2 份** — `netcode-session.md`（#1 Session、#2 網路同步層，經 r1-r4 四輪評審）＋ `product-database.md`（#6 商品資料庫，2026-09-19，待 /design-review） |
+| **GDD** | **19 份完成 2 份** — `netcode-session.md`（#1、#2，經 r1-r4 四輪評審）＋ `product-database.md`（#6，2026-09-19 首版；2026-09-20 首審 NEEDS REVISION → 同日修訂完畢，待複審） |
 | W1 原型 | 第 0-4 批；20 條假設**結案 9 條** |
 | **正式程式碼** | **0 行。大夜班沒有 Unity 專案。** |
 
@@ -44,8 +44,9 @@ Relay region 不選就直接違反 AC22。
 
 ## 下一步
 
-1. **`/design-review design/gdd/product-database.md`** —— 必須在**全新 session** 跑，
-   不可與 /design-system 同場（評審必須獨立於撰寫脈絡）
+1. **複審 `product-database.md`** —— 首審已於 2026-09-20 完成（NEEDS REVISION，
+   30 blocking 全數處理完畢）。**複審必須在全新 session 跑**：首審已經違規在同場進行，
+   creative-director 判定殘餘偏誤是「不利綜合的缺席」，不可再犯第二次
 2. **開大夜班的正式 Unity 專案**，把網路層依 GDD **重寫**成生產程式碼
 3. **繼續寫 GDD** —— 依系統索引設計順位，下一份是 **③第一人稱控制器**
 
@@ -72,6 +73,33 @@ unity-specialist／gameplay-programmer／qa-lead）逐節投入，arlong 逐節�
 **Registry 已登錄**：`product_matches` 公式 ＋ 4 常數（`machine_family_values`、
 `sku_network_index_type`、`sku_display_label_max_chars`、`sku_count_target`）。
 `items:` 仍空——具體 SKU 清單屬內容製作，尚未裁決。
+
+
+### 2026-09-20：②商品資料庫首審 NEEDS REVISION，同日修訂完畢
+
+`/design-review` 六位對抗式專家（全部零背景新 agent）＋ creative-director 終審。
+**30 blocking／20 recommended，CD 合併為 6 個根因。** 詳見
+`design/gdd/reviews/product-database-review-log.md`。
+
+**CD 的一句話診斷**：「這份文件的架構是對的，但它的三個安全故事目前是虛構的。」
+
+修訂後 514 → 768 行，AC 12→17 條，OQ 7→12 條。四項使用者裁決：
+`display_label` 拆兩個常數（新增 `sku_holler_max_chars = 4`）／Player Fantasy 補家族級
+錨點／`Matches()` 改回傳 `MatchResult` enum／「擋建置」明寫 `IPreprocessBuildWithReport`。
+
+**最值得記住的三條發現**：
+1. **enum 序列化重排**——Unity 存的是底層整數不是名稱，重排 `MachineFamily` 宣告會讓
+   既有資產語意靜默錯位且**測試套件會一起漂移然後互相對上**。全套唯一「安靜、不可回復、
+   會出貨」的失敗模式，修法兩行。
+2. **`[P-17]` 擋不住純內容變更**——netcode GDD 全文未定義 token 產生規則，唯一證據是
+   `payload=w1-proto-v1`（字面量、命名為 proto）。原文件把一道沒查證的閘當成已證成立的
+   防線引用。已改為 OQ-P8，指派 technical-director。
+3. **准入門檻稽核了錯誤的頻道**——四條門檻全是聽覺判準，但尖峰的高風險管道是玩家永遠
+   不會聽到的 icon。已擴充為六條（新增層級標記、32×32 花色不撞）。
+
+⚠ **程序教訓**：首審與撰寫同場進行（使用者知情裁決）。CD 判定「沒有偵測到壓制，
+殘餘偏誤是**不利綜合的缺席**」——零背景專家保護的是**輸入**，不是**接合**。
+下次同場評審應指派一位專家專職交叉引用他人發現，或要求彙整者以自己無從選擇的順序呈現。
 
 ## 待 arlong 裁決（皆不擋進度）
 
@@ -572,7 +600,7 @@ shoot-down the heli (needs vertical aim), more environment variety.
 <!-- STATUS -->
 Epic: 大夜班 Pre-production
 Feature: GDD 撰寫
-Task: ②商品資料庫完成（待 /design-review，須新 session）→ 下一份 ③第一人稱控制器
+Task: ②商品資料庫 r1 修訂完畢（768 行，待新 session 複審）→ 下一份 ③第一人稱控制器
 <!-- /STATUS -->
 
 **Unity KEY FACTS**（每次動 Unity 程式碼前重讀）：C# 9.0 only；`[SerializeField]` fields-only；
