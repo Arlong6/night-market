@@ -79,8 +79,17 @@ entities: []
 
 items: []
   # 大夜班 (Night Shift) 的商品 SKU 尚未登錄：design/gdd/product-database.md 定義了
-  # schema（sku_id / network_index / display_label / machine_family / nameable）
-  # 與准入門檻，但具體品項清單屬內容製作，尚未裁決。內容定案後在此登錄。
+  # schema 與准入門檻，但具體品項清單屬內容製作，尚未裁決。內容定案後在此登錄。
+  #
+  # schema（7 欄，r3 補齊）：
+  #   sku_id / network_index / display_label / machine_family / nameable
+  #   / status / mesh_ref / icon_ref
+  # ⚠ r3 修正：這段註解原本只列 5 欄，漏掉 r2 新增的 status / mesh_ref / icon_ref
+  #   ——而 r2 在 GDD 裡譴責同一個缺陷（「一個標題寫著『一筆 SKU 的欄位集合』的章節
+  #   漏掉一個承重欄位，是單一真相源本身的缺陷」）之後，在 registry 這一份副本上
+  #   原樣重演。改了定義處、漏了引用處。
+  #
+  # 准入門檻共 7 條（r3 新增門檻 7「同家族可互換」）。適用分級見 GDD。
 
 # Example:
 #
@@ -120,16 +129,53 @@ formulas:
       # - design/gdd/station-interactions.md  # #5 — may show live "right/wrong" feedback
       # - design/gdd/carry-deliver.md    # #4 — delivery-point adjudication
     variables:
+      - catalog         # r3: data source, NOT logic source
       - instance.network_index
       - instance.is_spoiled
       - demand.kind
       - demand.family
       - demand.network_index
-    output_range: [0, 3]
-    expression: "MatchResult enum {Match=0, WrongFamily=1, WrongSku=2, Spoiled=3}; Get() is called before both branches so the Named path cannot bypass fail-fast"
+    output_range: [0, 4]
+    expression: "ProductMatching.Matches(catalog, instance, demand) -> MatchResult enum {Unevaluated=0, Match=1, WrongFamily=2, WrongSku=3, Spoiled=4}; both the instance side AND the demand side are validated before either branch runs; is_spoiled short-circuits AFTER domain validation, BEFORE adjudication"
     notes: "Returns an enum, not a bool (revised r1 2026-09-20). Only Match satisfies a slot; the other three values exist so #13/#15 can give differentiated feedback — WrongFamily means go to another machine, WrongSku means grab another item from the same pot. Rationale is precedent consistency: the slot-allocation rule lives in this table to stop #15 reinventing it, and failure classification is the identical situation. Still deliberately exact — no partial credit, no fuzzy matching."
     added: 2026-09-19
-    revised: 2026-09-20  # r1 review: bool -> MatchResult enum; Get() now called before both branches
+    revised: 2026-09-21  # r3: moved OUT of IProductCatalog into `static ProductMatching`; takes catalog as a parameter
+    # r3 HOUSING CHANGE (design/gdd/product-database.md, Interactions): Matches() and AllocateSlot()
+    # are NO LONGER members of IProductCatalog. Reason (qa-lead over systems-designer, adjudicated by
+    # creative-director): while they sat on the interface, a test double `FakeProductCatalog :
+    # IProductCatalog` had to REIMPLEMENT the adjudication logic -- so AC11a's regression vectors,
+    # AC5, AC6 and AC13 would all run against the fake's rules and the real implementation could be
+    # wholly wrong while every test stayed green. `catalog` is now a DATA-SOURCE parameter, not a
+    # LOGIC-SOURCE: fakes supply rows, the adjudication is always this one function.
+    # "False green" is the single most consistent failure mode across all three review rounds.
+    # Verified in prototypes/product-database-core/ (FAKE-r3 vs the FAKE-R2SHAPE counterfactual).  # r2 review: Unevaluated=0 sentinel (Match=0 made the zero value the PASS value, violating rule 1b); demand-side input domain now validated (family==Invalid, nameable==false, deprecated all threw silently before)
+  - name: allocate_slot
+    status: active
+    source: design/gdd/product-database.md
+    referenced_by:
+      - design/gdd/product-database.md
+      # Future dependents (add when designed):
+      # - design/gdd/scoring.md          # #15 — delivery-point integration
+      # - design/gdd/carry-deliver.md    # #4 — owns `filled`, and owns CROSS-ORDER allocation
+    variables:
+      - catalog         # r3: data source, NOT logic source -- see product_matches notes
+      - slots           # was order.slots; the function takes the slot array directly
+      - filled          # caller-supplied occupancy; #15/#4 own this state
+      - instance.network_index
+      - instance.is_spoiled
+    output_range: [-1, "slots.Length - 1"]
+    precondition: "filled.Length == slots.Length, else throw ArgumentException (AC13 case 7)"
+    expression: "PRECONDITION filled.Length == slots.Length. ELIGIBILITY a slot s is a candidate iff Matches(catalog, instance, s) == Match. PRIORITY among candidates, Named before Family. TIE-BREAK lowest index not yet filled. One product consumes one slot. No candidate -> -1"
+    notes: "Registered in r2. The r1 signature AllocateSlot(order, instance) could not evaluate its own rule -- the rule says 'lowest index NOT YET FILLED' but CustomerOrder carries no occupancy and the GDD assigns that state to #15/#4, so the three-slot worked example was unreachable from the API and AC13 was untestable. `filled` is now a caller-supplied parameter: the function stays pure and the layering is unchanged. SCOPE: single order only. Cross-order allocation (the same item accepted by two different customers' orders) is #4's, adjudicated at the delivery point; the scarce-locks-first exchange argument gives zero protection there because the scarce and flexible slots sit in different orders."
+    added: 2026-09-20
+    revised: 2026-09-21  # r3: eligibility predicate added; signature takes catalog; filled-length precondition
+    # was (r2): "Named before Family; within one priority, lowest unfilled slot index; one product
+    #           consumes one slot; no eligible slot -> -1"  -- it never DEFINED eligibility.
+    # r3 PROTOTYPE EVIDENCE (prototypes/product-database-core/, probe AC13-4-R2RULE):
+    #   order [Family:Oden, Named:coffee], deliver one fresh 黑輪. Under the r2 wording the
+    #   literal rule (Named first, lowest index, not yet filled) assigns it to SLOT 1 -- the
+    #   named-coffee slot. Correct answer is slot 0. The rule contradicted its own acceptance
+    #   criterion AC13 case 5. The eligibility predicate is LOAD-BEARING, not restatement.
   - name: unresolved_count
     status: active
     source: design/gdd/game-session-state.md
@@ -203,6 +249,7 @@ constants:
     source: design/gdd/product-database.md
     referenced_by:
       - design/gdd/product-database.md
+      - design/registry/sku-shipped-snapshot.txt  # frozen_enum: block — AC15a compares against it
       # Future dependents (add when designed):
       # - design/gdd/station-interactions.md  # #5 — each station queries its own menu
       # - design/gdd/customer-system.md       # #7 — family-level demands
@@ -215,9 +262,95 @@ constants:
       - Microwave = 3
       - CoffeeMachine = 4
     unit: enum_values_explicit
-    notes: "Product source families. Integer values MUST be explicit and may only be appended — never reordered, never renumbered: Unity serializes enum fields as the underlying integer, so reordering the declaration silently remaps every existing asset (Oden could become Microwave) with no compile error and no exception. Invalid=0 is a sentinel and must never be assigned. Guarded by AC15. NOT isomorphic to the art bible §3.3 demand icon set (碗/杯/條碼/箱) — those were drawn for service types, not for machine_family; only 碗 and 杯 overlap, and Microwave/Shelf have no icon. See OQ-P1. The 4-vs-5 gap against the concept doc's 'five stations' is resolved in Core Rules 3b: checkout is a delivery/verification action, not a product source."
+    notes: "Product source families. Integer values MUST be explicit and may only be appended — never reordered, never renumbered: Unity serializes enum fields as the underlying integer, so reordering the declaration silently remaps every existing asset (Oden could become Microwave) with no compile error and no exception. Invalid=0 is a sentinel and must never be assigned. Guarded by AC15a (declaration-level snapshot, bidirectional, also freezes the underlying type) and AC15b (asset-level integer check). R3 FIX: this note still said 'AC15', which r2 had already split into a/b -- and this was the ONE tuning entry that also omitted the back-reference to design/registry/sku-shipped-snapshot.txt, i.e. the enum that r1's creative-director ranked highest on severity-over-cost was the one whose registry entry pointed at the weakest guard. R3 also notes the underlying type is frozen as `byte`. NOT isomorphic to the art bible §3.3 demand icon set (碗/杯/條碼/箱) — those were drawn for service types, not for machine_family; only 碗 and 杯 overlap, and Microwave/Shelf have no icon. See OQ-P1. The 4-vs-5 gap against the concept doc's 'five stations' is resolved in Core Rules 3b: checkout is a delivery/verification action, not a product source."
     added: 2026-09-19
-    revised: 2026-09-20  # r1 review: explicit integer values + Invalid sentinel
+    revised: 2026-09-20  # r3 review: AC15 -> AC15a/b, snapshot back-reference, underlying type frozen
+
+  - name: sku_status_values
+    status: active
+    source: design/gdd/product-database.md
+    referenced_by:
+      - design/gdd/product-database.md
+      - design/registry/sku-shipped-snapshot.txt
+    value:
+      - Invalid = 0
+      - Active = 1
+      - Deprecated = 2
+    unit: enum_values_explicit
+    notes: "Added in r2. The status field was MISSING from the GDD's rule-1 field table entirely, while rule 2, the States table, both filtered queries, AC3/AC4/AC16 and three Edge Cases all depended on it. Append-only, never reordered. Invalid=0 is a sentinel and must never be assigned. Deprecated is terminal -- AC1a asserts no row goes back to Active."
+    added: 2026-09-20
+    revised: ""
+
+  - name: demand_kind_values
+    status: active
+    source: design/gdd/product-database.md
+    referenced_by:
+      - design/gdd/product-database.md
+      # Future dependents: customer-system.md (#7) constructs these
+      - design/registry/sku-shipped-snapshot.txt
+    value:
+      - Invalid = 0
+      - Family = 1
+      - Named = 2
+    unit: enum_values_explicit
+    notes: "Added in r2. Rule 1b mandates explicit integers for EVERY enum, and this one -- declared 190 lines later in the same GDD -- complied with neither half. Without the sentinel, a default-initialised CustomerDemand is {kind=Family, family=Invalid, network_index=0}, a SYNTACTICALLY VALID family demand that returns WrongFamily against every product in the game, forever, with no error. Guarded by AC6c, and made unrepresentable by the CustomerDemand.Family()/.Named() factories."
+    added: 2026-09-20
+    revised: ""
+
+  - name: match_result_values
+    status: active
+    source: design/gdd/product-database.md
+    referenced_by:
+      - design/gdd/product-database.md
+      - design/registry/sku-shipped-snapshot.txt
+      # Future dependents: scoring.md (#15), settlement-screen.md (#13)
+    value:
+      - Unevaluated = 0
+      - Match = 1
+      - WrongFamily = 2
+      - WrongSku = 3
+      - Spoiled = 4
+    unit: enum_values_explicit
+    notes: "Renumbered in r2. r1 shipped Match=0, which made the ZERO VALUE the PASS value -- an unfilled array, an unwritten out-param or a default(MatchResult) in #15's aggregation all read as 'every slot satisfied'. That is the exact failure rule 1b exists to prevent ('no error, no assert, looks completely normal'), applied with maximum force, and rule 1b was not applied to it. Matches() never returns Unevaluated; reading it means #15 has a bug. The integer values were previously recorded ONLY here and never stated in the GDD that owns the type -- now stated in both."
+    added: 2026-09-20
+    revised: ""
+
+  - name: sku_nameable_max
+    status: active
+    source: design/gdd/product-database.md
+    referenced_by:
+      - design/gdd/product-database.md
+      # Future dependents: customer-system.md (#7), hud.md (#11)
+    value: 6
+    unit: nameable_sku_entries
+    notes: "PROVISIONAL. R3: LOWERED 8 -> 6 by art-director, derived from a SHAPE budget rather than an art-hours budget -- pool A (above-customer-head silhouettes) holds at most ~14 distinct shapes, of which 8 are already spoken for (overtime exclamation 1 + completion check 1 + family icons 6), leaving 6 for named icons. That 14 is a PLANNING ceiling, not a measured threshold; art-director flagged medium confidence and it must be re-calibrated against gate 6 once #11 backfills the real on-screen icon size. R3 also DELETED the N*(N+K) manual-dedup cost model that r2 used to justify the 8 -- the doc carried three mutually incompatible cost models for gate 6 and one of them was load-bearing for this number. The real reason for a ceiling is peak readability, not a cost curve. R3 ADDED A LOWER BOUND: MVP requires nameable >= 2 (arlong ruling 2026-09-20). Without a floor, three individually correct and individually cheap revisions compose into an empty named pool for all of MVP -- and AC4 is vacuously true on the empty set, AC20 is vacuously true, AC3 is unaffected, so none of the thirty ACs would go red. Original r2 note follows.  Refill trigger: same as gate 6's test size -- #11's first in-scene measurement. Rationale for having a number at all: r1 made the UNENFORCEABLE half (runtime concurrency of distinct symbols) the knob and left the ENFORCEABLE half (pool size) at TBD alongside it. Pool size is build-checkable, so it now has a value and an AC (AC20); concurrency is levied on #7 instead. Cost curve worth noting: the k-th nameable icon costs O(1) to draw but (k-1)+K manual silhouette comparisons to clear gate 6, where K is the rest of the above-head symbol inventory -- the doc named the CONSTANT term as its brake and left the growing term unowned."
+    added: 2026-09-20
+    revised: ""
+
+  - name: sku_nameable_min
+    status: active
+    source: design/gdd/product-database.md
+    referenced_by:
+      - design/gdd/product-database.md
+      # Future dependents: customer-system.md (#7), hud.md (#11), art production schedule
+    value: 2
+    unit: nameable_sku_entries
+    notes: "MVP FLOOR, ruled by arlong 2026-09-20 (r3). One per generator family, so the two-tier demand
+      rule can actually be PLAYTESTED in MVP rather than argued about for a fourth review round. Guarded
+      by AC20's lower clause. WHY A FLOOR EXISTS AT ALL: r2 levied only a ceiling, and r3's cross-reference
+      pass found that three individually correct, individually cheap revisions (extend the Shelf supply
+      constraint to all families / mechanise it inside GetNameable() / tighten the named pool) COMPOSE into
+      an empty named pool for the whole of MVP -- while AC4 is vacuously true on the empty set, AC20 was
+      vacuously true, and AC3 is unaffected. Thirty ACs, none of them red, and the highest-emotion moment
+      in the design doc silently gone. A knob that only turns one way is not a knob.
+      COST OF THIS RULING (stated, not hidden): OQ-P1 and the icon graphic spec become REAL blockers --
+      art-director must deliver 6 family icons + 2 named icons + 2 tier overlays before any SKU can be
+      marked Active. If the MVP schedule cannot absorb that wait, the honest alternative is floor = 0,
+      which defers thresholds 1/3/5/6, AC4, AC18, AC20 and unblocks art immediately -- at the cost of
+      shipping MVP without the one mechanic in this game that is not drawn from real convenience-store
+      experience, and therefore the one that has to be taught."
+    added: 2026-09-20
+    revised: ""
 
   - name: sku_network_index_type
     status: active
@@ -251,7 +384,29 @@ constants:
       - design/gdd/product-database.md
     value: 4
     unit: han_characters
-    notes: "Admission threshold 1 — the label must be shoutable across the aisle in 2-3 syllables. Split from sku_display_label_max_chars in the r1 review: the 6-char ceiling came from #13 settlement layout and was twice as loose as the threshold it was standing in for, so '特濃黑咖啡' (5 chars) passed the automated check while plainly failing the threshold. This is the tighter of the two and the one that actually binds. Counting uses StringInfo.LengthInTextElements."
+    notes: "Admission threshold 1 — the label must be shoutable across the aisle in <=4 syllables (Chinese: one character = one syllable). R3 FIX: this line previously said '2-3 syllables' while the GDD claimed the wording had been synchronised everywhere to <=4 -- the drift survived a round that was specifically looking for it. R3 also ruled that the '2-3' in the GDD prose was an ILLUSTRATION, not a norm, so the value stays 4 and is explicitly NOT to be backfilled to 3. Applies ONLY to nameable == true; family-filler SKUs use sku_display_label_max_chars (6). Split from sku_display_label_max_chars in the r1 review: the 6-char ceiling came from #13 settlement layout and was twice as loose as the threshold it was standing in for, so '特濃黑咖啡' (5 chars) passed the automated check while plainly failing the threshold. This is the tighter of the two and the one that actually binds. Counting uses StringInfo.LengthInTextElements."
+    added: 2026-09-20
+    revised: ""
+
+  - name: sku_concurrent_distinct_max
+    status: active
+    source: design/gdd/product-database.md
+    referenced_by:
+      - design/gdd/product-database.md
+      # Future dependents: customer-system.md (#7 — must carry an AC for this), hud.md (#11)
+    value: 4
+    unit: distinct_demand_symbols_onscreen
+    notes: "PROVISIONAL, added in r3. Counting unit is SLOTS, not customers: the doc models 'two skewers'
+      as two slots, so one customer can contribute several symbols. Refill trigger: same as gate 6 --
+      #11's first in-scene measurement. WHY IT NEEDED A VALUE: r2 levied this constraint on #7 but never
+      gave it a number, so #7 was being asked to write an acceptance test for an undefined variable --
+      a test that cannot fail. .claude/rules/design-docs.md requires tuning knobs to state a safe range.
+      WHAT IT IS NOT: it is NOT a photosensitivity ceiling. r2's OQ-P16 claimed it was; r3 deleted that
+      claim. Photosensitivity risk is a function of flashing AREA and FREQUENCY, not of how many DISTINCT
+      shapes are present -- and art bible §4.3 explicitly permits 'ten yellow icons lit at once'. Ten
+      copies of the SAME icon flashing in phase are entirely unconstrained by this knob. Worse, §8.3's
+      shared-material global pulse means all flashing is IN PHASE, so areas add. Photosensitivity is
+      unowned and is levied on #18."
     added: 2026-09-20
     revised: ""
 
@@ -262,9 +417,9 @@ constants:
       - design/gdd/product-database.md
     value: "[20, 40]"
     unit: sku_entries_mvp
-    notes: "ESTIMATED, not derived — see product-database.md OQ-P4. The real criterion is how many items per family give variety without confusion, measurable only when #7/#8 are designed. Hard floor per family is 1 active entry (build fails at 0)."
+    notes: "ESTIMATED, not derived, and FLAGGED FOR RE-DERIVATION in r2 — see product-database.md OQ-P4. r1 said the real criterion was 'how many items per family give variety without confusion'; r2 found that question is wrong, because under family-level demands (the majority path per rule 3) all SKUs in a family are mechanically interchangeable, so the n-th entry in a family (n >= 2) buys the player no decision at all on the common path. The defensible count is 4 + |nameable| + |distinct #5 processing profiles| (overlapping), which plausibly lands at 12-20 rather than 20-40. Upper bounds get filled, so do not treat 40 as a target. Hard floor per family is 1 active entry (build fails at 0)."
     added: 2026-09-19
-    revised: ""
+    revised: 2026-09-20  # r2 review: flagged for re-derivation; the stated lower bound of 12 was derived from the wrong variable
   - name: total_semantic_slots
     status: active
     source: design/gdd/game-session-state.md
