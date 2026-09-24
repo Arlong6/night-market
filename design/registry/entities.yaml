@@ -212,6 +212,90 @@ formulas:
     added: 2026-05-29
     revised: ""
 
+  - name: player_frame_budget
+    status: active
+    source: design/gdd/first-person-controller.md
+    referenced_by:
+      - design/gdd/first-person-controller.md
+      # Future dependents (add when the consuming doc NAMES this formula):
+      # - design/gdd/netcode-session.md   # AC4 / AC23 already CONSUME this bound, but under the
+      #                                   # prose name「角色移動速度上限」, not this formula name.
+      #                                   # See the stale `blocked-by` note recorded 2026-09-24.
+      # - design/gdd/carry-deliver.md     # #4 — consumes the POSITIONS this budget produces
+      # - design/gdd/station-interactions.md  # #5 — same
+    variables:
+      - player_move_speed_max    # 1.39 m/s
+      - dt                       # this frame's time step, seconds
+      - movement_max_step_sec    # 0.10 s — clamp, derived from network_tick_rate, not a knob
+    output_range: [0, 0.139]
+    expression: "player_move_speed_max × min(dt, movement_max_step_sec) -> metres of TOTAL displacement permitted this frame, covering input displacement PLUS depenetration displacement, in any direction and any input combination"
+    notes: "C12 — the FP controller's hard delivery upward. Registered because #4 and #5 consume the
+      POSITIONS this budget produces, and because the same sentence had two readings 6× apart.
+      ⚠ THE 0.139 IS A WORST-CASE CEILING, NOT A PER-FRAME ALLOWANCE. Reading it as a constant
+      0.139 m/frame permits 8.4 m/s at 60fps — contradicting the speed cap outright, and making
+      netcode AC23 false. The ceiling is only reached when dt is clamped at movement_max_step_sec.
+      Load-bearing consequences: (1) diagonal input MUST be normalised (strafe-running is the
+      classic FPS bug, and the upstream AC uses exactly that as its test); (2) depenetration
+      displacement draws on the SAME budget, which is what makes a 0.6 m overlap take 0.43 s to
+      separate at 60fps rather than 0.083 s — read as a shove, not a bounce; (3) zero teleports
+      for player characters during a shift. On overflow, the INPUT component is sacrificed —
+      never proportionally scaled, or holding forward discounts the depenetration."
+    added: 2026-09-24
+    revised: ""
+
+  - name: depenetration_delta
+    status: active
+    source: design/gdd/first-person-controller.md
+    referenced_by:
+      - design/gdd/first-person-controller.md
+      # Future dependents (add when designed):
+      # - design/gdd/npc-customer-flow.md   # #7 — queries capsules this displaces
+    variables:
+      - overlap_depth              # metres of capsule interpenetration against the LOCALLY RENDERED other capsule
+      - self_depenetration_scale   # 0.5 — vs another player
+      - npc_depenetration_scale    # 1.0 — vs a customer
+    output_range: [0, 0.6]
+    expression: "scale × overlap_depth, applied ENTIRELY to self; scale = self_depenetration_scale (0.5) when the other end is a player, npc_depenetration_scale (1.0) when it is an NPC. Runs BEFORE displacement summation, and draws on player_frame_budget"
+    notes: "C9 / C11 / F4. `scale = 1 / n_correcting_ends`: two players each push THEMSELVES out
+      (n=2 -> 0.5), while a player pushes itself out of a customer and writes zero to the customer
+      (n=1 -> 1.0). Registered specifically because the two scales diverge and the divergence is
+      one line old (2026-09-23): sharing 0.5 makes CUSTOMERS STICKIER THAN TEAMMATES, the exact
+      inverse of C11's intent — shoving a customer aside should be FASTER than negotiating past a
+      teammate, and that asymmetry is where the comedy lives.
+      ⚠ 'Applied entirely to self' is the only form compatible with owner authority — 'push the
+      other player x cm' is PHYSICALLY IMPOSSIBLE there (no write permission on their transform).
+      The push is instead carried by network lag itself: A stops against B's ghost while B keeps
+      walking in reality, so B's ghost keeps pressing for the next L seconds. Symmetric by
+      construction; needs no messages, and needs no global solver at any n (unlike a 50/50 split,
+      which would in three-body).
+      ⚠ Upper bound 0.6 = 2·r_c (max meaningful overlap depth); the frame budget clamps it lower."
+    added: 2026-09-24
+    revised: ""
+
+  - name: should_warn
+    status: active
+    source: design/gdd/first-person-controller.md
+    referenced_by:
+      - design/gdd/first-person-controller.md
+      # Future dependents (add when designed):
+      # - design/gdd/hud.md   # #11 — renders whatever this predicate gates
+    variables:
+      - closing_speed        # m/s, clamped to player_move_speed_max before evaluation
+      - time_to_contact      # seconds until centre distance reaches 2·r_c
+      - warning_lead_sec     # 0.5 s (provisional)
+    output_range: [false, true]
+    expression: "(closing_speed > 0) AND (time_to_contact ≤ warning_lead_sec)"
+    notes: "F7 — the delivery for crowding criterion 5. Same shape as vignette_valid: a predicate,
+      not a scalar. Registered because the FORM was what changed this round.
+      ⚠ The rejected form was a warning RADIUS = v × t × 2, which had two defects: it omits the
+      +2·r_c term (contact happens at centre distance 2·r_c, not 0), and at this game's scale a
+      pure radius DEGENERATES INTO ALWAYS-ON (lead 1.0 s -> 3.4 m against a ~10 m shop diagonal).
+      ⚠ closing_speed must be clamped to player_move_speed_max BEFORE evaluation, or a post-HOL
+      burst lights the whole screen up.
+      Executable as 5 pure-C# EditMode tests — no PhysX, no NGO."
+    added: 2026-09-24
+    revised: ""
+
 # Example:
 #
 # formulas:
@@ -420,6 +504,183 @@ constants:
     notes: "ESTIMATED, not derived, and FLAGGED FOR RE-DERIVATION in r2 — see product-database.md OQ-P4. r1 said the real criterion was 'how many items per family give variety without confusion'; r2 found that question is wrong, because under family-level demands (the majority path per rule 3) all SKUs in a family are mechanically interchangeable, so the n-th entry in a family (n >= 2) buys the player no decision at all on the common path. The defensible count is 4 + |nameable| + |distinct #5 processing profiles| (overlapping), which plausibly lands at 12-20 rather than 20-40. Upper bounds get filled, so do not treat 40 as a target. Hard floor per family is 1 active entry (build fails at 0)."
     added: 2026-09-19
     revised: 2026-09-20  # r2 review: flagged for re-derivation; the stated lower bound of 12 was derived from the wrong variable
+  # ── 第一人稱控制器 (#3) ── design/gdd/first-person-controller.md
+  - name: player_move_speed_max
+    status: active
+    source: design/gdd/first-person-controller.md
+    referenced_by:
+      - design/gdd/first-person-controller.md
+      - design/gdd/netcode-session.md   # AC4 / AC15 / AC23 use this as their SOLE criterion
+    value: 1.39
+    unit: metres_per_second
+    notes: "PROVISIONAL (2026-09-22). THE hard deliverable of #3: netcode AC4/AC15/AC23 were
+      literally blocked on this constant's existence -- netcode-session.md:1433 says 'that constant
+      does not currently exist ... this criterion cannot be executed' and :1538 tags it
+      blocked-by: first-person-controller GDD. Defining it unblocks all three.
+      SEMANTICS (rule C12): absolute horizontal displacement ceiling, covering input displacement
+      PLUS depenetration displacement, for any direction and any input combination. Three corollaries,
+      each of which is a network-independent trap that would make AC23 false: (1) diagonal input MUST
+      be normalised -- strafe-running is the single most common FPS implementation bug and the upstream
+      AC uses exactly this as its criterion; (2) depenetration eats the same budget, which incidentally
+      is what makes deep overlap take several frames to resolve -- and THAT is what criterion 4 wants,
+      'reads as a push, not a bounce'; (3) zero teleports for player avatars during a shift.
+      DERIVATION: v <= depenetration_margin * 2*r_c / L_p95 = 0.79 * 0.60 / 0.339 = 1.39823, ROUNDED DOWN to 1.39. The rounding direction was forced on 2026-09-24 by the acceptance-criteria pass, on the day the constant was written: 1.40 makes v*L = 0.4746, which EXCEEDS the permitted bound of 0.474 by 0.13%. The 0.79 margin is itself a chosen number and 0.13% is engineering noise -- but an acceptance criterion that is red on day one gets learned-to-be-ignored on day one, so the number moved rather than the criterion. Adding a tolerance instead would have been a close relative of the repair pattern r3's final review explicitly forbids ('assertion goes red -> add tolerance -> green'). CONSEQUENCE: 1.39 leaves only 0.13% headroom, so any downward revision of r_c forces a downward revision of the speed.
+      The binding inequality is v*L <= 2*r_c, NOT v*L <= W (corridor width) -- W is merely an upper
+      bound on r_c and the two differ by 50% under the assumed values. The 0.79 margin exists because
+      the camera sits on the capsule axis, so at 0.75x the remote ghost's centre already reaches the
+      camera and the near plane clips into the model; it is also a feedback loop with gain exactly 1
+      and delay exactly L, so the boundary is only marginally stable.
+      DEPENDS ON TWO UNVERIFIED INPUTS: r_c = 0.3m is an ASSUMPTION (true owner is #11 / art bible
+      3.2), and L_p95 = 0.339s is DERIVED from W1's RTT model, not directly measured.
+      SENSITIVITY: interpolation_buffer_ms (150, owned by netcode) is 44% of L and the only term this
+      project controls. Cutting it to its tuning floor of 100ms buys 1.64 m/s (+18%); 150->120 buys about 0.14 m/s. Neither GDD has
+      written this cross-document coupling down before.
+      DISPOSITION ORDER IF PLAYTEST SAYS 'TOO SLOW' (registered in advance, more important than the
+      number): (1) FOV first -- it enters none of the inequalities; (2) interpolation_buffer 150->120;
+      (3) capsule radius / corridor width; (4) speed LAST, and only with a measured L_p95. Raising it
+      to 2.2 pushes v*L to 0.75m > 2*r_c, making interpenetration routine -- and the symptom gets
+      blamed on 'the network is bad' while the Unique Hook dies quietly."
+    added: 2026-09-22
+    revised: ""
+
+  - name: movement_max_step_sec
+    status: active
+    source: design/gdd/first-person-controller.md
+    referenced_by:
+      - design/gdd/first-person-controller.md
+    value: 0.10
+    unit: seconds
+    notes: "NOT A KNOB -- derived: = 1 / network_tick_rate. A frame that travels further than one tick
+      period is something the sync layer cannot express by construction. Guards the background-tab
+      case: W1 measured Chrome throttling a backgrounded Unity main loop to a steady 1 Hz (it does NOT
+      stop), so Time.deltaTime inflates and an unclamped controller.Move(v * dt) teleports. Check
+      against netcode AC4 ('no other-player frame jump > 1m'): 0.10 * 1.39 = 0.139m < 1m. NOTE the two
+      constants are bound together and must be set together."
+    added: 2026-09-22
+    revised: ""
+
+  - name: self_depenetration_scale
+    status: active
+    source: design/gdd/first-person-controller.md
+    referenced_by:
+      - design/gdd/first-person-controller.md
+    value: 0.5
+    unit: ratio
+    notes: "NOT A KNOB -- derived: = 1 / n_correcting_ends = 1/2. Rule C9 has BOTH ends push their OWN
+      capsule out of the other's ghost, so the separation rate is twice the single-player intuition and
+      needs halving. WHY BOTH ENDS SELF-CORRECT: under owner authority, pushing the other player is
+      PHYSICALLY IMPOSSIBLE -- I have no permission to write your position. A spec written as 'push the
+      other player x cm' has only two implementations: send a message (which they may ignore) or write
+      their transform (overwritten by the next packet = snap-back = the visual equivalent of the
+      rollback that netcode Core Rule #5 explicitly excludes). Symmetry is therefore guaranteed BY
+      CONSTRUCTION rather than by implementer discipline."
+    added: 2026-09-22
+    revised: ""
+
+  - name: npc_depenetration_scale
+    status: active
+    source: design/gdd/first-person-controller.md
+    referenced_by:
+      - design/gdd/first-person-controller.md
+    value: 1.0
+    unit: ratio
+    notes: "NOT A KNOB -- derived: = 1 / n_correcting_ends = 1/1. Added 2026-09-23 after an edge-case
+      pass found that F4's formula had NEVER been applied to NPCs. Per rule C11 the player writes zero
+      displacement to customers, so only ONE end corrects, so the scale is 1.0 -- not the 0.5 used for
+      player-player. Sharing 0.5 would make customers STICKIER than teammates, which inverts C11's
+      intent: shoving past a customer should be FASTER than negotiating around a teammate, not slower.
+      C11's asymmetry is deliberate: 'being blocked by a teammate is a person, being blocked by a
+      customer is a thing -- shoving a customer aside requires no apology, and that is the comedy.'"
+    added: 2026-09-23
+    revised: ""
+
+  - name: player_pin_timeout_sec
+    status: active
+    source: design/gdd/first-person-controller.md
+    referenced_by:
+      - design/gdd/first-person-controller.md
+    value: 4.0
+    unit: seconds
+    notes: "Rule C10's degradation threshold: after sustained overlap AND sustained input cancellation,
+      that PAIR degrades to pass-through until fully separated. It is criterion 2's fuse (a blockage
+      must always have a solution one player can execute alone) and repays the debt C2 incurs by
+      removing jumping -- in real games jumping is mostly used to UNSTICK, not to clear obstacles.
+      DERIVATION: >= design test (3.0) + L_p95 (0.339, the other end must see you push first) + human
+      reaction (0.30) = 3.64 -> 4.0. Safe range 3.7-5.0 (upper bound TIGHTENED from 8.0 on 2026-09-23): it must be strictly less than background_disconnect_threshold_sec (5.0), otherwise the guarantee 'whoever is blocked by a backgrounded teammate is always released first' breaks -- a guarantee only discovered during the edge-case pass, since C14 zeroes the backgrounded player's INPUT and C10's timer keys on input cancellation rather than on overlap, so the backgrounded end never degrades at all.
+      WHY IT IS DERIVABLE AT ALL (a specialist disagreement, resolved): game-designer argued the
+      invariant 'must exceed the p95 of normal push-resolution time' cannot be chosen because that p95
+      is unmeasured. But that p95 is NOT an unknown -- it is an already-written design assertion: the
+      Player Fantasy design test says 'resolved within three seconds', and it further rules that if the
+      measured p95 cannot hold, the correct response is to CHANGE THE FRAMING, not to raise the
+      timeout. 'Wait and measure' is therefore invalid by construction: it presumes a world where
+      p95 = 6s and we would set 7s, and in that world the entire fantasy section is already void.
+      DOMINANT-STRATEGY CHECK IS NOW A DISTANCE: any corridor segment whose detour path exceeds
+      4.0 * 1.39 = 5.56m makes 'shove and wait for degradation' the optimal play (recomputed to 5.56m after the speed moved to 1.39). This REPLACES the
+      vaguer 'please enumerate dead ends' request previously levied on #11.
+      TWO FALSIFIERS: too short if (degradation triggers / successful separations) > 0.05 -- and
+      checking whether both inputs are still cancelling at the moment of degradation separates 'constant
+      too short' from '#11 geometry is broken', two failures that are otherwise indistinguishable.
+      Too long if overlaps > 2s are observed but degradation NEVER fires: it is then dead code and C2's
+      debt is unpaid."
+    added: 2026-09-22
+    revised: ""
+
+  - name: npc_pin_timeout_sec
+    status: active
+    source: design/gdd/first-person-controller.md
+    referenced_by:
+      - design/gdd/first-person-controller.md
+    value: 4.0
+    unit: seconds
+    notes: "= player_pin_timeout_sec. Rule C11 only requires it be NO LONGER than the teammate value,
+      so equality is legal; merging removes a knob. The design intent it was going to carry ('shoving
+      past a customer needs no apology, and that is the comedy') is delivered by PRESENTATION, not by a
+      different threshold. NOTE C11's asymmetry is deliberate and is a DESIGN decision before it is a
+      technical one: customers hard-block players, players write zero displacement to NPCs, because NPC
+      density IS the wave curve -- if customers could be shoved aside, peak crowding would be erased by
+      a routine action and the difficulty produced by pillar 1 would be cashed out for free using the
+      mechanic of pillar 3."
+    added: 2026-09-22
+    revised: ""
+
+  - name: player_speed_ramp_sec
+    status: active
+    source: design/gdd/first-person-controller.md
+    referenced_by:
+      - design/gdd/first-person-controller.md
+    value: 0.08
+    unit: seconds
+    notes: "NEEDS PLAYTEST. Acceleration and deceleration share ONE time constant: the only quantity
+      coupled to geometry is stopping distance, and one complaint does not need two knobs. The upper
+      bound r_c / (2v) = 0.107s IS derived. HONEST FLAG: the sub-rule 'stopping_distance <= r_c / 4'
+      contains a quarter that was CHOSEN, not derived -- all that is derivable is 'must be much smaller
+      than r_c'. This is the one number the proposing specialist declined to defend."
+    added: 2026-09-22
+    revised: ""
+
+  - name: warning_lead_sec
+    status: active
+    source: design/gdd/first-person-controller.md
+    referenced_by:
+      - design/gdd/first-person-controller.md
+    value: 0.5
+    unit: seconds
+    notes: "NEEDS PLAYTEST. Serves criterion 5 (foreseeability), which was DOWNGRADED from MUST to
+      SHOULD on 2026-09-22. Two reasons it was downgraded: (a) it had been delivered to netcode AC23,
+      but AC23 measures per-frame SMOOTHNESS, which is orthogonal to LEAD TIME -- 'badly lagged but
+      perfectly smooth' scores green, and that is precisely the cell this game occupies; (b) it
+      competes with criterion 1 for the same resource (the player's gaze), and criterion 1's cost is
+      bounded (one head-turn, after the fact) while criterion 5's is unbounded (continuous monitoring,
+      before the fact) -- levying it on the visual channel taxes attention in direct opposition to
+      pillar 1's peak.
+      DELIVERY IS A PREDICATE, NOT A RADIUS: ShouldWarn = (closing_speed > 0) AND (time_to_contact <=
+      warning_lead_sec). The radius form was rejected for two reasons: it omits the +2*r_c term
+      (contact happens at centre distance 2*r_c, not 0) and at this game's scale it degenerates to
+      always-on (lead 1.0s gives 3.4m in a store whose diagonal is ~10m). The predicate form is five
+      pure-C# EditMode tests touching neither PhysX nor NGO."
+    added: 2026-09-22
+    revised: ""
+
   - name: total_semantic_slots
     status: active
     source: design/gdd/game-session-state.md

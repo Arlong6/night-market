@@ -1,0 +1,2 @@
+- [Review stance](feedback_review_stance.md) — GDD reviews are adversarial: find problems, verify every citation, no padding
+- [UX scope ruling](project_ux_scope_ruling.md) — a non-UI GDD owes the UI layer constraints on pixels, not pixels; checklist for judging deferrals

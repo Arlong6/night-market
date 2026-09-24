@@ -1,6 +1,6 @@
 # Active Session State
 
-> Last Updated: 2026-09-20
+> Last Updated: 2026-09-24
 > Purpose: Living checkpoint. Read this first after compaction or new session.
 
 **目前唯一在推進的專案＝大夜班 (Night Shift)。** Road Rage 與其他遊戲皆為已完成／暫停
@@ -22,18 +22,49 @@
 | 引擎決策與環境 | ✅ 完成 — Unity 6.3 LTS（arlong 指定），參考文件已建 |
 | 美術聖經 | ✅ 第 1-4、8 節 — `design/art/art-bible-night-shift.md`（5/6/7/9 刻意延到原型後） |
 | 系統索引 | ✅ 19 系統盤點，MVP 14 項 — `design/gdd/systems-index.md` |
-| **GDD** | **19 份完成 2 份** — `netcode-session.md`（#1、#2，經 r1-r4 四輪評審）＋ `product-database.md`（#6，2026-09-19 首版；2026-09-20 首審 NEEDS REVISION → 同日修訂完畢，待複審） |
+| **GDD** | **19 份完成 2 份，第 3 份進行中** — `netcode-session.md`（#1、#2，r1-r4）＋ `product-database.md`（#6，**r3 複審完成 2026-09-21，裁定為最後一輪散文評審**）＋ `first-person-controller.md`（#3，**2026-09-24 完成，待獨立複審**） |
+| **原型（非 W1）** | `prototypes/product-database-core/` — 純 C# 核心，**50 PASS / 0 FAIL**，r3 終審 Design Test 撞 3/5，AC15a 已成活絆線（三次汙染測試皆亮紅） |
 | W1 原型 | 第 0-4 批；20 條假設**結案 9 條** |
 | **正式程式碼** | **0 行。大夜班沒有 Unity 專案。** |
 
 ⚠ 目前所有 Unity 程式碼都在 `prototypes/w1-netcode/`，依 `.claude/rules/prototype-code.md`
 那是**拋棄式的**——結論若支持進生產，程式碼**重寫而非搬移**，且生產程式碼不得引用該目錄。
 
-## 系統 #3-#19 全部 Not Started
+## 目前任務（2026-09-24）
 
-GDD 一份都沒有：第一人稱控制器、攜帶與交付、機台互動組、商品資料庫、客人系統、
-波次導演、遊戲時鐘、窗外天色、HUD、大廳 UI、結算畫面、音效、評分邏輯、進度解鎖、
-教學、設定無障礙、單人練習。
+**Task**: #3 第一人稱控制器 GDD — ✅ **完成**
+**File**: `design/gdd/first-person-controller.md`（1390 行，11 節，**零 placeholder**）
+**Status**: **Designed，待獨立複審**（`/design-review` 必須另開 session）
+
+**射程**：移動 ＋ 視角 ＋ 碰撞。不含互動（#5）與攜帶（#4）。
+
+🔴 **硬交付已兌現**：`player_move_speed_max = 1.39 m/s`
+→ netcode 的 `blocked-by: 第一人稱控制器 GDD` 已解除（`netcode-session.md:1256/1433/1538` 已改）。
+⚠ **但擋路石是換人不是消失**：U1 指出 **AC23 的 `≤ v × dt` 在構造上餘裕為零**
+（遠端內插在 owner 全速時恰好等於它），會在正確的實作上隨機紅燈。
+**AC15 是同一個形式而原本沒被標**，現已與 AC23 一起改標 `blocked-by: remote_step_tolerance`（暫定 1.5，歸屬 netcode）。
+
+**registry `formulas` 4 → 7 筆**：`player_frame_budget`、`depenetration_delta`、`should_warn`
+（2026-09-24 `/consistency-check` 補登；三條都是跨系統事實，#4／#5 消費前兩者產生的位置）。
+
+**八個 registry 常數已登記**（含四個「不是旋鈕」的架構推導值）。
+**AC 節 43 條，今天可執行 24 條（56%）全在純 C#**——但前提是移動求解器為純 C#（OQ-F11）。
+
+### 本輪關閉／裁決的事
+- OQ-P13（遊戲內語音）**已關閉**：MVP 不做語音，非語音 ping 欠 #11
+- Player Fantasy 採 A＋B 合寫；六條「擁擠」判準全收，判準 3／5／6 依專家意見改寫
+- G12（碰撞權威）裁決：**本機渲染位置解算、雙向自我解除穿透、零訊息**
+- 跳躍／衝刺／蹲下**全部不做**；移動**刻意沒有狀態機**
+
+### 待決（三條給 CD、三條給 TD，已登記索引）
+- 🔴 **itch.io iframe pointer lock**（TD）——風險最高、成本最低，約 1 小時
+- 🔴 **移動求解器是否純 C#**（TD／ADR）——**值 24 條 AC**
+- 🔴 **視野角在 MVP 無擁有者**（CD）＋ #18 的 Alpha 時序矛盾
+
+## 系統 #4-#19 仍 Not Started
+
+GDD 一份都沒有：攜帶與交付、機台互動組、客人系統、波次導演、遊戲時鐘、窗外天色、
+HUD、大廳 UI、結算畫面、音效、評分邏輯、進度解鎖、教學、設定無障礙、單人練習。
 
 **這個分布是刻意的**：系統索引把「網路同步層」標為 high-risk 並註明「GDD 後直衝原型」，
 理由是新引擎 ＋ WebGL 多人**沒有官方端到端範例**，這條不通則後面十八個系統全部白做。

@@ -1253,7 +1253,7 @@ game-designer／`/ux-design`；客製 Web Template 視覺→`/ux-design`；Web �
 | heartbeat_timeout_sec = 8 | Y | Y | AC27, AC6b |
 | background_disconnect_threshold_sec = 5 | Y | Y | AC15, AC16, AC29 |
 | network_tick_rate = 10Hz | Y | Y（registry 已登錄） `[P-3]` | **AC46（r4 新增）**——原標 AC23 為假引用：AC23 測插值平滑度，與 tick rate 無關 |
-| interpolation_buffer_ms = 150 | Y | Y | AC23（**條件引用**：150ms 在 GIVEN，判準是移動速度上限；AC23 `blocked-by` 第一人稱控制器 GDD） |
+| interpolation_buffer_ms = 150 | Y | Y | AC23（**條件引用**：150ms 在 GIVEN，判準是移動速度上限＝`player_move_speed_max`＝**1.39 m/s**，2026-09-24 由第一人稱控制器 GDD F1 定案；AC23 的 `blocked-by` 已由「該 GDD 未撰寫」換為「`remote_step_tolerance` 未定義」——見 AC23 列） |
 | npc_event_min_interval_sec = 0.2 | Y | Y（registry 已登錄） | AC25 |
 | npc_milestone_catchup_sec = 0.2 | Y | Y（registry 已登錄） | AC15, AC24 |
 | catchup_duration_sec = 2 | Y | Y（registry 已登錄） | AC15, AC29 |
@@ -1415,7 +1415,7 @@ Relay 中繼的純網路成本 ≥400ms，AC22 的 300ms 在數學上不可能�
 | 13b | GIVEN 房內僅剩 Host 在線，WHEN Host 亦離線（關頁／背景 >5s／心跳逾時），THEN **玩家可見的局終** ≤`session_end_worstcase_sec`（12s）內完成：所有仍在線的 client 回主選單並顯示「店長把鐵門拉下來了」 | MVP |
 | 13c | GIVEN 同 13b，WHEN Host 已消失，THEN **服務端的 Relay 連線於 ≤10s 內回收**（✅ `[P-9]` 已回填 2026-09-13：Relay 對每個 client 連線的 TTL 為 10s，Host 停止送 PING 後即計時）。**r4 修正**：原 13b 要求「≤10s 釋放 Relay」，但 `[P-9]` 自己假設 Relay idle timeout ≥30s，且 Host 已消失時**沒有任何 actor 能執行釋放**——兩個數字方向相反且無可執行路徑。這是 MVP 無 host migration 的**設計限制，不是 bug**，AC 須誠實反映 | MVP `[P-9]` |
 | 14 | GIVEN 兩玩家正在交接物品，WHEN 交接完成前（Host 尚未提交 transfer）一方斷線，THEN 物品歸屬留在原持有人並依 #10 掉落；WHEN 交接完成後新持有人斷線，THEN 依新持有人最後位置掉落。兩情境皆不消失也不複製 | MVP |
-| 15 | GIVEN **受測 client 自身**分頁背景 3s（<5s 閾值），WHEN 回到前景，THEN 走顯示層 catch-up：**時鐘顯示**於 `catchup_duration_sec`（2s）內追平（倍速 2.5×）且模擬（NPC 數量、波次進度）與背景前連續、無補跑；**其他玩家角色**單幀位移 ≤ 移動速度上限×dt；**NPC** 依 `npc_milestone_catchup_sec`（**0.2s**，r4 修正）補位規則單幀位移 ≤1m | MVP |
+| 15 | GIVEN **受測 client 自身**分頁背景 3s（<5s 閾值），WHEN 回到前景，THEN 走顯示層 catch-up：**時鐘顯示**於 `catchup_duration_sec`（2s）內追平（倍速 2.5×）且模擬（NPC 數量、波次進度）與背景前連續、無補跑；**其他玩家角色**單幀位移 ≤ `player_move_speed_max × dt × remote_step_tolerance`（🔴 **與 AC23 同一個餘裕為零的形式**，見 AC23 列；本條的處境更差——背景恢復本身就保證 dt 抖動。同列 `blocked-by: remote_step_tolerance`）；**NPC** 依 `npc_milestone_catchup_sec`（**0.2s**，r4 修正）補位規則單幀位移 ≤1m | MVP |
 | 16 | GIVEN **受測 client 自身**分頁背景 8s（>5s 閾值），WHEN 回到前景，THEN 該 client 依 **#17a** 主動 teardown（Host 於 ≤`relay_disconnect_propagation_sec`（2s）內收到 disconnect），並顯示「這班你先下班了——點連結再回來上工」（非 catch-up）。**r4 修正**：原寫「Host ≤1s」比 `[P-8]` 自承的傳播 ≤2s 還嚴，且未標 [P]——Relay 架構下 client 與 Host 之間沒有直接 socket | MVP `[P-8]` `[P-15]` |
 | 17 | GIVEN 斷線 29s（窗口內），WHEN 重連，THEN 恢復原 slot：位置、朝向、名牌一致（手持物品除外——已掉落） | Post `[P-2]` |
 | 18 | GIVEN 斷線 31s（逾窗口），WHEN 嘗試重連，THEN slot 已釋放，以新玩家流程加入。邊界歸屬：`t ≤ W` 視為窗口內 | Post `[P-2]` |
@@ -1430,7 +1430,7 @@ Relay 中繼的純網路成本 ≥400ms，AC22 的 300ms 在數學上不可能�
 | 22 | GIVEN **節流只套用於受測 client 單側**（Host 走標準網路；雙側節流下純網路成本 ≥400ms，數學上不可能達標），**且房內所有人與 Host 同大區**（依 #28，relay 貼著 Host），WHEN 玩家對機台送出 claim，THEN 按下→收到成功/撲空結果的往返 P95 ≤`interact_rtt_p95_ms`（300ms，20 次取樣）；超過即顯示等待狀態，不卡死無回饋。✅ **`[P-3]` 已回填（2026-09-13）：本條可達成，先前的「不可達」判斷解除。** RPC 不受 network tick 影響（每幀 `PostLateUpdate` 送出），預算約 235-250ms，餘裕 50-65ms。**但 GIVEN 須追加硬前提：互動請求與結果一律走 RPC，不得以 NetworkVariable 承載**——後者受 tick 批次，10Hz 下單邊 +100ms 即超標。🟢 **W1 第 4 批已實測（2026-09-15）**：雙進程經 Relay WSS、20 樣本，tick 10Hz 與 1Hz 的往返**完全一致**（p95 335.8 vs 333.0ms）→ 不受 tick 閘門控制的推論成立。<br>🔴 **但 GIVEN 必須再追加一條，否則本條在預設設定下必定失敗**：**Relay region 須顯式指定為玩家所在大區**。同一組量測中，預設 region 的 p95 = **335.8ms（已超標）**，指定 `asia-northeast1` 後為 **94.5ms**，餘裕從負值變成約 205ms。區別純粹來自 region，與 tick、與遊戲邏輯無關（見約束⑮、OQ#20）。<br>⚠ 上述為**裸傳輸往返**，尚未含 server 端 frame rate、節流、與遊戲處理時間；餘裕的最大未知數仍是 WebSocket 丟包下的 P95 尾端 🟢 **同區已實測達標**：`asia-northeast1` 下裸傳輸往返 p95 = 94.5ms，餘裕約 205ms 供 server frame rate、節流與遊戲處理使用。 | MVP |
 | 22a | GIVEN 房內存在**與 Host 不同大區**的玩家（arlong 2026-09-15 裁決「讓國外的人也可以參與」後新增），WHEN 該玩家送出 claim，THEN (1) 互動**仍必須得出正確且最終一致的結果**，不得因逾時而卡死或落入錯誤狀態；(2) 按下後 ≤`ui_feedback_sec` 內必須出現**本地的「處理中」回饋**，不得靜默等待網路；(3) **不得給出會被推翻的樂觀結果**——`claim` 的成功／撲空只能由 Host 宣告（此為 #2 權威模型的直接後果，跨區只是讓它更容易被看見）。<br>**本條不設 300ms 上限，因為那是光速問題不是實作問題**：依約束⑮ 的模型，歐洲玩家在台灣 Host 房中的裸往返落在 **217–306ms**，再加 server frame rate 與遊戲處理必定超過 `interact_rtt_p95_ms`。把跨區也綁 300ms 等於寫一條**注定失敗且無法靠實作補救**的 AC。<br>改以**降級契約**承接：慢，但正確、有回饋、不卡死。<br>⚠ 量測邊界：217–306ms 是由兩組實測值夾擠推得，**非直接量測**（本地兩個進程都在台灣，量不到歐洲↔東京）。真實跨洲數字須待有海外測試者時補量，列入 W1 結案後的待辦。 | MVP |
 | 22b | GIVEN Host 建立房間，WHEN 建立 Relay allocation 前，THEN 依 `relay_region_by_timezone` 查得 region 並顯式傳入（查不到則用 `relay_region_offset_fallback`），**且建房介面提供覆寫**；WHEN 玩家覆寫，THEN 以覆寫值建立。<br>驗證方式：以偽造時區（`.jslib` 可注入）逐一覆蓋表中每個 region 值，斷言傳入 `RelayNetworkOptions` 的 region 與查表結果一致；另斷言未知時區會落到 offset fallback 而非拋例外或留空。<br>**留空即為缺陷**：留空會落到預設 region，實測 p95 335.8ms，直接違反 AC22。 | MVP |
-| 23 | GIVEN **節流只套用於受測 client 單側**，WHEN 觀察其他 client 的角色 60s，THEN 插值（緩衝 `interpolation_buffer_ms`＝150ms）後單幀位移超過**第一人稱控制器 GDD 所定義之移動速度上限**的次數＝0。**⚠ 該常數目前不存在**（第一人稱控制器 GDD 未撰寫）——本條在該 GDD 定案前**無法執行**，列為 `blocked-by: 第一人稱控制器 GDD` | MVP |
+| 23 | GIVEN **節流只套用於受測 client 單側**，WHEN 觀察其他 client 的角色 60s，THEN 插值（緩衝 `interpolation_buffer_ms`＝150ms）後單幀位移超過 `player_move_speed_max × dt × remote_step_tolerance` 的次數＝0，**並記錄該比值的 p99 分佈**。✅ **`player_move_speed_max` 已定案＝1.39 m/s**（2026-09-24，第一人稱控制器 GDD F1／registry）——舊的 `blocked-by: 第一人稱控制器 GDD` 解除。🔴 **但新擋路石：`remote_step_tolerance` 尚未定義**（暫定 1.5），歸屬本 GDD。理由（第一人稱控制器 GDD U1）：**遠端內插的每幀位移在 owner 全速時恰好等於 `v × dt`**（一個 tick 的位移攤在 `interpolation_buffer_ms` 的渲染時間上），所以原本的 `≤ v × dt` **在構造上餘裕為零**——任何 dt 抖動、HOL 後 burst、兩端幀率不對等都會超線，**本條會在正確的實作上隨機紅燈**。列為 `blocked-by: remote_step_tolerance`（OQ-F7） | MVP |
 | 24 | GIVEN NPC 以里程碑事件同步，WHEN 任一里程碑觸發，THEN 全 client（含中途加入者）於 `state_convergence_sec`（1s）內顯示相同 NPC 狀態；Host 凍結後恢復時只套用最新一筆並於 `npc_milestone_catchup_sec`（**0.2s**，r4 修正）內補位，不瞬跳。**r4 修正理由**：原值 0.3s > `npc_event_min_interval_sec`（0.2s），補位永遠被下一筆 milestone 打斷，兩常數互斥（約束⑨） | MVP `[P-12]` |
 | 25 | GIVEN 同一 NPC 連續狀態變化，WHEN 事件送出，THEN 同一 NPC 兩事件間隔 ≥0.2s（log 驗證） | MVP |
 | 26 | GIVEN 以腳本刻意延後送出先發 RPC 製造亂序，WHEN client 收到**同一物件** sequence 落後的封包，THEN 封包被丟棄不覆蓋狀態（丟棄計數 log >0）；不同物件的序號互不比較 | MVP `[P-5]` |
@@ -1535,7 +1535,11 @@ Relay 中繼的純網路成本 ≥400ms，AC22 的 300ms 在數學上不可能�
   **AC43b 需能分別針對 Relay 端點與 MPS 端點設定規則**（分辨兩條獨立連線）
 - **AC53 是 B1（MPS 名額釋放）的唯一直接驗收**，且 **AC36、AC33 的可執行性依賴它**
   ——標記 `blocked-by: AC53`，AC53 未通過前這兩條不進 /qa-plan 執行清單
-- **AC23 標記 `blocked-by: 第一人稱控制器 GDD`**（其判準「角色移動速度上限」尚不存在）
+- ~~**AC23 標記 `blocked-by: 第一人稱控制器 GDD`**（其判準「角色移動速度上限」尚不存在）~~
+  ✅ **2026-09-24 解除**：`player_move_speed_max` ＝ 1.39 m/s 已由第一人稱控制器 GDD F1 定案並進 registry。
+- 🔴 **改為 AC15、AC23 兩條同標 `blocked-by: remote_step_tolerance`**（暫定 1.5，定義與歸屬 ＝ 本 GDD，
+  對應第一人稱控制器 GDD 的 OQ-F7）。**擋路石換了，不是消失了**——原本的 `≤ v × dt` 餘裕為零，
+  會在正確的實作上隨機紅燈；刪掉 `blocked-by` 而不定義容差，等於把一條假紅燈放進 MVP 執行清單。
 
 ## Provisional Assumptions（未驗證的引擎/平台行為）
 
