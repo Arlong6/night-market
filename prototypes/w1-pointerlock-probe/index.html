@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OQ-F1 / OQ-F2 Pointer Lock Probe</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: #12192C; color: #E9EEEC;
+    font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    display: flex; flex-direction: column;
+  }
+  #stage {
+    flex: 1 1 auto; min-height: 180px;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center; padding: 16px;
+    background: #1b2440; cursor: pointer; user-select: none;
+    border-bottom: 2px solid #2d3a5e;
+  }
+  /* 整個 stage 就是點擊目標 —— 解鎖後游標位置各瀏覽器行為不明，
+     可控的只有面積，所以直接用最大面積（ux-designer R2 的建議）。 */
+  #stage.locked { background: #14331f; }
+  #stage.failed { background: #3a1620; }
+  #stage h1 { font-size: 20px; margin: 0 0 8px; }
+  #stage p  { margin: 4px 0; opacity: .85; }
+  #out { flex: 0 0 auto; max-height: 55%; overflow: auto; padding: 12px 16px; }
+  .row { display: flex; gap: 8px; padding: 2px 0; border-bottom: 1px solid #222c4a; }
+  .k { flex: 0 0 200px; opacity: .65; }
+  .v { flex: 1 1 auto; word-break: break-all; }
+  .pass { color: #7CE38B; } .fail { color: #FF8FA3; } .warn { color: #FFD479; }
+  h2 { font-size: 13px; margin: 14px 0 6px; opacity: .6; text-transform: uppercase; letter-spacing: .08em; }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div>
+    <h1 id="headline">點一下這裡</h1>
+    <p id="sub">要求指標鎖定 (requestPointerLock)</p>
+    <p id="hint" style="opacity:.5">鎖定後移動滑鼠以取樣 movementX/Y，按 Esc 解除</p>
+  </div>
+</div>
+
+<div id="out">
+  <h2>OQ-F1 — 指標鎖定</h2>
+  <div id="lockResults"></div>
+  <h2>OQ-F2 — 滑鼠位移單位</h2>
+  <div id="moveResults"></div>
+  <h2>環境</h2>
+  <div id="envResults"></div>
+</div>
+
+<script>
+"use strict";
+
+// 早期信標：在任何可能拋錯的程式碼之前先送一次，用來區分
+// 「腳本沒跑」與「腳本跑了但中途拋錯」。
+// slot 只給本機 harness 區分左右兩格用。opaque origin 下 iframe 的 WindowProxy 身分
+// 在導覽後會改變，所以父層不能靠 e.source 比對——由子層自報最可靠。
+// （itch.io 上 query string 會被換成它自己的 ?v=，W1 已實測過；那裡用不到 slot，無妨。）
+const SLOT = new URLSearchParams(location.search).get("slot") || "?";
+try { parent.postMessage({ probe: "oq-f1", phase: "boot", slot: SLOT }, "*"); } catch (e) {}
+addEventListener("error", (ev) => {
+  try {
+    parent.postMessage({ probe: "oq-f1", slot: SLOT, phase: "error",
+      message: ev.message, source: ev.filename, line: ev.lineno, col: ev.colno }, "*");
+  } catch (e) {}
+});
+
+const stage = document.getElementById("stage");
+const headline = document.getElementById("headline");
+const sub = document.getElementById("sub");
+
+// 把目前所有結果列打包回報給父視窗。
+// 存在理由：opaque-origin 的 sandbox iframe 是跨域的，父層讀不到 contentDocument，
+// 而 OOPIF 的內容在截圖裡也不保證被合成到。postMessage 是唯一可靠的取值管道。
+// 在 itch.io 上父層不會有監聽者，這些訊息會被安靜丟棄——無副作用。
+function snapshot() {
+  const grab = (id) => [...document.getElementById(id).children].map(r => ({
+    k: r.querySelector(".k").textContent,
+    v: r.querySelector(".v").textContent,
+    cls: r.querySelector(".v").className.replace("v", "").trim()
+  }));
+  return { probe: "oq-f1", slot: SLOT, t: Date.now(),
+           lock: grab("lockResults"), move: grab("moveResults"), env: grab("envResults") };
+}
+function report() {
+  try { parent.postMessage(snapshot(), "*"); } catch (e) { /* 無父層或被擋，忽略 */ }
+}
+
+function put(container, key, value, cls) {
+  const row = document.createElement("div");
+  row.className = "row";
+  const k = document.createElement("div"); k.className = "k"; k.textContent = key;
+  const v = document.createElement("div"); v.className = "v " + (cls || ""); v.textContent = String(value);
+  row.append(k, v);
+  document.getElementById(container).append(row);
+  return v;
+}
+let reportTimer = null;
+function set(el, value, cls) {
+  el.textContent = String(value);
+  if (cls) el.className = "v " + cls;
+  // 節流回報：mousemove 每秒可達數百次，不需要每次都送。
+  if (reportTimer === null) reportTimer = setTimeout(() => { reportTimer = null; report(); }, 100);
+}
+
+// ─── 環境 ────────────────────────────────────────────────────────────
+// 這一節全部是「觀察得到什麼」，不是「推論什麼」。
+const inIframe = window.self !== window.top;
+put("envResults", "在 iframe 內", inIframe ? "是" : "否（直接開啟）", inIframe ? "warn" : "");
+put("envResults", "location.href", location.href);
+put("envResults", "document.referrer", document.referrer || "(空)");
+put("envResults", "origin", location.origin);
+put("envResults", "devicePixelRatio", window.devicePixelRatio);
+put("envResults", "螢幕 / 視窗", `${screen.width}x${screen.height} / ${innerWidth}x${innerHeight}`);
+put("envResults", "userAgent", navigator.userAgent);
+
+// 跨域時讀不到父層的 iframe 屬性，只能記錄嘗試結果本身。
+let frameAttrs = "跨域，讀不到";
+try {
+  if (window.frameElement) {
+    frameAttrs = `sandbox="${window.frameElement.getAttribute("sandbox") ?? ""}" allow="${window.frameElement.getAttribute("allow") ?? ""}"`;
+  } else if (!inIframe) {
+    frameAttrs = "不在 iframe 內";
+  }
+} catch (e) {
+  frameAttrs = "跨域，讀不到（存取 frameElement 拋例外：" + e.name + "）";
+}
+put("envResults", "父層 iframe 屬性", frameAttrs, inIframe ? "warn" : "");
+
+// Permissions Policy：pointer-lock 未必是註冊過的 feature，
+// 所以這裡只「列出瀏覽器自己承認的清單」，不對它下結論。
+const fp = document.featurePolicy || document.permissionsPolicy;
+if (fp && typeof fp.allowedFeatures === "function") {
+  const feats = fp.allowedFeatures();
+  put("envResults", "allowedFeatures 數量", feats.length);
+  const hasPL = feats.includes("pointer-lock");
+  put("envResults", "清單含 pointer-lock", hasPL ? "是" : "否", hasPL ? "pass" : "warn");
+  put("envResults", "allowedFeatures 全文", feats.join(", "));
+} else {
+  put("envResults", "featurePolicy API", "此瀏覽器不提供（無法查詢）", "warn");
+}
+
+// ─── OQ-F1：指標鎖定 ─────────────────────────────────────────────────
+const rLockSupported = put("lockResults", "API 是否存在",
+  typeof Element.prototype.requestPointerLock === "function" ? "是" : "否",
+  typeof Element.prototype.requestPointerLock === "function" ? "pass" : "fail");
+const rAttempts   = put("lockResults", "嘗試次數", 0);
+const rVerdict    = put("lockResults", "🔴 結果", "尚未嘗試 — 請點擊上方區域", "warn");
+const rErrText    = put("lockResults", "錯誤細節", "—");
+const rRelock     = put("lockResults", "Esc 後能否重鎖", "尚未測試（先鎖定一次，按 Esc，再點一次）", "warn");
+const rPromise    = put("lockResults", "requestPointerLock 回傳", "—");
+
+let attempts = 0;
+let everLocked = false;
+let escSeen = false;
+
+stage.addEventListener("click", () => {
+  attempts++;
+  set(rAttempts, attempts);
+  let ret;
+  try {
+    // 新版瀏覽器回傳 Promise；舊版回傳 undefined。兩種都要處理。
+    ret = stage.requestPointerLock({ unadjustedMovement: true });
+  } catch (e) {
+    // unadjustedMovement 不被支援時，退回無參數呼叫。
+    try { ret = stage.requestPointerLock(); }
+    catch (e2) { set(rVerdict, "❌ 呼叫直接拋例外：" + e2.name + " — " + e2.message, "fail"); return; }
+  }
+  if (ret && typeof ret.then === "function") {
+    set(rPromise, "Promise");
+    ret.then(() => set(rPromise, "Promise → resolved", "pass"))
+       .catch(err => {
+         set(rPromise, "Promise → rejected", "fail");
+         set(rVerdict, "❌ 指標鎖定被拒絕", "fail");
+         set(rErrText, (err && (err.name + ": " + err.message)) || String(err), "fail");
+         stage.className = "failed";
+         headline.textContent = "❌ 被拒絕";
+         sub.textContent = (err && err.message) || "requestPointerLock rejected";
+       });
+  } else {
+    set(rPromise, "undefined（舊版 API 形狀）");
+  }
+});
+
+document.addEventListener("pointerlockchange", () => {
+  const locked = document.pointerLockElement === stage;
+  if (locked) {
+    everLocked = true;
+    stage.className = "locked";
+    headline.textContent = "✅ 已鎖定";
+    sub.textContent = "移動滑鼠取樣；按 Esc 解除";
+    set(rVerdict, "✅ 指標鎖定成功取得" + (inIframe ? "（在 iframe 內）" : "（非 iframe）"), "pass");
+    set(rErrText, "—");
+  } else {
+    stage.className = "";
+    if (everLocked) {
+      escSeen = true;
+      headline.textContent = "已解除 — 再點一次測試重鎖";
+      sub.textContent = "C15 主張：使用者手勢解除後，必須要有一次玩家主動點擊才能重鎖";
+      if (attempts >= 2) {
+        set(rRelock, "✅ 解除後再次點擊可重新取得鎖定", "pass");
+      } else {
+        set(rRelock, "等待第二次點擊…", "warn");
+      }
+    }
+  }
+});
+
+document.addEventListener("pointerlockerror", (e) => {
+  stage.className = "failed";
+  headline.textContent = "❌ pointerlockerror";
+  sub.textContent = "瀏覽器拒絕了鎖定請求";
+  set(rVerdict, "❌ 觸發 pointerlockerror 事件", "fail");
+  set(rErrText, "事件已觸發（規範不帶原因；多半為 sandbox 缺 allow-pointer-lock，或 UA 抑制反覆重鎖）", "fail");
+});
+
+// ─── OQ-F2：滑鼠位移單位 ─────────────────────────────────────────────
+// 本專案對「Web 上滑鼠位移的單位」零筆記載，不以訓練資料填。這裡量它。
+const rSamples = put("moveResults", "取樣數", 0);
+const rLast    = put("moveResults", "最後一次 movementX/Y", "—");
+const rMax     = put("moveResults", "|movement| 最大值", "—");
+const rMean    = put("moveResults", "|movement| 平均（非零）", "—");
+const rSum     = put("moveResults", "累計 |ΔX| / |ΔY|", "—");
+const rRatio   = put("moveResults", "movement 對 screenX 的比值", "— （需實際移動後才有意義）");
+
+let n = 0, sumAbs = 0, maxAbs = 0, sumX = 0, sumY = 0;
+let lastScreenX = null, screenDelta = 0, movementDelta = 0;
+
+document.addEventListener("mousemove", (e) => {
+  if (document.pointerLockElement !== stage) return;
+  const mx = e.movementX || 0, my = e.movementY || 0;
+  n++;
+  sumX += Math.abs(mx); sumY += Math.abs(my);
+  const mag = Math.hypot(mx, my);
+  if (mag > 0) { sumAbs += mag; maxAbs = Math.max(maxAbs, mag); }
+
+  // 鎖定期間 screenX 通常凍結，這個比值可以驗證「movement 是否為唯一訊號來源」。
+  if (lastScreenX !== null) {
+    screenDelta += Math.abs(e.screenX - lastScreenX);
+    movementDelta += Math.abs(mx);
+  }
+  lastScreenX = e.screenX;
+
+  set(rSamples, n);
+  set(rLast, `${mx}, ${my}   (screenX=${e.screenX}, clientX=${e.clientX})`);
+  set(rMax, maxAbs.toFixed(2));
+  set(rMean, (sumAbs / Math.max(1, n)).toFixed(3));
+  set(rSum, `${sumX.toFixed(1)} / ${sumY.toFixed(1)}`);
+  set(rRatio, screenDelta === 0
+    ? `screenX 完全凍結（累計 movement=${movementDelta.toFixed(1)}）→ movement 是唯一訊號`
+    : `screen 累計 ${screenDelta.toFixed(1)} vs movement 累計 ${movementDelta.toFixed(1)}`,
+    screenDelta === 0 ? "pass" : "warn");
+});
+
+// 載入完成時先送一次，讓父層（本機 harness）即使在使用者還沒點擊前也有環境資料。
+report();
+</script>
+</body>
+</html>

@@ -511,9 +511,24 @@ constants:
     referenced_by:
       - design/gdd/first-person-controller.md
       - design/gdd/netcode-session.md   # AC4 / AC15 / AC23 use this as their SOLE criterion
-    value: 1.39
+    value: 1.47
     unit: metres_per_second
-    notes: "PROVISIONAL (2026-09-22). THE hard deliverable of #3: netcode AC4/AC15/AC23 were
+    notes: "REVISED 2026-09-26 (design-review, 10 specialists): 1.39 -> 1.47. The old value rested on
+      depenetration_margin = 0.79, a CHOSEN number that VIOLATED this document's own stated threshold of
+      0.75 by 4.7%. The fix was not a tolerance: the missing input was the CAMERA NEAR CLIP, never
+      declared anywhere. With it the margin becomes DERIVED, not chosen:
+      depenetration_margin <= 1 - camera_near_clip_m / (2*r_c) = 1 - 0.10/0.60 = 0.8333.
+      Hence v <= 0.8333 * 0.60 / 0.339 = 1.47493 -> 1.47, and v*L = 0.49833 <= 0.50000 (0.33% headroom).
+      CROSS-CHECK: substituting near = 0.15 reproduces the document's old 0.75 EXACTLY -- so 0.75 was
+      never a wrong number, it was a number with a HIDDEN INPUT.
+      DANGER THIS NOW GUARDS: an implementer who never touches the camera inspector gets Unity URP's
+      DEFAULT near clip of 0.30, whose safe speed is 0.88 m/s -- the constant would be 67% over, and the
+      symptom (a teammate's ghost clipping through the camera) gets blamed on the network. AC5 clause (j)
+      makes this a compile-time-adjacent assertion instead of a playtest mystery.
+      UPSTREAM UNAFFECTED: netcode AC4/AC15/AC23 require the constant to EXIST and be NAMED, not to hold a
+      particular value; this revision re-blocks nothing.
+      --- original 2026-09-22 note follows ---
+      PROVISIONAL (2026-09-22). THE hard deliverable of #3: netcode AC4/AC15/AC23 were
       literally blocked on this constant's existence -- netcode-session.md:1433 says 'that constant
       does not currently exist ... this criterion cannot be executed' and :1538 tags it
       blocked-by: first-person-controller GDD. Defining it unblocks all three.
@@ -630,9 +645,27 @@ constants:
     source: design/gdd/first-person-controller.md
     referenced_by:
       - design/gdd/first-person-controller.md
-    value: 4.0
+    value: 1.5
     unit: seconds
-    notes: "= player_pin_timeout_sec. Rule C11 only requires it be NO LONGER than the teammate value,
+    notes: "REVISED 2026-09-26 (design-review): 4.0 -> 1.5, and PROMOTED from 'not a knob' to an
+      independent tuning knob (safe range 0.8-4.0). The old entry said '= player_pin_timeout_sec,
+      merging removes a knob', and delegated the design intent to PRESENTATION. Per-frame arithmetic
+      shows that merge was the document's real design error: teammates have TWO ends depenetrating
+      (overlap shrinks by 2*budget, 13 frames from a 0.6 m overlap) while customers have ONE (1*budget,
+      25 frames), so a customer is ~1.9x STICKIER than a teammate -- the exact opposite of the stated
+      intent, and NOT fixable via npc_depenetration_scale because the asymmetry lives in
+      n_correcting_ends, not in the coefficient (a scale > 2.0 would be clamped by the frame budget).
+      The threshold is therefore the ONLY remaining lever, and 1.5 s buys three things: (1) the intent
+      C11/F4 stated twice and delivered zero times; (2) relief for the geometry consequence that at
+      W = 0.9 m a SINGLE STATIONARY CUSTOMER makes an aisle impassable while the player has no 'squeeze
+      past' option (C11 zero-write) -- 4 s of that reads as a bug, 1.5 s reads as comedy; (3) the
+      dominant-strategy threshold drops from 5.88 m to 2.21 m, so in a store whose diagonal is ~10 m
+      detouring becomes the mainstream choice again -- and 'difficulty comes from circulation' is
+      pillar 3's literal text. Still satisfies C11 ('no longer than'): 1.5 <= 4.0, AC5g passes.
+      FLOOR: must not drop below human reaction (0.30 s) + one sidestep, or customers read as having no
+      body at all.
+      --- original note follows ---
+      = player_pin_timeout_sec. Rule C11 only requires it be NO LONGER than the teammate value,
       so equality is legal; merging removes a knob. The design intent it was going to carry ('shoving
       past a customer needs no apology, and that is the comedy') is delivered by PRESENTATION, not by a
       different threshold. NOTE C11's asymmetry is deliberate and is a DESIGN decision before it is a
@@ -679,6 +712,142 @@ constants:
       always-on (lead 1.0s gives 3.4m in a store whose diagonal is ~10m). The predicate form is five
       pure-C# EditMode tests touching neither PhysX nor NGO."
     added: 2026-09-22
+    revised: ""
+
+  # ── 第一人稱控制器 (#3) — 2026-09-26 design-review 新增 ──
+  - name: camera_near_clip_m
+    status: active
+    source: design/gdd/first-person-controller.md
+    referenced_by:
+      - design/gdd/first-person-controller.md
+    value: 0.10
+    unit: metres
+    notes: "PROVISIONAL (2026-09-26, arlong). ADDED BECAUSE IT WAS THE MISSING INPUT TO F1. The document
+      declared 'the camera (owned by this system)' while declaring NOT ONE camera value; five findings
+      across four specialist domains turned out to be this single hole. This constant ENTERS THE SPEED
+      INEQUALITY: depenetration_margin <= 1 - camera_near_clip_m / (2*r_c). At 0.10 that ceiling is
+      0.8333, giving player_move_speed_max = 1.47. THE TRAP IT CLOSES: Unity URP's DEFAULT near clip is
+      0.30, which caps the safe speed at 0.88 m/s -- an implementer who never opens the camera inspector
+      silently runs 67% over, and the symptom (remote ghost clipping into the camera) is attributed to
+      the network. Chosen over 0.15 (speed 1.32) and 0.05 (1.62): 0.10 is a conventional FPS value and
+      this game never renders the player's own body, so the perceptual cost is ~zero. It is now the
+      FIRST and cheapest rung of F1's disposition order, ahead of FOV -- FOV enters no inequality at all
+      and therefore buys feel, not speed."
+    added: 2026-09-26
+    revised: ""
+
+  - name: camera_eye_height_m
+    status: active
+    source: design/gdd/first-person-controller.md
+    referenced_by:
+      - design/gdd/first-person-controller.md
+    value: 1.60
+    unit: metres
+    notes: "ASSUMPTION (2026-09-26). Input to F6's backfill inequality for the pitch limit. The GDD's
+      Dependencies section listed this as coming from the ART BIBLE, but a grep of both art-bible.md and
+      art-bible-night-shift.md returns ZERO camera-height values -- the dependency was declared against
+      a document that does not contain it. That is why it is declared here as an owned assumption rather
+      than left as a dangling citation. F6's inequality has THREE inputs; the GDD previously
+      acknowledged only one as missing (the head-icon top edge, levied to #11)."
+    added: 2026-09-26
+    revised: ""
+
+  - name: camera_fov_deg
+    status: active
+    source: design/gdd/first-person-controller.md
+    referenced_by:
+      - design/gdd/first-person-controller.md
+    value: 70
+    unit: degrees
+    notes: "PROVISIONAL (2026-09-26). OWNED BY #3, NOT #18 -- this ruling closed OQ-F3. #18 owns the
+      player-facing SETTINGS UI, not the value; the value rides the data-driven config the coding
+      standards already mandate, so it needs no UI to be tunable. Previously the GDD flagged three times
+      that FOV was 'the first step of the speed disposition order but has no MVP owner', treating an
+      Alpha-tier system as a blocker on an MVP-tier lever. NOTE it enters NO inequality: FOV buys
+      perceived speed, not headroom, which is why the near clip now precedes it in the order."
+    added: 2026-09-26
+    revised: ""
+
+  - name: r_c
+    status: active
+    source: design/gdd/first-person-controller.md
+    referenced_by:
+      - design/gdd/first-person-controller.md
+    value: 0.30
+    unit: metres
+    notes: "ASSUMPTION -- true owner is #11 / level layout (OQ-F5). Character capsule RADIUS. REGISTERED
+      2026-09-26 because F1's OUTPUT was in this registry while none of its THREE INPUTS were, so
+      /consistency-check could not flag the derived constant when an input moves. r_c appears on BOTH
+      sides of the binding inequality (in the margin ceiling AND in 2*r_c), so shrinking it forces the
+      speed down from two directions at once. GEOMETRY CONSEQUENCE worth recording: two capsules need a
+      corridor of W >= 4*r_c = 1.20 m to pass without overlapping; the assumed W = 0.9 m forces a
+      residual 0.3 m overlap on EVERY head-on encounter -- contact is guaranteed, not narrowly avoided."
+    added: 2026-09-26
+    revised: ""
+
+  - name: L_p95
+    status: active
+    source: design/gdd/first-person-controller.md
+    referenced_by:
+      - design/gdd/first-person-controller.md
+    value: 0.339
+    unit: seconds
+    notes: "NOT MEASURED, AND THE DERIVATION IS NOT SHOWN -- this is the weakest input to the project's
+      only hard deliverable. REGISTERED 2026-09-26 so the gap is visible to /consistency-check.
+      A grep of netcode-session.md for '339' and 'L_p95' returns ZERO hits. That document's only real
+      measurement (:1238) is relay RTT p95: asia-northeast1 (Tokyo) 94.5 ms, US-central (default)
+      335.8 ms, europe-west4 437.8 ms. The GDD labelled 0.339 as 'Tokyo relay' -- but Tokyo measures
+      94.5 ms, a 3.6x discrepancy, while 0.339 sits within 0.95% of the US-central value that the
+      upstream document explicitly flags as ALREADY FAILING AC22. The charitable reconstruction is
+      cross-continental client<->client (EU player via Tokyo relay to a TW host: single trip ~153-197 ms
+      + 150 ms interpolation buffer = 303-347 ms, which does bracket 339) -- but that addition appears
+      in NEITHER document. DISPOSITION: until AC39 measures it, the label must read 'cross-continental
+      client<->client estimate including the 150 ms interpolation buffer, derivation above, unmeasured',
+      never 'Tokyo relay'. SENSITIVITY: this is the DENOMINATOR of F1; a 5-10% error moves the speed
+      ceiling enough to matter."
+    added: 2026-09-26
+    revised: ""
+
+  - name: depenetration_margin
+    status: active
+    source: design/gdd/first-person-controller.md
+    referenced_by:
+      - design/gdd/first-person-controller.md
+    value: 0.831
+    unit: dimensionless
+    notes: "DERIVED as of 2026-09-26, previously CHOSEN. Equals v*L/(2*r_c) by construction, so it is the
+      fraction of contact centre-distance that the remote ghost may compress. Ceiling:
+      1 - camera_near_clip_m/(2*r_c) = 0.8333; actual 0.49833/0.6 = 0.8306. THE BUG THIS RECORDS: the
+      old value 0.79 EXCEEDED the 0.75 threshold the same document stated one paragraph later, by 4.7%,
+      and no acceptance criterion could detect it because the threshold was prose with an unstated
+      input. AC5 clause (j) now makes it decidable. The OTHER half of the old argument still stands and
+      is worth keeping: this is a feedback loop of gain exactly 1 and delay exactly L (my yield rate
+      ceiling equals his approach rate), so the boundary is only marginally stable -- BUT that analysis
+      covers ONE-WAY approach only and does NOT cover C9's two-way mutual depenetration (see OQ-F6,
+      still unmeasured; network-programmer's delay-differential analysis suggests one-off overshoot
+      bounded by v*L ~ 0.50 m rather than sustained resonance, and C10's fuse bounds it structurally)."
+    added: 2026-09-26
+    revised: ""
+
+  - name: input_cancel_threshold
+    status: active
+    source: design/gdd/first-person-controller.md
+    referenced_by:
+      - design/gdd/first-person-controller.md
+    value: 0.5
+    unit: dimensionless
+    notes: "PROVISIONAL (2026-09-26, needs playtest). Safe range 0.3-0.8. The decidable predicate behind
+      rule C10's 'input is being continuously cancelled': IsInputCanceled := overlapping AND |raw_input| >
+      dead_zone AND |applied_input_displacement| < |desired_input_displacement| * (1 - threshold). Meaning:
+      'more than half of what you asked for was eaten'. WHY IT EXISTS: the GDD's C10 only REJECTED the
+      wrong definition ('net displacement is zero' -- which would turn every idle player into a ghost) and
+      never supplied the right one; the first T0 test run found the implementation had to invent it, which
+      makes code the owner of a design value. Timer semantics that ride on it: full separation -> reset;
+      predicate true -> += dt; still overlapping but predicate false -> HOLD (neither increment nor reset)
+      -- the hold case protects players whose finger is not steady on W, otherwise a genuinely pinned player
+      might never reach the fuse. TOO HIGH: a player pushing at an angle never trips the fuse. TOO LOW:
+      brushing past someone accumulates timer and PassThrough becomes routine."
+    added: 2026-09-26
     revised: ""
 
   - name: total_semantic_slots

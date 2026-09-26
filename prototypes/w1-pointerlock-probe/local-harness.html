@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>探針鑑別力驗證（本機用，不是要部署的東西）</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0b0f1a; color: #E9EEEC;
+         font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+  header { padding: 12px 16px; border-bottom: 1px solid #2d3a5e; }
+  header h1 { font-size: 15px; margin: 0 0 6px; }
+  header p { margin: 2px 0; opacity: .7; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #2d3a5e; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .cell { background: #0b0f1a; display: flex; flex-direction: column; min-height: 640px; }
+  .cell h2 { font-size: 13px; margin: 0; padding: 10px 14px; background: #1b2440; }
+  .cell .expect { padding: 8px 14px; background: #131a2c; opacity: .8; }
+  .ok   { color: #7CE38B; } .no { color: #FF8FA3; }
+  iframe { flex: 1 1 auto; width: 100%; border: 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>探針鑑別力驗證</h1>
+  <p>左右兩格載入<strong>同一個</strong> index.html，只差一個 sandbox token。</p>
+  <p>探針若兩格都回報成功，它就沒有鑑別力，不能拿去 itch.io 用 —— 這一頁存在的唯一理由是排除那件事。</p>
+</header>
+
+<div class="grid">
+  <div class="cell">
+    <h2>A：sandbox 含 allow-pointer-lock</h2>
+    <div class="expect">預期：<span class="ok">✅ 指標鎖定成功取得</span></div>
+    <!-- 刻意不給 allow-same-origin：產生 opaque origin，近似 itch.io 的跨域情境 -->
+    <iframe src="./index.html?slot=A" sandbox="allow-scripts allow-pointer-lock"></iframe>
+  </div>
+  <div class="cell">
+    <h2>B：sandbox 不含 allow-pointer-lock</h2>
+    <div class="expect">預期：<span class="no">❌ pointerlockerror 或 Promise rejected</span></div>
+    <iframe src="./index.html?slot=B" sandbox="allow-scripts"></iframe>
+  </div>
+</div>
+
+<div id="relay" style="padding:12px 16px;border-top:1px solid #2d3a5e">
+  <h2 style="font-size:13px;margin:0 0 6px;opacity:.6">探針經 postMessage 回報（跨域讀不到 contentDocument，OOPIF 也不保證入截圖，所以走這條）</h2>
+  <pre id="relayOut" style="margin:0;white-space:pre-wrap">尚未收到任何回報</pre>
+</div>
+
+<script>
+"use strict";
+// 以 iframe 的 contentWindow 比對來源，判定訊息是 A 格還是 B 格送來的。
+const frames = [...document.querySelectorAll(".grid iframe")];
+const labels = ["A（含 allow-pointer-lock）", "B（不含 allow-pointer-lock）"];
+const latest = [null, null];
+
+const boots = [0, 0], errors = [null, null];
+
+addEventListener("message", (e) => {
+  if (!e.data || e.data.probe !== "oq-f1") return;
+  const idx = { A: 0, B: 1 }[e.data.slot] ?? -1;
+  if (idx < 0) return;
+  // boot 信標與 error 回報沒有結果列，不能當成快照處理 ——
+  // 先前就是漏了這個判斷，render() 一取 d.lock 就拋錯，整個面板靜默死掉。
+  if (e.data.phase === "boot") { boots[idx]++; }
+  else if (e.data.phase === "error") { errors[idx] = e.data; }
+  else if (e.data.lock) { latest[idx] = e.data; }
+  render();
+});
+
+function render() {
+  const pick = (rows, key) => (rows.find(r => r.k === key) || {}).v || "—";
+  document.getElementById("relayOut").textContent = latest.map((d, i) => {
+    if (errors[i]) return `${labels[i]}：腳本拋錯 — ${errors[i].message} @${errors[i].line}:${errors[i].col}`;
+    if (!d) return `${labels[i]}：已收到 boot ${boots[i]} 次，尚無完整快照`;
+    return [
+      `${labels[i]}`,
+      `  結果      : ${pick(d.lock, "🔴 結果")}`,
+      `  嘗試次數  : ${pick(d.lock, "嘗試次數")}`,
+      `  錯誤細節  : ${pick(d.lock, "錯誤細節")}`,
+      `  Promise   : ${pick(d.lock, "requestPointerLock 回傳")}`,
+      `  重鎖      : ${pick(d.lock, "Esc 後能否重鎖")}`,
+      `  取樣數    : ${pick(d.move, "取樣數")}`,
+      `  最後 mv   : ${pick(d.move, "最後一次 movementX/Y")}`,
+      `  screen比值: ${pick(d.move, "movement 對 screenX 的比值")}`,
+      `  在iframe內: ${pick(d.env, "在 iframe 內")}`,
+      `  pointer-lock 在 allowedFeatures: ${pick(d.env, "清單含 pointer-lock")}`,
+    ].join("\n");
+  }).join("\n\n");
+}
+
+// 供自動化直接取值，不必依賴截圖。
+window.__probeResults = () => latest;
+</script>
+
+</body>
+</html>
