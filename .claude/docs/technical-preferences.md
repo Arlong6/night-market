@@ -77,16 +77,24 @@
 
 ## Forbidden Patterns
 
-- [None configured yet — add as architectural decisions are made]
+真相源是 `docs/registry/architecture.yaml` 的 `forbidden_patterns` 節；此處只列指標。
+
+- **`movement_logic_outside_core`**（ADR-0001）— 移動／碰撞決策邏輯不得住在任何引用 UnityEngine 的組件
+- **`owner_truth_in_collision`**（ADR-0001）— 碰撞解算不得讀他人的權威位置，只讀內插後 transform
+- **`charactercontroller_adds_motion`**（ADR-0001）— `stepOffset`／`slopeLimit`／`enableOverlapRecovery` 必須歸零
+- **`networktransform_setstate_on_local`**（ADR-0001）— 本機 `NetworkTransform` 永不呼叫 `SetState()`
 
 ## Allowed Libraries / Addons
 
-- [None configured yet — add as dependencies are approved; Netcode for GameObjects /
-  Relay / Lobby packages will be added here when the netcode prototype begins]
+- **`com.unity.inputsystem` 1.14–1.15**（2026-09-26，ADR-0001）：project-wide actions；第一人稱控制器的
+  Movement action map 恰為 `{Move2D, Look2D}`（AC1③）。舊版 Input Manager 禁用。
+- [Netcode for GameObjects / Relay / Lobby packages will be added here when the netcode prototype
+  is promoted from `prototypes/w1-netcode/`]
 
 ## Architecture Decisions Log
 
-- [No ADRs yet — use /architecture-decision to create one]
+- **ADR-0001**（2026-09-26，Proposed）— 移動求解器為純 C#，Unity 只是轉接層。
+  `docs/architecture/adr-0001-pure-csharp-movement-solver.md`
 
 ## Engine Specialists
 

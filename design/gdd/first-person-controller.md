@@ -1602,7 +1602,7 @@ GIVEN 兩名玩家的相對位置與速度，THEN `ShouldWarn` 為真**若且唯
 | **OQ-F8** | 更衣室過場與店面是否同一個 Unity 場景。若是，「過場結束時碰撞未載入」在構造上不可能發生 | #2／#11 | 不擋 |
 | ~~**OQ-F9**~~ | ✅ **已於 2026-09-26 裁決關閉：MVP 的無障礙保護以「預設值」交付，不以「設定畫面」交付。** 三項全部落回 #3 現有射程、全部不需要 #18：①`look_scale` 與其他調校值走同一份資料驅動設定（編碼標準本就要求，不需要 UI）②🔴 **C5 側身回饋在 MVP 預設關閉**——本檔自己寫它「不承載任何判準、關閉時不得損失任何資訊」，那麼關掉零損失，而它是砍掉 walk bob 之後最大的動暈曝險 ③walk bob 維持不做。**⇒ MVP 動暈保護成本＝零 UI、零 #18 依賴。** ⚠ 連帶：C5 的三個時間常數不必現在定值（一個 MVP 不開的效果不需要數字），gameplay-programmer 對此的 BLOCKING 一併消解 | ~~creative-director~~ | ✅ **已關閉** |
 | **OQ-F10** | HOL 阻塞下的停滯長度分佈（上游自承未測）。⚠ 門檻：停滯 p99 > 0.71 s 時，ghost 恢復的單幀跳變會逼近上游 AC4 的 1 m 上限 | netcode | 不擋 |
-| **OQ-F11** | 🔴 **移動求解器是不是純 C#。** 本檔明寫實作模式「一律標 → ADR」，但**這個 ADR 的答案值 31 條 AC**：若把移動邏輯綁進 `CharacterController`，AC 節的 T0 層會整層塌掉。⚠ `technical-preferences.md` 的測試慣例正好要求相反方向 | **technical-director（ADR）** | 不擋本檔；**決定 AC 節今天可執行率是 72% 還是接近 0** |
+| ~~**OQ-F11**~~ | ✅ **已由 ADR-0001 回答（2026-09-26，Proposed）**：**純 C#**。`NightShift.Movement.Core` 設 `noEngineReferences = true`，Unity 層是薄轉接層；場景碰撞在 C12 預算之外且只能縮短（`stepOffset`／`slopeLimit`／`enableOverlapRecovery` 三者歸零）；不繼承 `NetworkTransform`，`AuthorityMode = Owner` 顯式 ＋ runtime guard。32/32 T0 已在純 C# 下實證。見 `docs/architecture/adr-0001-pure-csharp-movement-solver.md` | ~~technical-director（ADR）~~ | ✅ **已回答**；ADR Accepted 後本列可刪 |
 
 ⚠ **本檔關閉了一條別人的 OQ**：`product-database.md` 的 **OQ-P13**（遊戲內語音是否進 MVP）
 已於 2026-09-22 由 arlong 裁決關閉——**MVP 不做語音，非語音 ping 欠 #11**。
