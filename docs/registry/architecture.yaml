@@ -30,7 +30,7 @@
 #   Superseded entries:     Grep pattern="status: superseded"
 
 version: 1
-last_updated: "2026-09-26"
+last_updated: "2026-09-27"
 
 # ─── STATE OWNERSHIP ─────────────────────────────────────────────────────────
 # Who is the authoritative owner of each piece of shared game state.
@@ -51,6 +51,7 @@ state_ownership:
     interface: "本機 transform 由 MoveSolver 直接驅動；他端只能經 NetworkTransform 內插後的 transform 讀取（唯讀）"
     write_access: owner-only   # owner 權威（netcode Core Rule #2）；轉接層永不呼叫 NetworkTransform.SetState()
     referenced_by:
+      - docs/architecture/adr-0002-horizontal-only-interaction-validation.md
       - docs/architecture/adr-0001-pure-csharp-movement-solver.md
     added: 2026-09-26
     revised: ""
@@ -104,6 +105,7 @@ interfaces:
     adr: docs/architecture/adr-0001-pure-csharp-movement-solver.md
     signal_signature: "NetworkTransform：同步 position + yaw；不同步 pitch（C6）；AuthorityMode = Owner 顯式；每 tick 至多一次（10 Hz，專案值）"
     referenced_by:
+      - docs/architecture/adr-0002-horizontal-only-interaction-validation.md
       - docs/architecture/adr-0001-pure-csharp-movement-solver.md
     added: 2026-09-26
     revised: ""
@@ -127,6 +129,19 @@ interfaces:
 #     added: 2026-03-26
 #     revised: ""
 
+
+  - contract: interact_request
+    status: active
+    pattern: rpc
+    producer: player-client（每位玩家自己的 NetworkBehaviour）
+    consumers:
+      - host-interaction-validator   # #5：InteractValidator.Validate，純 C#
+    adr: docs/architecture/adr-0002-horizontal-only-interaction-validation.md
+    signal_signature: "[Rpc(SendTo.Server)] RequestInteractRpc(int stationId, uint claimGenerationSeen, float selfX, float selfZ, float selfYawDeg, RpcParams)；回應以 RpcTarget.Single(rpcParams.Receive.SenderClientId) 送回 RejectReason；claim 狀態經 NetworkVariable 回呼得知，不從回應推斷"
+    referenced_by:
+      - docs/architecture/adr-0002-horizontal-only-interaction-validation.md
+    added: 2026-09-27
+    revised: ""
 
 # ─── PERFORMANCE BUDGETS ──────────────────────────────────────────────────────
 # Frame time allocations per system, against a defined total frame budget.
@@ -216,6 +231,17 @@ api_decisions:
 #     revised: ""
 
 
+  - purpose: interaction_rpc_response_target
+    status: active
+    api: RpcTarget.Single(rpcParams.Receive.SenderClientId, RpcTargetUse.Temp)（執行期定址，RpcTarget.cs:257）
+    not: SendTo.Everyone；SendTo.Owner
+    adr: docs/architecture/adr-0002-horizontal-only-interaction-validation.md
+    reason: "Everyone 會讓無關 client 收到別人的 RejectReason 並誤播撲空；Owner 解析的是掛載 RPC 的 NetworkObject 的 owner——方法若被搬到站台的 NetworkBehaviour 上，回應會悄悄送給 Host 自己而不報錯。執行期定址不受掛載位置影響"
+    referenced_by:
+      - docs/architecture/adr-0002-horizontal-only-interaction-validation.md
+    added: 2026-09-27
+    revised: ""
+
 # ─── FORBIDDEN PATTERNS ──────────────────────────────────────────────────────
 # Architecture anti-patterns explicitly banned by accepted ADRs.
 # When writing a new ADR, check this list — if the proposed approach matches
@@ -273,3 +299,17 @@ forbidden_patterns:
 #       ownership model. The owning system must be the sole writer."
 #     adr: docs/architecture/adr-0000-architecture-principles.md
 #     added: 2026-03-26
+
+  - pattern: unbounded_client_pose_trust
+    status: active
+    description: "Host 使用任何 client 自報的姿態（位置、朝向）之前，必須先以自己的複製品綁住：|自報 − 複製品| ≤ tol_lag（player_move_speed_max × host_view_lag_p95_sec），否則拒絕為 PoseOutOfBound。yaw 不綁（複製落後超過一圈且作弊價值為零），但位置必綁。"
+    why: "Host 對 client 只有內插後、落後 ≥ 200 ms 的複製品（NGO 2.13.2 無不繼承的旁路），不能直接拿它精確驗；但完全相信自報等於讓改封包者隔牆互動。綁住之後作弊包絡有界且可實測，容差只花在反作弊上不花在合法玩家身上。"
+    adr: docs/architecture/adr-0002-horizontal-only-interaction-validation.md
+    added: 2026-09-27
+
+  - pattern: claimstate_read_from_rpc_response
+    status: active
+    description: "client 端不得以「收到互動 RPC 回應」推斷本機的 ClaimState NetworkVariable 已同步更新；所有依賴 claim 狀態的顯示只讀 NetworkVariable 回呼。"
+    why: "RPC 與 NetworkVariable 共用同一條 per-client FIFO（NetworkMessageManager.cs:75）但入列時機不同（RPC 呼叫當下、NetworkVariable 每 tick 收集），NGO 不保證順序，官方文件明講 NetworkVariable 只是 eventually consistent。"
+    adr: docs/architecture/adr-0002-horizontal-only-interaction-validation.md
+    added: 2026-09-27

@@ -95,6 +95,8 @@
 
 - **ADR-0001**（2026-09-26，Proposed）— 移動求解器為純 C#，Unity 只是轉接層。
   `docs/architecture/adr-0001-pure-csharp-movement-solver.md`
+- **ADR-0002**（2026-09-27，Proposed）— 互動驗證只驗水平——信但要綁。
+  `docs/architecture/adr-0002-horizontal-only-interaction-validation.md`
 
 ## Engine Specialists
 
