@@ -30,7 +30,7 @@
 #   Superseded entries:     Grep pattern="status: superseded"
 
 version: 1
-last_updated: "2026-09-27"
+last_updated: "2026-09-28"
 
 # ─── STATE OWNERSHIP ─────────────────────────────────────────────────────────
 # Who is the authoritative owner of each piece of shared game state.
@@ -63,6 +63,7 @@ state_ownership:
     interface: "PairMachine.Get(PairKey) → Separated | Overlapping | PassThrough（唯讀）。#7 據此停供膠囊（AC17）；#11 據此顯示 PassThrough（雙向可見）"
     write_access: first-person-controller-only   # 每端各自獨立執行，不跨端同步（C8／C10）
     referenced_by:
+      - docs/architecture/adr-0003-solid-capsule-query.md
       - docs/architecture/adr-0001-pure-csharp-movement-solver.md
     added: 2026-09-26
     revised: ""
@@ -83,6 +84,17 @@ state_ownership:
 #     added: 2026-03-26
 #     revised: ""
 
+
+  - state: pass_through_flags
+    status: active
+    owner_system: first-person-controller（owner 端寫；轉接層承載）
+    adr: docs/architecture/adr-0003-solid-capsule-query.md
+    interface: "玩家 NetworkObject 上的 NetworkVariable<ulong> PassThroughNpcMask（bit = NPC id）與 NetworkVariable<byte> PassThroughPlayerMask（bit = slot）；ReadPermission.Everyone；只在 PairMachine 轉移時以 .Value 賦值。這是 directed_pair_state 的複製編碼，不是第二個真相源"
+    write_access: owner-only   # NetworkVariableWritePermission.Owner，必須在建構子指定（預設是 Server）
+    referenced_by:
+      - docs/architecture/adr-0003-solid-capsule-query.md
+    added: 2026-09-28
+    revised: ""
 
 # ─── INTERFACE CONTRACTS ──────────────────────────────────────────────────────
 # How systems are required to communicate with each other.
@@ -105,6 +117,7 @@ interfaces:
     adr: docs/architecture/adr-0001-pure-csharp-movement-solver.md
     signal_signature: "NetworkTransform：同步 position + yaw；不同步 pitch（C6）；AuthorityMode = Owner 顯式；每 tick 至多一次（10 Hz，專案值）"
     referenced_by:
+      - docs/architecture/adr-0003-solid-capsule-query.md
       - docs/architecture/adr-0002-horizontal-only-interaction-validation.md
       - docs/architecture/adr-0001-pure-csharp-movement-solver.md
     added: 2026-09-26
@@ -141,6 +154,20 @@ interfaces:
     referenced_by:
       - docs/architecture/adr-0002-horizontal-only-interaction-validation.md
     added: 2026-09-27
+    revised: ""
+
+  - contract: solid_capsule_query
+    status: active
+    pattern: direct_call
+    producer: first-person-controller（Core：ISolidCapsuleQuery）
+    consumers:
+      - customer-system   # #7：每幀避讓；本機玩家看 PairMachine，遠端玩家看遮罩位元
+      - hud               # #11：PassThrough 雙向可見，讀同一遮罩
+    adr: docs/architecture/adr-0003-solid-capsule-query.md
+    signal_signature: "int ISolidCapsuleQuery.FillSolidCapsules(int npcId, CapsuleGhost[] buffer) — 零配置；回傳位置為本端渲染位置；兩端答案不一致窗口 ≤ 1 tick + 單程，由下一筆 NPC 里程碑吸收"
+    referenced_by:
+      - docs/architecture/adr-0003-solid-capsule-query.md
+    added: 2026-09-28
     revised: ""
 
 # ─── PERFORMANCE BUDGETS ──────────────────────────────────────────────────────
@@ -242,6 +269,17 @@ api_decisions:
     added: 2026-09-27
     revised: ""
 
+  - purpose: pass_through_flag_transport
+    status: active
+    api: owner-write NetworkVariable 位元遮罩，建構子 new NetworkVariable<T>(init, ReadPermission.Everyone, WritePermission.Owner)；OnNetworkSpawn() 斷言 WritePerm == Owner
+    not: 邊緣觸發 RPC SendTo.Everyone（遲加入者拿不到現值、與 NetworkVariable 順序無保證）；NetworkList（MVP 規模下過重）；NavMeshObstacle 切換（全域、無法 per-pair）
+    adr: docs/architecture/adr-0003-solid-capsule-query.md
+    reason: "NGO 2.13.2 原始碼確認：owner 寫權在 client-server 拓撲完全支援（NetworkVariableBase.cs:403-418）、只在值變更時送（NetworkVariable.cs:158-165）、遲加入者自動取得現值（:496-498）——三個性質都是既有機制，不是新風險"
+    referenced_by:
+      - docs/architecture/adr-0003-solid-capsule-query.md
+    added: 2026-09-28
+    revised: ""
+
 # ─── FORBIDDEN PATTERNS ──────────────────────────────────────────────────────
 # Architecture anti-patterns explicitly banned by accepted ADRs.
 # When writing a new ADR, check this list — if the proposed approach matches
@@ -313,3 +351,17 @@ forbidden_patterns:
     why: "RPC 與 NetworkVariable 共用同一條 per-client FIFO（NetworkMessageManager.cs:75）但入列時機不同（RPC 呼叫當下、NetworkVariable 每 tick 收集），NGO 不保證順序，官方文件明講 NetworkVariable 只是 eventually consistent。"
     adr: docs/architecture/adr-0002-horizontal-only-interaction-validation.md
     added: 2026-09-27
+
+  - pattern: npc_presence_from_rpc_event
+    status: active
+    description: "任何依 NPC 在場狀態做決策的邏輯（含 PassThrough 遮罩的清零時機、避讓集合的建立）必須讀 NPC 的 NetworkVariable 狀態，不得讀 NpcStateChanged RPC 事件本身。"
+    why: "netcode-session.md:823-826 已裁定狀態真相走 NetworkVariable、RPC 只驅動表現層；且 RPC 與 NetworkVariable 送達順序無保證（ADR-0002）。讀 RPC 會在錯的時刻清零遮罩，讓玩家對一個從未接觸的新客人被判為 PassThrough。"
+    adr: docs/architecture/adr-0003-solid-capsule-query.md
+    added: 2026-09-28
+
+  - pattern: owner_networkvariable_without_writeperm
+    status: active
+    description: "任何由 owner 寫入的 NetworkVariable 必須在建構子傳入 NetworkVariableWritePermission.Owner，並在 OnNetworkSpawn() 以 runtime guard 斷言 WritePerm == Owner。"
+    why: "DefaultWritePerm 是 Server（NetworkVariableBase.cs:225），WritePerm 為 get-only、無 setter（:261-267）。漏掉建構子參數時 owner 的寫入被 CannotWrite() 丟棄（NetworkVariable.cs:151-152），值永遠停在初始值——功能靜默失效，而純 C# T0 測試看不到 Unity 轉接層的建構呼叫。"
+    adr: docs/architecture/adr-0003-solid-capsule-query.md
+    added: 2026-09-28

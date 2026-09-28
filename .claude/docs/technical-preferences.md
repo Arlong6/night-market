@@ -97,6 +97,8 @@
   `docs/architecture/adr-0001-pure-csharp-movement-solver.md`
 - **ADR-0002**（2026-09-27，Proposed）— 互動驗證只驗水平——信但要綁。
   `docs/architecture/adr-0002-horizontal-only-interaction-validation.md`
+- **ADR-0003**（2026-09-28，Proposed）— 膠囊與 PassThrough 查詢介面（owner-write NetworkVariable 遮罩）。
+  `docs/architecture/adr-0003-solid-capsule-query.md`
 
 ## Engine Specialists
 

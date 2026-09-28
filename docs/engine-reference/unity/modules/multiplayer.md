@@ -23,6 +23,7 @@
 - **通用 `[Rpc]` attribute** 取代 `[ServerRpc]`/`[ClientRpc]`——可指定目標（含 client-to-client）、可延遲執行
 - **Distributed authority** 拓撲加入（DA session 中 NetworkVariable 預設 owner 寫/全體讀；
   client-server 拓撲仍是 server 權威）
+  ⚠ **2026-09-28 補（ADR-0003，v2.13.2 原始碼查證）**：上一句講的是**預設值**的差異。**顯式指定 `NetworkVariableWritePermission.Owner` 在 client-server 與 DA 兩種拓撲下行為相同**——`CanClientWrite` 只比對 `OwnerClientId`，不看拓撲（`NetworkVariableBase.cs:403-418`）；`DefaultWritePerm` 是 `Server`（`:225`），`WritePerm` 為 get-only、**只能在建構子指定**（`:261-267`）。
 - NetworkTransform 重寫：`NetworkTransform.Update` 不可 override（用 `OnUpdate` / `INetworkUpdateSystem`）
 - ⚠ **更正（2026-09-13 原始碼查證）**：先前本檔寫「owner-authoritative 為預設」是**錯的**。
   `AuthorityModes` enum 的 `Server = 0` 是預設值，欄位 `public AuthorityModes AuthorityMode;`

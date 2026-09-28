@@ -850,6 +850,28 @@ constants:
     added: 2026-09-26
     revised: ""
 
+  - name: npc_id_reuse_cooldown_sec
+    status: active
+    source: docs/architecture/adr-0003-solid-capsule-query.md
+    referenced_by:
+      - docs/architecture/adr-0003-solid-capsule-query.md
+      - design/gdd/systems-index.md   # 前向義務表 #7
+    value: 1.0
+    unit: seconds
+    notes: "PROVISIONAL (2026-09-28, arlong). OWNED BY #7 (customer system); registered here so the
+      obligation is visible before #7's GDD exists. The minimum time the Host must wait before reusing a
+      despawned NPC's id. WHY: players' PassThroughNpcMask (ADR-0003) is bit-indexed by NPC id; when an
+      NPC despawns the owning player's PairMachine destroys the pair and clears the bit, but that clear
+      takes <= 1 tick + one-way transport to reach other ends. Player SLOT reuse is protected by the
+      locker-room transition's 3.0 s hard floor (netcode-session.md:177); NPC ids have NO equivalent
+      structural delay -- customers can leave and be replaced within seconds -- so without a cooldown a
+      brand-new customer inherits the previous occupant's PassThrough bit on any end that read the stale
+      mask. 1.0 s is >> the worst-case clear window (~0.4 s cross-continent) and shorter than a customer's
+      door-entry animation. LOWER BOUND: must exceed 1 tick + one-way p95. UPPER BOUND: only limits how
+      fast ids cycle under >64 concurrent customers per shift (MVP is far below that)."
+    added: 2026-09-28
+    revised: ""
+
   - name: total_semantic_slots
     status: active
     source: design/gdd/game-session-state.md
