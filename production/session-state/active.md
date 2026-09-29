@@ -12,9 +12,22 @@
 
 **階段：Pre-production。** 2026-09-03 開案，至今 13 天。
 
+## 目前任務（2026-09-29）
+
+- **Task**：設計 #5 機台互動組 GDD（`/design-system 機台互動組`）
+- **File**：`design/gdd/machine-interaction.md`
+- **Status**：✅ **完成（2026-09-29）**——803 行、11 節零 placeholder、45 AC（必達 6）；registry +5 formulas +11 constants、10 條 referenced_by；索引 #5 Designed、#7／#15 補登、前向義務表 +4 列；CD-GDD-ALIGN 依 solo 跳過
+- **未 commit**：machine-interaction.md、systems-index.md、entities.yaml、active.md——待 arlong 指示
+- **Next**：新 session 跑 `/design-review design/gdd/machine-interaction.md`（不得在本 session）；`/architecture-review`（三份 ADR）；ADR-0004 候選（#5 Core 分層，OQ-M14）；`/ux-design` hud（UX 旗標）
+- **Sections done**：A Overview（2026-09-28；裁決：維護動作歸 #5 但 MVP 只做補貨；五台全設計、逐台點亮歸 #17）；B Player Fantasy（2026-09-28；框架 A「手會記得」＋ B 的撲空判準；關東煮永遠不出包；發現 2、3 已登記 netcode）；C Detailed Design（2026-09-28；C1–C19；裁決：走開時 Working 自主繼續、Ready 隊友可拿、獨立 Interaction map、Faulted 預留不實作；levy 登記 #4/#7/#11/#14/netcode）；D Formulas（2026-09-29；F1–F9；淨旋鈕九個：reach 0.8／hysteresis 0.20／buffer 2／微波 18／咖啡 22／寬限 18+18（2026-09-29 由 16 修正：qa-lead 抓到 grace ≥ T_max+B = 17 在原稿不成立；F3 改成 T_max／T_min 端點式）／d_peak 3 未測量／restock 4；推導量 leave 1.3、ray 1.4、whiff 200+150=350→400；T=crossing_time 11–15 暫借無出處；`ready_item_spoil_sec` 明寫不存在；`action_min_interval_ms` 不登記）；E Edge Cases（2026-09-29；systems-designer 16 條＋追加 4 條全納入；四個新概念回寫 C：SKU 槽（射線回 (stationId, sku)、OutOfStock 為每 SKU 全域條件）、庫存決定 Shelf 手勢語意（>0 點按拿、==0 按住補）、對另一台 claim＝離開前一台（第四觸發源）、第一下＝claim＋動作一則 RPC；Ready→Spoiled 換件；新拒絕值 NothingToTake；同 tick 先 RPC 後逾時掃描；四條 ⏳ levy 待 Phase 5 登記：ADR-0002／#7／#15／#11 關卡佈局）；F Dependencies（2026-09-29；上游 9／下游 6；索引 #7、#15 列缺本系統 → Phase 5 補）；G Tuning Knobs（2026-09-29；九個旋鈕＋「不是旋鈕」表；T 不是旋鈕，換版面＝重跑 F3）；Visual/Audio（2026-09-29；art-director＋audio-director；裁決：Spoiled 每家族一款、Ready 疊互動黃、空排面無中間態；訂正 C2／Fantasy 關東煮 MVP 無界）；H Acceptance Criteria（2026-09-29；qa-lead AC1–40 ＋ 主 session AC41–45；必達 19/24/25/32/37/39；覆蓋矩陣）
+- **上游已鎖定**：ADR-0002 定了驗證模型；商品資料庫規則 3b／4；FP 四條硬拒絕；三份 ADR 皆 Proposed
+- **本週里程碑**（2026-09-26～28，四個 commit）：FP GDD 十位專家評審 → 修訂 → 32/32 T0 純 C# 實測；
+  OQ-F1 itch.io pointer lock 實測通過；ADR-0001／0002／0003 寫入，registry 3/3/5/8
+- **下次新 session 先做**：`/architecture-review`（三份 ADR 的覆蓋率與互相一致性，不得在本 session 跑）
+
 ## 一句話現況
 
-**設計深度夠，但只深在一個系統上；正式程式碼還是零。**
+**設計深度夠，但只深在一個系統上；正式程式碼還是零。**（2026-09-28 補：現在深在兩個系統上，且純 C# 原型 32/32。）
 
 | 項目 | 狀態 |
 |---|---|

@@ -126,7 +126,7 @@ formulas:
       - design/gdd/product-database.md
       # Future dependents (add when designed):
       # - design/gdd/scoring.md          # #15 — aggregates per-slot results into stars
-      # - design/gdd/station-interactions.md  # #5 — may show live "right/wrong" feedback
+      - design/gdd/machine-interaction.md  # #5 — C12/E5: checkout is the adjudication site; MatchResult→hit/miss mapping (2026-09-29)
       # - design/gdd/carry-deliver.md    # #4 — delivery-point adjudication
     variables:
       - catalog         # r3: data source, NOT logic source
@@ -327,6 +327,83 @@ formulas:
 #
 # Required fields: name, status, source, referenced_by, value, unit, added
 
+  - name: accept_radius_m
+    status: active
+    source: design/gdd/machine-interaction.md
+    referenced_by:
+      - design/gdd/machine-interaction.md
+      - docs/architecture/adr-0002-horizontal-only-interaction-validation.md  # predicate ⑤: dist ≤ R + r_c
+    variables:
+      - station_reach_m
+      - r_c
+    output_range: [1.1, 1.1]
+    expression: "accept_radius_m = station_reach_m + r_c = 0.8 + 0.30 = 1.1 m (F1)"
+    notes: "Host 實際接受的玩家中心水平距離；推導量，不得獨立調。HUD 互動提示以此亮、以 station_leave_m 滅（E3）；#11 不得把 1.1 當可操作範圍（實際可操作半徑是 station_leave_m，C6 不重驗⑤）。"
+    added: 2026-09-29
+    revised: ""
+
+  - name: station_leave_m
+    status: active
+    source: design/gdd/machine-interaction.md
+    referenced_by:
+      - design/gdd/machine-interaction.md
+      - docs/architecture/adr-0002-horizontal-only-interaction-validation.md  # Decision 7 first layer: owner-side leave interrupt radius
+    variables:
+      - station_reach_m
+      - r_c
+      - leave_hysteresis_m
+    output_range: [1.3, 1.3]
+    expression: "station_leave_m = max(station_reach_m + r_c + leave_hysteresis_m, 2·r_c) = max(1.3, 0.6) = 1.3 m (F2)"
+    notes: "owner 端『離開即中斷』半徑。2·r_c 下界（FP 硬拒絕④）在 r_c ∈ [0.25, 0.45] 內從未咬合，只擋 leave_hysteresis_m 被調成負值。單次擠壓最大位移 2·r_c = 0.6 < 1.3，一般擠壓不誤觸中斷（AC31）。npc_pin_timeout_sec × v = 2.2 m > 1.3 為已接受風險：Working 在 Host 自走、Ready 任何人可收、保險絲兜底。"
+    added: 2026-09-29
+    revised: ""
+
+  - name: interact_ray_length_m
+    status: active
+    source: design/gdd/machine-interaction.md
+    referenced_by:
+      - design/gdd/machine-interaction.md
+    variables:
+      - station_reach_m
+      - r_c
+    output_range: [1.4, 1.4]
+    expression: "interact_ray_length_m = station_reach_m + 2·r_c = 0.8 + 0.60 = 1.4 m (F6)"
+    notes: "每幀一次互動 raycast 的長度（C15）；margin 取 r_c 本身當俯仰斜線餘量，不另設常數。純函式非獨立常數：R 改 1.0 即 1.6（AC35）。射線只選台與亮提示，不驗證。"
+    added: 2026-09-29
+    revised: ""
+
+  - name: whiff_arrival_wait_max_ms
+    status: active
+    source: design/gdd/machine-interaction.md
+    referenced_by:
+      - design/gdd/machine-interaction.md
+    variables:
+      - network_tick_rate
+      - interact_rtt_p95_ms
+    output_range: [350, 400]
+    expression: "whiff_arrival_wait_max_ms = interp_floor_ms + one_way_p95_ms = 2×(1000/network_tick_rate) + interact_rtt_p95_ms/2 = 200 + 150 = 350 → 出貨取整 400 (F4)"
+    notes: "輸家等贏家的內插位置在本機畫面上到站的上限，逾時降級為無方向撲空（判準 4①）。因果是『內插地板＋單程 p95』，不是『地板的 2 倍』——tick 改 20 Hz 時 floor 100、one-way 仍 150 → 250（AC33）。NothingToTake 撲空不套此門檻，0 ms 立即播（AC37）。"
+    added: 2026-09-29
+    revised: ""
+
+  - name: station_timing_bounds
+    status: active
+    source: design/gdd/machine-interaction.md
+    referenced_by:
+      - design/gdd/machine-interaction.md
+    variables:
+      - crossing_time_sec
+      - disengage_buffer_sec
+      - microwave_cook_duration_sec
+      - coffee_brew_duration_sec
+      - microwave_burn_grace_sec
+      - coffee_overflow_grace_sec
+    output_range: "cook ∈ [15, 24] s; grace ≥ 17 s"
+    expression: "cook_duration_sec ∈ [T_max, 2·T_min + B]; grace_sec ≥ T_max + B — with T ∈ [11, 15], B = 2: cook ∈ [15, 24], grace ≥ 17 (F3)"
+    notes: "兩事件台（微波／咖啡）的核心關係式：cook 短於最長穿越＝沒有離開的理由；cook 長於最短來回＋一件小事＝『等』被焊回遊戲；grace 短於最長回程＝判準 1 退化成手速。下界用最長穿越、上界用最短穿越，才對整個 T 區間成立。2026-09-29 qa-lead 抓到原稿拿中點 T = 13 算，寬限 16 在 T = 15 差 1 s → 兩台寬限改 18（AC32 必達）。寬限對 T_max 只有 1 s 餘裕：player_move_speed_max 或店面幾何一改就重驗。"
+    added: 2026-09-29
+    revised: ""
+
 constants:
   - name: machine_family_values
     status: active
@@ -335,7 +412,7 @@ constants:
       - design/gdd/product-database.md
       - design/registry/sku-shipped-snapshot.txt  # frozen_enum: block — AC15a compares against it
       # Future dependents (add when designed):
-      # - design/gdd/station-interactions.md  # #5 — each station queries its own menu
+      - design/gdd/machine-interaction.md  # #5 — GetByMachineFamily() defines each station's SKU slots (E0.1, 2026-09-29)
       # - design/gdd/customer-system.md       # #7 — family-level demands
       # - design/gdd/wave-director.md         # #8 — per-station load weighting
       # - design/gdd/hud.md                   # #11 — family demand icon lookup key
@@ -510,6 +587,7 @@ constants:
     source: design/gdd/first-person-controller.md
     referenced_by:
       - design/gdd/first-person-controller.md
+      - design/gdd/machine-interaction.md  # #5 — F2 cross-check (npc_pin × v) and F3 crossing_time derivation; grace margin re-verified whenever this changes (2026-09-29)
       - design/gdd/netcode-session.md   # AC4 / AC15 / AC23 use this as their SOLE criterion
     value: 1.47
     unit: metres_per_second
@@ -645,6 +723,7 @@ constants:
     source: design/gdd/first-person-controller.md
     referenced_by:
       - design/gdd/first-person-controller.md
+      - design/gdd/machine-interaction.md  # #5 — F2 cross-check: 1.5 × 1.47 = 2.2 m > station_leave_m, accepted risk (2026-09-29)
     value: 1.5
     unit: seconds
     notes: "REVISED 2026-09-26 (design-review): 4.0 -> 1.5, and PROMOTED from 'not a knob' to an
@@ -741,6 +820,7 @@ constants:
     source: design/gdd/first-person-controller.md
     referenced_by:
       - design/gdd/first-person-controller.md
+      - design/gdd/machine-interaction.md  # #5 — C15 ray origin; F6 pitch-slant example (2026-09-29)
     value: 1.60
     unit: metres
     notes: "ASSUMPTION (2026-09-26). Input to F6's backfill inequality for the pitch limit. The GDD's
@@ -773,6 +853,7 @@ constants:
     source: design/gdd/first-person-controller.md
     referenced_by:
       - design/gdd/first-person-controller.md
+      - design/gdd/machine-interaction.md  # #5 — F1/F2/F6 inputs: accept_radius, station_leave, interact_ray_length (2026-09-29)
     value: 0.30
     unit: metres
     notes: "ASSUMPTION -- true owner is #11 / level layout (OQ-F5). Character capsule RADIUS. REGISTERED
@@ -963,7 +1044,8 @@ constants:
     source: design/gdd/netcode-session.md
     referenced_by:
       - design/gdd/netcode-session.md
-      # Future dependents: 機台互動組 GDD (手感預算), 攜帶與交付 GDD
+      - design/gdd/machine-interaction.md  # #5 — F4: one_way_p95 = RTT/2 feeds whiff_arrival_wait_max_ms; C5 fire-and-forget keeps it out of the feel (2026-09-29)
+      # Future dependents: 攜帶與交付 GDD
     value: 300
     unit: milliseconds
     notes: "按下互動→收到成功/撲空結果的 P95 上限；逾時須顯示等待狀態。"
@@ -1023,7 +1105,7 @@ constants:
     source: design/gdd/netcode-session.md
     referenced_by:
       - design/gdd/netcode-session.md
-      # Future dependents: 機台互動組 GDD
+      - design/gdd/machine-interaction.md  # #5 — C7 renewal on every accepted action RPC (provisional); E2 same-tick RPC-before-timeout ordering; AC7 (2026-09-29)
     value: 5
     unit: seconds
     notes: "互動 claim 未獲 Host 回應的強制解鎖時限；逾時後抵達的原請求以 lock 世代編號拒絕。Tuning 2-10。"
@@ -1212,6 +1294,7 @@ constants:
     source: design/gdd/netcode-session.md
     referenced_by:
       - design/gdd/netcode-session.md
+      - design/gdd/machine-interaction.md  # #5 — F4 interp_floor_ms = 2 ticks; WorkStartTick progress self-computed from ServerTime.Tick (2026-09-29)
     value: 10
     unit: hz
     notes: "＝ NetworkConfig.TickRate。引擎預設 30，本專案設 10。Tuning 10-30。✅ **[P-3] 已於 2026-09-13 回填（NGO 2.13.2 原始碼）**：本值**同時**決定 NetworkTransform 與 NetworkVariable 的送出節奏（兩者皆每 tick 收集送出），**但完全不影響 RPC**——RPC 每『幀』於 PostLateUpdate 批次送出，非 tick-gated。因此先前『10Hz 會讓互動往返 +200ms 而使 AC22 不可達』的判斷**解除**；約束⑧已重寫為『RTT + 2 幀 + 處理 ≤ interact_rtt_p95_ms，且互動結果一律走 RPC 不得用 NetworkVariable 承載』。⚠ NetworkTransform **無 per-instance 頻率設定**（可調的只有 PositionThreshold 等門檻）。⚠ 設為 10 等於把所有 NetworkVariable 也從引擎預設的 30Hz 降到 10Hz。AC46。"
@@ -1428,7 +1511,8 @@ constants:
     source: design/gdd/netcode-session.md
     referenced_by:
       - design/gdd/netcode-session.md
-      # Future dependents: 機台互動組 GDD (手感), 攜帶與交付 GDD
+      - design/gdd/machine-interaction.md  # #5 — C5 optimistic gesture bound; F8 action_min_interval_ms ≡ this constant, not registered separately (2026-09-29)
+      # Future dependents: 攜帶與交付 GDD
     value: 100
     unit: milliseconds
     notes: "Core Rule #3：client 端樂觀動畫的最大播放時長，超過即須等 Host 裁決結果。決定互動手感。r4 二次修訂登錄：先前無常數、無 AC 覆蓋。⚠ 與 AC4 的『單幀 >100ms』同數字但**完全不同概念**（那是 frame time 尖峰），實作時勿混。Tuning 50-150。"
@@ -1527,6 +1611,128 @@ constants:
     unit: seconds
     notes: "進房三分段的**各自獨立硬閘門**（AC7a 明令「不得以總和抵銷」）。r4 新增為獨立常數——先前只存在於公式②與 join_time_budget_sec 的 notes 字串裡，等於未登錄。合計 45s 對 join_time_budget_sec(60) 留 25% 餘裕。T_load 的餘裕實際為 0（50MB ÷ 20Mbps = 20s + TTFB 5s），故公式⑤的體積槓桿不得少列（含 WebAssembly 2023 開關）。"
     added: 2026-09-13
+    revised: ""
+
+  - name: station_reach_m
+    status: active
+    source: design/gdd/machine-interaction.md
+    referenced_by:
+      - design/gdd/machine-interaction.md
+      - docs/architecture/adr-0002-horizontal-only-interaction-validation.md
+    value: 0.8
+    unit: metres
+    notes: "claim 精確驗證的水平半徑（ADR-0002 述詞⑤：dist ≤ R + r_c）；旋鈕，安全範圍 0.5–1.2。沿用 ADR-0002 暫定值。太高：隔著隊友也能 claim（判準 4 失真）、站台間距 < 2×接受半徑時同時在兩台範圍內；太低：OutOfReach 撲空變多（判準 2）。回填觸發：ADR-0002 Decision 4 的 OutOfReach 比率 playtest。"
+    added: 2026-09-29
+    revised: ""
+
+  - name: leave_hysteresis_m
+    status: active
+    source: design/gdd/machine-interaction.md
+    referenced_by:
+      - design/gdd/machine-interaction.md
+    value: 0.20
+    unit: metres
+    notes: "離開判定緩衝：接受半徑外再走多遠才算走開；旋鈕，安全範圍 0.1–0.4。station_leave_m = R + r_c + H = 1.3（F2）。太高：遠在 1.1 m 外仍可操作，HUD 與 Host 幾何脫節；太低：一次擠壓（≤ 0.6 m）就中斷，FP 硬拒絕④失守；負值由 L > 2·r_c 擋住。"
+    added: 2026-09-29
+    revised: ""
+
+  - name: disengage_buffer_sec
+    status: active
+    source: design/gdd/machine-interaction.md
+    referenced_by:
+      - design/gdd/machine-interaction.md
+    value: 2
+    unit: seconds
+    notes: "銜接緩衝：去程做一件小事／回程反應，共用一個量；旋鈕，安全範圍 1–4。進 station_timing_bounds 的所有區間界（F3）。"
+    added: 2026-09-29
+    revised: ""
+
+  - name: crossing_time_sec
+    status: active
+    source: design/gdd/machine-interaction.md
+    referenced_by:
+      - design/gdd/machine-interaction.md
+    value: "11-15"
+    unit: seconds
+    notes: "⚠ 暫借值，無文件出處：直線下界 10 m ÷ v ≈ 6.8 s、繞行倍率 1.5–2，來自 FP 評審中 level-designer 的估算。不是旋鈕，是店面幾何的量測值——#11／關卡佈局定稿店面後重量並重跑 F3（OQ-M2）；FP GDD 已 levy 一個具名的『穿越店面時間上限』常數給 #11／關卡佈局，本值屆時應被它取代。"
+    added: 2026-09-29
+    revised: ""
+
+  - name: microwave_cook_duration_sec
+    status: active
+    source: design/gdd/machine-interaction.md
+    referenced_by:
+      - design/gdd/machine-interaction.md
+    value: 18
+    unit: seconds
+    notes: "微波 Working 自走時長（C3：Host 收到啟動 RPC 起算，與持有者在場無關）；旋鈕，安全範圍 [15, 24] = [T_max, 2·T_min + B]（F3）。與咖啡刻意不同值，讓兩台聲音節奏可分（判準 3）。AC3：T0 + 180 tick 自轉 Ready。"
+    added: 2026-09-29
+    revised: ""
+
+  - name: coffee_brew_duration_sec
+    status: active
+    source: design/gdd/machine-interaction.md
+    referenced_by:
+      - design/gdd/machine-interaction.md
+    value: 22
+    unit: seconds
+    notes: "咖啡機 Working 自走時長；旋鈕，安全範圍 [15, 24]，距上界餘 2 s（F3）。與微波共用兩事件骨架但時長刻意錯開。"
+    added: 2026-09-29
+    revised: ""
+
+  - name: microwave_burn_grace_sec
+    status: active
+    source: design/gdd/machine-interaction.md
+    referenced_by:
+      - design/gdd/machine-interaction.md
+    value: 18
+    unit: seconds
+    notes: "微波 Ready 後無人回收即 Spoiled（燒焦）的寬限；旋鈕，安全範圍 ≥ 17 = T_max + B（F3）。2026-09-29 由 16 修正：qa-lead 抓到原值在 T = 15 違反 grace ≥ T + B（差 1 s）。只比下界多 1 s，那 1 s 是被客人卡一次（npc_pin_timeout_sec 1.5 s）的餘裕；player_move_speed_max 一改就重驗（AC32 必達）。"
+    added: 2026-09-29
+    revised: ""
+
+  - name: coffee_overflow_grace_sec
+    status: active
+    source: design/gdd/machine-interaction.md
+    referenced_by:
+      - design/gdd/machine-interaction.md
+    value: 18
+    unit: seconds
+    notes: "咖啡機 Ready 後無人回收即 Spoiled（溢出）的寬限；旋鈕，安全範圍 ≥ 17（F3）。與 microwave_burn_grace_sec 同值但獨立登記——兩台失敗率要能分開調。2026-09-29 由 16 修正（同上）。"
+    added: 2026-09-29
+    revised: ""
+
+  - name: d_peak
+    status: active
+    source: design/gdd/machine-interaction.md
+    referenced_by:
+      - design/gdd/machine-interaction.md
+    value: 3
+    unit: count
+    notes: "🔴 未測量：單 SKU 在單一尖峰窗內的預期指名購買次數；粗估 3（一班兩個尖峰窗、2 人房 MVP），未經 #7／#8 客流模型驗證——比照 FP GDD 對 L_p95 的標示方式。三名一值：stock_max = stock_initial = restock_amount_per_action = d_peak（F5，三個名字不另登記）；開店滿架、一次補滿，C11 的 clamp 退化為安全網。每班缺貨次數上界 ≤ 2 是結構推導、下界 ≥ 1 依賴本值校準。校準後 > 5 須重審 stock_max = d_peak（排面美術的可信上限）。回填觸發：#7／#8 客流模型定案。"
+    added: 2026-09-29
+    revised: ""
+
+  - name: restock_duration_sec
+    status: active
+    source: design/gdd/machine-interaction.md
+    referenced_by:
+      - design/gdd/machine-interaction.md
+    value: 4
+    unit: seconds
+    notes: "Shelf 補貨按住時長：stock == 0 的槽按住此秒數即補到 stock_max，Host 自走計時、放開即中斷不保留進度（E0.2）；旋鈕，安全範圍 2–8。太高：靜窗也補不完、變成懲罰；太低：按住與點按無感差別。與 d_peak 一起決定補貨在一班裡的存在感。"
+    added: 2026-09-29
+    revised: ""
+
+  - name: instant_gesture_duration_sec
+    status: active
+    source: design/gdd/machine-interaction.md
+    referenced_by:
+      - design/gdd/machine-interaction.md
+    value: 0
+    unit: seconds
+    notes: "Shelf 拿取／Oden 撈取／收銀掃描的 Working 時長合一（F7）：三個 0 不需要三個名字。Shelf／Oden 的第一下在同一次 Host 處理內走完 Claimed → Working → Ready → Taken → Idle（E0.4）。收銀 A/B 原型定案後再分岔出 checkout_scan_duration_sec。"
+    added: 2026-09-29
     revised: ""
 
 # Example:
