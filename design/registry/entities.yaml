@@ -398,11 +398,11 @@ formulas:
       - coffee_brew_duration_sec
       - microwave_burn_grace_sec
       - coffee_overflow_grace_sec
-    output_range: "cook ∈ [15, 24] s; grace ≥ 17 s"
-    expression: "cook_duration_sec ∈ [T_max, 2·T_min + B]; grace_sec ≥ T_max + B — with T ∈ [11, 15], B = 2: cook ∈ [15, 24], grace ≥ 17 (F3)"
-    notes: "兩事件台（微波／咖啡）的核心關係式：cook 短於最長穿越＝沒有離開的理由；cook 長於最短來回＋一件小事＝『等』被焊回遊戲；grace 短於最長回程＝判準 1 退化成手速。下界用最長穿越、上界用最短穿越，才對整個 T 區間成立。2026-09-29 qa-lead 抓到原稿拿中點 T = 13 算，寬限 16 在 T = 15 差 1 s → 兩台寬限改 18（AC32 必達）。寬限對 T_max 只有 1 s 餘裕：player_move_speed_max 或店面幾何一改就重驗。"
+    output_range: "cook ∈ [15, 24] s (= [T_max, min(2·T_min + B, 30)]); grace ≥ T_max + B = 17 s"
+    expression: "cook_duration_sec ∈ [T_max, min(2·T_min + B, cook_cap_sec = 30)]; grace_sec ≥ T_max + B; invariant T_max ≤ 2·T_min + B — with T ∈ [11, 15], B = 2: cook ∈ [15, 24], grace ≥ 17 (F3, r1 2026-09-29)"
+    notes: "兩事件台（微波／咖啡）的核心關係式：cook 短於最長穿越＝沒有離開的理由；cook 長於最短來回＋一件小事＝『等』被焊回遊戲；grace 短於最長回程＝判準 1 退化成手速。下界用最長穿越、上界用最短穿越，才對整個 T 區間成立。2026-09-29 qa-lead 抓到原稿拿中點 T = 13 算，寬限 16 在 T = 15 差 1 s → 兩台寬限改 18（AC32 必達）。寬限對 T_max 只有 1 s 餘裕：player_move_speed_max 或店面幾何一改就重驗。r1（2026-09-29 /design-review，arlong 裁決）：①加支柱 5 硬帽 cook_cap_sec = 30（非旋鈕）——level-designer 估支柱 3 的店 T ≈ [6, 11]、咖啡 22 會超過 2·T_min+B，CD 指出 C3 讓人走開、長烹煮是訂單延遲不是玩家等待；兩者並列取小 ②B 安全上限由 4 降為 3（B = 4 → grace 下界 19 > 18，兩個安全範圍原本互不相容）③v = 1.62 時 cook 上界 21.96，咖啡 22 超出 0.04 s，v 上調亦須重驗 ④不變式 T_max ≤ 2·T_min + B，否則區間為空 ⑤AC32 改讀本 registry 現值，不寫死 T。"
     added: 2026-09-29
-    revised: ""
+    revised: "2026-09-29 r1"
 
 constants:
   - name: machine_family_values
@@ -1643,7 +1643,7 @@ constants:
       - design/gdd/machine-interaction.md
     value: 2
     unit: seconds
-    notes: "銜接緩衝：去程做一件小事／回程反應，共用一個量；旋鈕，安全範圍 1–4。進 station_timing_bounds 的所有區間界（F3）。"
+    notes: "銜接緩衝：去程做一件小事／回程反應，共用一個量；旋鈕，安全範圍 1–3（r1 2026-09-29：上限由 4 降為 3——B = 4 時 grace 下界 19 > 現值 18，與 grace 的安全範圍互不相容，systems-designer）。進 station_timing_bounds 的所有區間界（F3）。"
     added: 2026-09-29
     revised: ""
 
@@ -1654,7 +1654,7 @@ constants:
       - design/gdd/machine-interaction.md
     value: "11-15"
     unit: seconds
-    notes: "⚠ 暫借值，無文件出處：直線下界 10 m ÷ v ≈ 6.8 s、繞行倍率 1.5–2，來自 FP 評審中 level-designer 的估算。不是旋鈕，是店面幾何的量測值——#11／關卡佈局定稿店面後重量並重跑 F3（OQ-M2）；FP GDD 已 levy 一個具名的『穿越店面時間上限』常數給 #11／關卡佈局，本值屆時應被它取代。"
+    notes: "⚠ 暫借值，無文件出處：直線下界 10 m ÷ v ≈ 6.8 s、繞行倍率 1.5–2，來自 FP 評審中 level-designer 的估算。不是旋鈕，是店面幾何的量測值——#11／關卡佈局定稿店面後重量並重跑 F3（OQ-M2）；FP GDD 已 levy 一個具名的『穿越店面時間上限』常數給 #11／關卡佈局，本值屆時應被它取代。r1（2026-09-29）：那個『10 m』是 FP GDD 一句側寫參照，從未當店面尺寸驗證；level-designer 估支柱 3 的店約 6×6–7×6 m、T ≈ [6, 11]。blockout 實測後以 T_min／T_max 兩值回填，並重驗 F3 不變式 T_max ≤ 2·T_min + B（OQ-M2）。"
     added: 2026-09-29
     revised: ""
 
@@ -1687,7 +1687,7 @@ constants:
       - design/gdd/machine-interaction.md
     value: 18
     unit: seconds
-    notes: "微波 Ready 後無人回收即 Spoiled（燒焦）的寬限；旋鈕，安全範圍 ≥ 17 = T_max + B（F3）。2026-09-29 由 16 修正：qa-lead 抓到原值在 T = 15 違反 grace ≥ T + B（差 1 s）。只比下界多 1 s，那 1 s 是被客人卡一次（npc_pin_timeout_sec 1.5 s）的餘裕；player_move_speed_max 一改就重驗（AC32 必達）。"
+    notes: "微波 Ready 後無人回收即 Spoiled（燒焦）的寬限；旋鈕，安全範圍 ≥ T_max + B（現值 17；是式子不是數字——T 或 B 一改就重算，B = 4 會要求 ≥ 19，故 B 上限已降為 3，r1 2026-09-29）（F3）。2026-09-29 由 16 修正：qa-lead 抓到原值在 T = 15 違反 grace ≥ T + B（差 1 s）。只比下界多 1 s，那 1 s 是被客人卡一次（npc_pin_timeout_sec 1.5 s）的餘裕；player_move_speed_max 一改就重驗（AC32 必達）。"
     added: 2026-09-29
     revised: ""
 
@@ -1698,7 +1698,7 @@ constants:
       - design/gdd/machine-interaction.md
     value: 18
     unit: seconds
-    notes: "咖啡機 Ready 後無人回收即 Spoiled（溢出）的寬限；旋鈕，安全範圍 ≥ 17（F3）。與 microwave_burn_grace_sec 同值但獨立登記——兩台失敗率要能分開調。2026-09-29 由 16 修正（同上）。"
+    notes: "咖啡機 Ready 後無人回收即 Spoiled（溢出）的寬限；旋鈕，安全範圍 ≥ T_max + B（現值 17，r1 2026-09-29）（F3）。與 microwave_burn_grace_sec 同值但獨立登記——兩台失敗率要能分開調。2026-09-29 由 16 修正（同上）。"
     added: 2026-09-29
     revised: ""
 
@@ -1709,7 +1709,7 @@ constants:
       - design/gdd/machine-interaction.md
     value: 3
     unit: count
-    notes: "🔴 未測量：單 SKU 在單一尖峰窗內的預期指名購買次數；粗估 3（一班兩個尖峰窗、2 人房 MVP），未經 #7／#8 客流模型驗證——比照 FP GDD 對 L_p95 的標示方式。三名一值：stock_max = stock_initial = restock_amount_per_action = d_peak（F5，三個名字不另登記）；開店滿架、一次補滿，C11 的 clamp 退化為安全網。每班缺貨次數上界 ≤ 2 是結構推導、下界 ≥ 1 依賴本值校準。校準後 > 5 須重審 stock_max = d_peak（排面美術的可信上限）。回填觸發：#7／#8 客流模型定案。"
+    notes: "🔴 未測量：單 SKU 在單一尖峰窗內的預期指名購買次數；粗估 3（一班兩個尖峰窗、2 人房 MVP），未經 #7／#8 客流模型驗證——比照 FP GDD 對 L_p95 的標示方式。二名一值（r1 2026-09-29）：stock_max = stock_initial = d_peak（F5）；restock_amount_per_action 已廢——補貨把本架每個未滿 SKU 設為 stock_max（E0.2 r1：點按＝拿、按住 ≥ 100 ms 且本架任一未滿＝補整架），不是加增量。每班缺貨次數上下界皆為機率主張（r0『≤ 2 是結構推導』不成立：同一尖峰窗可見底→補滿→再見底）。校準後 > 5 須重審 stock_max = d_peak（排面美術的可信上限）。回填觸發：#7／#8 客流模型定案。"
     added: 2026-09-29
     revised: ""
 
