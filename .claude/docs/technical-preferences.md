@@ -99,6 +99,9 @@
   `docs/architecture/adr-0002-horizontal-only-interaction-validation.md`
 - **ADR-0003**（2026-09-28，Proposed）— 膠囊與 PassThrough 查詢介面（owner-write NetworkVariable 遮罩）。
   `docs/architecture/adr-0003-solid-capsule-query.md`
+- **ADR-0004**（保留編號）— 機台互動組 Core 分層與 RPC 契約（`machine-interaction.md` OQ-M14），待寫。
+- **ADR-0005**（2026-10-01，Proposed）— 平台抽象層：瀏覽器能力是介面不是 `#if`；為 Steam 桌面版鋪路（`docs/research/steam-feasibility-2026-10-01.md`）。
+  `docs/architecture/adr-0005-platform-abstraction-layer.md`
 
 ## Engine Specialists
 

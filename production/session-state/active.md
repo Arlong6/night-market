@@ -1,6 +1,6 @@
 # Active Session State
 
-> Last Updated: 2026-09-24
+> Last Updated: 2026-09-30
 > Purpose: Living checkpoint. Read this first after compaction or new session.
 
 **目前唯一在推進的專案＝大夜班 (Night Shift)。** Road Rage 與其他遊戲皆為已完成／暫停
@@ -12,13 +12,16 @@
 
 **階段：Pre-production。** 2026-09-03 開案，至今 13 天。
 
-## 目前任務（2026-09-29）
+## 目前任務（2026-09-30）
 
-- **Task**：設計 #5 機台互動組 GDD（`/design-system 機台互動組`）
-- **File**：`design/gdd/machine-interaction.md`
-- **Status**：✅ **完成（2026-09-29）**——803 行、11 節零 placeholder、45 AC（必達 6）；registry +5 formulas +11 constants、10 條 referenced_by；索引 #5 Designed、#7／#15 補登、前向義務表 +4 列；CD-GDD-ALIGN 依 solo 跳過
-- **未 commit**：machine-interaction.md、systems-index.md、entities.yaml、active.md——待 arlong 指示
-- **Next**：新 session 跑 `/design-review design/gdd/machine-interaction.md`（不得在本 session）；`/architecture-review`（三份 ADR）；ADR-0004 候選（#5 Core 分層，OQ-M14）；`/ux-design` hud（UX 旗標）
+- **Task**：#5 機台互動組 GDD——`/design-review` full 已跑（2026-09-29，九位專家＋creative-director）→ **NEEDS REVISION** → 同 session 依 arlong 四項裁決修成 **r1**
+- **File**：`design/gdd/machine-interaction.md`（872 行、54 AC、必達 8，文末「r1 修訂紀錄」）；紀錄 `design/gdd/reviews/machine-interaction-review-log.md`
+- **Status**：🟡 **In Review r1**——7 條 Required 已落地（C10 保險絲／斷線只放 claim、`Failed` 只剩班次結束；判準 4 幾何四處：撲空門檻 1.1 m、非持有者提示＝本機述詞⑤⑥、錨點以槽為單位、槽高 ≥ 0.75；E0.2 點按拿／按住 ≥ 100 ms 補整架；新 C20 RPC 與資料契約表（`InteractRpc`／`TakeOutputRpc`／`InterruptRpc`／`InteractResponseRpc`；`StationStatus{Phase, WorkStartTick, Sku, PendingProductNetId}`；`StockState`）；#14 觸發源分流；表 B 補釋放邊；F3 加 30 s 硬帽＋不變式）；索引 #5 改 In Review r1、前向義務表 +5 列（#17／#11／#7／#4／netcode-ADR-0002）；entities.yaml 六條備註
+- **arlong 四項裁決（2026-09-29）**：E0.2 選 A「按住補整架」；斷線也只放 claim；F3 保留公式＋支柱 5 硬帽 30 s；完整變更集。**下一步依 CD 選 [A]：不再開散文複審輪**
+- **未 commit**：machine-interaction.md、systems-index.md、entities.yaml、reviews/machine-interaction-review-log.md（新）、active.md——待 arlong 指示
+- **Next**：`/architecture-decision` 產 ADR-0004（範圍見 GDD OQ-M14：C20 C# 簽章、`AutoObjectParentSync = false`、測試接縫介面、E2 掛 `OnNetworkTick`、雙時鐘、`visibilitychange` 匯流排、registry `architecture.yaml` 簽章同步 OQ-M17）→ 純 C# 站台狀態機跑約 40 條 T0（AC3 與舊 AC10① 類矛盾會自己亮紅燈）→ level-designer blockout 量 T 回填 registry；`/architecture-review`（三份 ADR）；`/ux-design` hud（UX 旗標）
+- **磁碟（2026-09-30）**：內建碟曾滿到剩 190 MB；已搬 SSD＋清模擬器後 18 GB；arlong 尚有三條 `!` 與一條 sudo 指令待跑（見記憶 ssd-offload-conventions）
+- **Steam 評估（2026-10-01）**：`docs/research/steam-feasibility-2026-10-01.md`——能上但不是現在；arlong 裁決：方向 A（記下方向、只做便宜兩件事）、商業模型傾向 C（Steam 付費＋Web 免費入口／Friend Pass）；索引加 #20 平台服務＋CD／TD 前向義務；**ADR-0005 平台抽象層已寫**（Proposed；unity-specialist 兩條 BLOCKING 已修：IClipboard 非同步、.Web asmdef includePlatforms）；registry +5 interfaces +2 api_decisions +3 forbidden_patterns。未 commit：research doc、systems-index、ADR-0005、architecture.yaml、technical-preferences.md、active.md
 - **Sections done**：A Overview（2026-09-28；裁決：維護動作歸 #5 但 MVP 只做補貨；五台全設計、逐台點亮歸 #17）；B Player Fantasy（2026-09-28；框架 A「手會記得」＋ B 的撲空判準；關東煮永遠不出包；發現 2、3 已登記 netcode）；C Detailed Design（2026-09-28；C1–C19；裁決：走開時 Working 自主繼續、Ready 隊友可拿、獨立 Interaction map、Faulted 預留不實作；levy 登記 #4/#7/#11/#14/netcode）；D Formulas（2026-09-29；F1–F9；淨旋鈕九個：reach 0.8／hysteresis 0.20／buffer 2／微波 18／咖啡 22／寬限 18+18（2026-09-29 由 16 修正：qa-lead 抓到 grace ≥ T_max+B = 17 在原稿不成立；F3 改成 T_max／T_min 端點式）／d_peak 3 未測量／restock 4；推導量 leave 1.3、ray 1.4、whiff 200+150=350→400；T=crossing_time 11–15 暫借無出處；`ready_item_spoil_sec` 明寫不存在；`action_min_interval_ms` 不登記）；E Edge Cases（2026-09-29；systems-designer 16 條＋追加 4 條全納入；四個新概念回寫 C：SKU 槽（射線回 (stationId, sku)、OutOfStock 為每 SKU 全域條件）、庫存決定 Shelf 手勢語意（>0 點按拿、==0 按住補）、對另一台 claim＝離開前一台（第四觸發源）、第一下＝claim＋動作一則 RPC；Ready→Spoiled 換件；新拒絕值 NothingToTake；同 tick 先 RPC 後逾時掃描；四條 ⏳ levy 待 Phase 5 登記：ADR-0002／#7／#15／#11 關卡佈局）；F Dependencies（2026-09-29；上游 9／下游 6；索引 #7、#15 列缺本系統 → Phase 5 補）；G Tuning Knobs（2026-09-29；九個旋鈕＋「不是旋鈕」表；T 不是旋鈕，換版面＝重跑 F3）；Visual/Audio（2026-09-29；art-director＋audio-director；裁決：Spoiled 每家族一款、Ready 疊互動黃、空排面無中間態；訂正 C2／Fantasy 關東煮 MVP 無界）；H Acceptance Criteria（2026-09-29；qa-lead AC1–40 ＋ 主 session AC41–45；必達 19/24/25/32/37/39；覆蓋矩陣）
 - **上游已鎖定**：ADR-0002 定了驗證模型；商品資料庫規則 3b／4；FP 四條硬拒絕；三份 ADR 皆 Proposed
 - **本週里程碑**（2026-09-26～28，四個 commit）：FP GDD 十位專家評審 → 修訂 → 32/32 T0 純 C# 實測；

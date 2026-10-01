@@ -30,7 +30,7 @@
 #   Superseded entries:     Grep pattern="status: superseded"
 
 version: 1
-last_updated: "2026-09-28"
+last_updated: "2026-10-01"
 
 # ─── STATE OWNERSHIP ─────────────────────────────────────────────────────────
 # Who is the authoritative owner of each piece of shared game state.
@@ -170,6 +170,75 @@ interfaces:
     added: 2026-09-28
     revised: ""
 
+  - contract: page_lifecycle
+    status: active
+    pattern: direct_call   # IPageLifecycle：可見性＋單調時鐘＋連線狀態；HiddenChanged 為邊緣事件
+    producer: platform-services（NightShift.Platform；Web 實作 .jslib、Desktop 實作原生 API）
+    consumers:
+      - netcode-session            # #17 背景分流 t_hidden／t_visible；#20 判定表第 2 列 IsOnline
+      - first-person-controller    # C14 → adoptInput（ADR-0001 Decision 9）
+      - machine-interaction        # C16 分頁隱藏中斷手勢
+    adr: docs/architecture/adr-0005-platform-abstraction-layer.md
+    signal_signature: "bool IsHidden（Desktop 恆 false）；double NowMs（單調；Web performance.now()、Desktop realtimeSinceStartupAsDouble）；bool IsOnline（只作快速否定）；event Action<bool> HiddenChanged（邊緣觸發，Desktop 永不觸發）"
+    referenced_by:
+      - docs/architecture/adr-0005-platform-abstraction-layer.md
+    added: 2026-10-01
+    revised: ""
+
+  - contract: unload_notifier
+    status: active
+    pattern: direct_call   # IUnloadNotifier：Web beforeunload→sendBeacon；Desktop wantsToQuit 有序關閉
+    producer: platform-services
+    consumers:
+      - netcode-session   # #12 Host 關頁＋離開通知（[P-18]）
+      - lobby-ui          # #12 Lobby 階段的 beforeunload 主動通知
+    adr: docs/architecture/adr-0005-platform-abstraction-layer.md
+    signal_signature: "void InstallLeaveBeacon(string url, string payload)（Desktop no-op）；event Func<bool> QuitRequested（Desktop：Application.wantsToQuit 回 false 延後退出；Web 不觸發）；void CompleteQuit()"
+    referenced_by:
+      - docs/architecture/adr-0005-platform-abstraction-layer.md
+    added: 2026-10-01
+    revised: ""
+
+  - contract: launch_params
+    status: active
+    pattern: direct_call   # ILaunchParams：帶碼連結；Steam Rich Presence connect 的延伸點
+    producer: platform-services
+    consumers:
+      - netcode-session   # #8 帶碼連結是主要入口（自身 query → iframe 父頁 query，[P-4]）
+      - lobby-ui          # 輸碼／帶碼加入
+    adr: docs/architecture/adr-0005-platform-abstraction-layer.md
+    signal_signature: "string RoomCode（無則 null；Desktop 命令列 --code=；Steam 延伸點）；bool IsEmbedded（Web iframe 內；Desktop false）"
+    referenced_by:
+      - docs/architecture/adr-0005-platform-abstraction-layer.md
+    added: 2026-10-01
+    revised: ""
+
+  - contract: clipboard
+    status: active
+    pattern: direct_call   # IClipboard：非同步（W1Web.jslib:33-43 回呼流程）
+    producer: platform-services
+    consumers:
+      - lobby-ui          # 複製房間碼（[P-19]：需 user gesture、iframe 可能被擋）
+    adr: docs/architecture/adr-0005-platform-abstraction-layer.md
+    signal_signature: "Task<bool> TryCopyAsync(string text)——false 時 UI 退手動複製；Desktop 以 GUIUtility.systemCopyBuffer 同步完成"
+    referenced_by:
+      - docs/architecture/adr-0005-platform-abstraction-layer.md
+    added: 2026-10-01
+    revised: ""
+
+  - contract: region_selector
+    status: active
+    pattern: direct_call   # IRegionSelector：Core Rule #28 的機制分平台，規則「貼著 Host 選」不變
+    producer: platform-services
+    consumers:
+      - netcode-session   # #26 開始上班建立 Relay allocation 前選 region
+    adr: docs/architecture/adr-0005-platform-abstraction-layer.md
+    signal_signature: "Task<string> SelectRegionAsync(IReadOnlyList<string> available, string fallback, CancellationToken ct)——Web：Intl 時區→relay_region_by_timezone→offset fallback→預設；Desktop：QoS（≤2 s）→同一條時區鏈"
+    referenced_by:
+      - docs/architecture/adr-0005-platform-abstraction-layer.md
+    added: 2026-10-01
+    revised: ""
+
 # ─── PERFORMANCE BUDGETS ──────────────────────────────────────────────────────
 # Frame time allocations per system, against a defined total frame budget.
 # Conflicts: allocations that sum to more than the total budget = unshippable.
@@ -280,6 +349,28 @@ api_decisions:
     added: 2026-09-28
     revised: ""
 
+  - purpose: relay_transport_protocol
+    status: active
+    api: 所有平台顯式 RelayProtocol.WSS ＋ UnityTransport.UseWebSockets = true（共用 Relay helper 一處設定）
+    not: RelayProtocol.Default（MPS 2.3.1 在非 WebGL 解析為 DTLS，與 UseWebSockets = true 不符即拋 Mismatched）；DTLS（待「傳輸協定與混房」ADR，前提是 DTLS×WSS 混房探針通過）
+    adr: docs/architecture/adr-0005-platform-abstraction-layer.md
+    reason: "RelayProtocol.cs:34-38 經 technical-director 與 unity-specialist 兩次獨立原始碼核對；桌面走 WSS 已由 W1 雙進程實測（RttRoleTests.cs:65,122，p95 94.5 ms）；tick rate 在 NGO 連線雜湊（NetworkConfig.cs:351），跨平台同房兩端必須一致。"
+    referenced_by:
+      - docs/architecture/adr-0005-platform-abstraction-layer.md
+    added: 2026-10-01
+    revised: ""
+
+  - purpose: platform_implementation_dispatch
+    status: active
+    api: asmdef 平台約束（NightShift.Platform.Web includePlatforms [WebGL]；NightShift.Platform.Desktop excludePlatforms [WebGL]）＋ RuntimeInitializeOnLoadMethod 自我註冊到 PlatformRoot；Editor 一律 Desktop 實作
+    not: Application.platform 執行期分支（連結期問題無法在執行期解）；散落於各消費者的 #if UNITY_WEBGL（唯一一處只准在 .Web 的註冊入口）；Editor 用 (editor) 假值 stub
+    adr: docs/architecture/adr-0005-platform-abstraction-layer.md
+    reason: "DllImport(__Internal) 在非 Web 平台的 IL2CPP 原生連結期硬性失敗，而 Editor 走 Mono 延遲解析測不出；只靠 IL2CPP 可達性分析排除從未驗證——asmdef 排除＋建置期 grep 雙鎖比照 ADR-0001。"
+    referenced_by:
+      - docs/architecture/adr-0005-platform-abstraction-layer.md
+    added: 2026-10-01
+    revised: ""
+
 # ─── FORBIDDEN PATTERNS ──────────────────────────────────────────────────────
 # Architecture anti-patterns explicitly banned by accepted ADRs.
 # When writing a new ADR, check this list — if the proposed approach matches
@@ -365,3 +456,24 @@ forbidden_patterns:
     why: "DefaultWritePerm 是 Server（NetworkVariableBase.cs:225），WritePerm 為 get-only、無 setter（:261-267）。漏掉建構子參數時 owner 的寫入被 CannotWrite() 丟棄（NetworkVariable.cs:151-152），值永遠停在初始值——功能靜默失效，而純 C# T0 測試看不到 Unity 轉接層的建構呼叫。"
     adr: docs/architecture/adr-0003-solid-capsule-query.md
     added: 2026-09-28
+
+  - pattern: dllimport_outside_platform_web
+    status: active
+    description: "DllImport(__Internal) 只得出現在 NightShift.Platform.Web；遊戲程式碼中 #if UNITY_WEBGL 恰一處且位於該組件的註冊入口；Core 組件的 asmdef 不得引用 NightShift.Platform。"
+    why: "每多一處 #if 就多一組會在桌面 build 靜默生效的 Editor 假值；桌面 IL2CPP 的原生連結期失敗在 Editor（Mono，P/Invoke 延遲解析）測不出。建置期 grep 與 asmdef 平台約束雙鎖，缺一不可。"
+    adr: docs/architecture/adr-0005-platform-abstraction-layer.md
+    added: 2026-10-01
+
+  - pattern: platform_stub_fake_values
+    status: active
+    description: "平台介面的非 Web 實作不得回傳佔位假值（如 (editor)、恆 1、以 Time.realtimeSinceStartup 冒充 performance.now()）；每項能力的桌面語意必須是等價行為或 ADR-0005 Decision 5 表中明寫的固定值；Editor 一律使用 Desktop 實作。"
+    why: "W1WebProbe.cs:22-45 的 #else stub 在真正的桌面 build 會靜默生效：GetOnline() 永遠 1、離開通知永遠不送——與 ADR-0001 的 enableOverlapRecovery、ADR-0003 的 NetworkVariable 建構子參數同屬「預設值悄悄生效、沒有錯誤訊息」。"
+    adr: docs/architecture/adr-0005-platform-abstraction-layer.md
+    added: 2026-10-01
+
+  - pattern: desktop_without_run_in_background
+    status: active
+    description: "桌面實作的 IPageLifecycle.IsHidden 恆 false 以 Application.runInBackground = true 為前提；PlatformRoot 的 Desktop 分支必須在建構時斷言並強制設為 true。"
+    why: "桌面放棄 netcode #17 的背景分流是刻意的（主迴圈不節流）；但 runInBackground 預設 false 時失焦即停主迴圈，Host 心跳中斷、整房被 #20 判離線，且沒有任何錯誤訊息。"
+    adr: docs/architecture/adr-0005-platform-abstraction-layer.md
+    added: 2026-10-01

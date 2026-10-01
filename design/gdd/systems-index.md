@@ -36,6 +36,7 @@ Web transport 未驗證），因此設計與原型順序以網路層優先。MVP
 | 17 | 教學／第一班 | Meta | Alpha | Not Started | — | 波次導演 |
 | 18 | 設定與無障礙 | Persistence | Alpha | Not Started | — | — |
 | 19 | 單人練習模式 | Meta | Alpha | Not Started | — | 波次導演 |
+| 20 | 平台服務（Web 橋接／Steamworks） | Core | MVP(Web 橋接)/Alpha(Steam) | Not Started（2026-10-01 Steam 評估新增：ADR-0005 平台抽象層先寫，`docs/research/steam-feasibility-2026-10-01.md`） | — | 網路同步層（region／心跳／背景分流／sendBeacon 的平台鉤子）, 大廳 UI（帶碼連結 ↔ Rich Presence） |
 
 ## Priority Tiers
 
@@ -59,6 +60,7 @@ Web transport 未驗證），因此設計與原型順序以網路層優先。MVP
 3. 機台互動組 — depends on: 網路同步層, 商品資料庫, **第一人稱控制器**
 4. 客人系統 — depends on: 網路同步層, 商品資料庫, 第一人稱控制器（膠囊，軟）
 5. 評分邏輯 — depends on: 商品資料庫（純邏輯，EditMode 可測）
+6. 平台服務 — depends on: 網路同步層（平台鉤子）, 大廳 UI（帶碼連結）；Web 橋接 `.jslib` 為 MVP、Steamworks 為 Alpha（2026-10-01 新增）
 
 ### Feature Layer
 1. 攜帶與交付 — depends on: FP控制器, 機台互動組, 客人系統, 商品資料庫（搬運 ProductInstance）
@@ -95,6 +97,7 @@ Web transport 未驗證），因此設計與原型順序以網路層優先。MVP
 | 12 | 音效系統（機台音效） | MVP | Presentation | sound-designer | S |
 | 13 | 窗外天色系統 | VS | Presentation | technical-artist | S |
 | 14 | 其餘（16-19） | Alpha+ | — | — | — |
+| 15 | 平台服務（#20：Web 橋接 MVP／Steam Alpha；ADR-0005 先行） | MVP/Alpha | Core | technical-director | S |
 
 ## Circular Dependencies
 
@@ -153,6 +156,8 @@ Web transport 未驗證），因此設計與原型順序以網路層優先。MVP
 | **#7 客人系統**（機台互動組 r1 新增，2026-09-29） | ①**關東煮家族需求占比上限**：關東煮零手勢失敗、MVP 供給無界，是五台中唯一零注意力成本的站；無上限則 2 人房可整班常駐躲藏（支柱 3 難度槓桿失效）②**隊友端的收銀「嗶」由訂單槽變化觸發**：收銀 `Scanning` 時長 0、`StationStatus` 對其他 client 無可觀察變化，#14 無法從站台狀態得知「有人刷了一件」 | `machine-interaction.md` C2、States B、Interactions #14 |
 | **#4 攜帶與交付**（機台互動組 r1 新增，2026-09-29） | **手部容量契約**：Take／貨架即時取貨鏈在請求者手已滿時的行為——client 已知無效即不送 RPC、給輕提示（C15「每次按 E 都要有反饋」）；Host 端由 #4 的容量查詢擋下、回 `NothingToTake` 等級回饋。E0.2 r1「先拿後補」在手滿時退化為只補 | `machine-interaction.md` E0.2、C15、C20 |
 | **netcode GDD／ADR-0002**（機台互動組 r1 新增，2026-09-29） | ①**述詞⑤⑥的錨點以槽為單位**：Host 由 RPC 的 `sku` 查槽錨點，述詞不動、只換輸入（寬貨架邊緣槽對站台中心可能超過 ±60°）②**`AutoObjectParentSync = false` 為 `ProductInstance` prefab 契約**（NGO 2.13.2 `NetworkObject.cs:1398`、`:2599-2627` 會強制還原本機重設父物件）③**E2 逾時掃描掛 `OnNetworkTick`**，RPC 每幀非 tick-gated ④**保險絲到期只釋放 claim**，不判 `Failed`（C10 r1）⑤C20 的 RPC 集合（`InteractRpc`／`TakeOutputRpc`／`InterruptRpc`／`InteractResponseRpc`）取代 registry 的 `RequestInteractRpc` 簽章，由 ADR-0004 同步 | `machine-interaction.md` C10、C13、C15、C20、E2 |
+| **creative-director**（Steam 評估新增，2026-10-01） | **支柱 4 分平台改寫**：Web＝「開連結就開玩」、Steam＝「一人買、朋友免費進」（Friend Pass／Web 訪客端）。Remote Play Together 不適用（串流房主單一畫面，本作每人有第一人稱視角）。arlong 商業模型傾向 C（Steam 付費＋Web 免費入口），VS playtest 過關後裁決；連帶 art-director 評估「零美術素材」路線在 Steam 的競爭力 | `docs/research/steam-feasibility-2026-10-01.md` |
+| **technical-director**（Steam 評估新增，2026-10-01） | ①ADR-0005 平台抽象層（現在）②VS 前 1–2 天探針：Relay DTLS×WSS 混房（W1 只測過 WSS 對 WSS）③共用 helper 鎖 `RelayProtocol.WSS`＋`UseWebSockets = true`，禁 `Default` ④兩平台同版本同時發版（tick rate 在 NGO 連線雜湊裡） | 同上 |
 
 ## ⚠ `design/gdd/` 混著兩款遊戲（2026-09-21 `/consistency-check` 記錄，暫不處理）
 
