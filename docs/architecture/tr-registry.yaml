@@ -23,34 +23,2745 @@
 #   NNN = three-digit zero-padded sequence per system, starting at 001
 #
 # STATUS VALUES: active | deprecated | superseded-by: TR-[system]-NNN
+# EXTRA FIELDS (added 2026-10-01): section = GDD 節／行；layer = Foundation|Core|Feature|Presentation|Platform|Polish；
+#   adr_coverage = covered|partial|gap（審查當日快照；權威來源為 docs/architecture/traceability-index.md）
 
-version: 1
-last_updated: ""
+version: 3
+last_updated: "2026-10-01"   # r2：ADR-0006 寫入後同日重跑（docs/architecture/architecture-review-2026-10-01-r2.md）
 
-requirements: []
+requirements:
+  - id: TR-netcode-001
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "Host 權威：NPC／波次／計分／班次時鐘／共用道具／結算"
+    section: "#1 L95"
+    layer: "Foundation"
+    adr: "0006/0003"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
 
-# --- EXAMPLE ENTRIES (remove when first real entries are added) ---
-#
-# - id: TR-combat-001
-#   system: combat
-#   gdd: design/gdd/combat-system.md
-#   requirement: "Player takes damage from enemies based on attack power minus defence"
-#   created: 2026-03-10
-#   revised: ""
-#   status: active
-#
-# - id: TR-combat-002
-#   system: combat
-#   gdd: design/gdd/combat-system.md
-#   requirement: "Combo window timing is 0.4 seconds between hits"
-#   created: 2026-03-10
-#   revised: "2026-04-01"
-#   status: active
-#
-# - id: TR-combat-003
-#   system: combat
-#   gdd: design/gdd/combat-system.md
-#   requirement: "Old damage formula using raw stats"
-#   created: 2026-03-10
-#   revised: ""
-#   status: superseded-by: TR-combat-001
+  - id: TR-netcode-002
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "Owner 權威移動；`AuthorityMode=Owner` 顯式＋runtime guard"
+    section: "#2 L96-103"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-003
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "request→Host validate→broadcast；樂觀動畫≤100ms；拒絕撲空不回滾"
+    section: "#3/#5 L104-113"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-004
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "Claim 三元組同一 NetworkVariable struct（`INetworkSerializable`+`IEquatable`）；世代比對；lock 5s 含端點、仲裁純 C#"
+    section: "#4 L108-111,844,1112"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-005
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "交接＝`ChangeOwnership` 同步原子；回讀 `OwnerClientId` 才廣播；僅 server；拋物線不同步、socket 遮蔽"
+    section: "#6/#7 L116-137"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-006
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "交接冷卻≥6 tick；攜帶物狀態不得放 owner-write NetworkVariable（遺失窗口≈1 tick）"
+    section: "L131-134,1639"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-007
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "房間碼＝`session.Code`，大小寫不敏感、可貼上；輸碼必備備援；帶碼連結須解析 `document.referrer`"
+    section: "#8 L140-150,1614"
+    layer: "Feature"
+    adr: "0005"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-008
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "截止閘門唯一執行點＝`ConnectionApprovalCallback`，Host 側 `shift_end_ts−now`；MPS custom data 預檢非權威"
+    section: "#9 L153-176"
+    layer: "Core"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-009
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "approval payload 帶 build/protocol version，不符即拒（任何資料交換前）"
+    section: "L163-165,AC54"
+    layer: "Core"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-010
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "Host 關頁＝局終（無 migration）；`beforeunload`+`pagehide`→`sendBeacon`／`DeleteAsync`；處理冪等；確認框 best-effort"
+    section: "#12 L195-237"
+    layer: "Core"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-011
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "進房預算 T_load≤25／T_lobby≤10／T_spawn≤10 各自硬閘門；auth 預熱並行"
+    section: "#13 L218,898-907"
+    layer: "Foundation"
+    adr: "0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-012
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "離線立即重取樣 `online_player_count`；grace／`host_solo` 旗標→波次導演；#15a 身分＝`AuthenticationService.PlayerId`"
+    section: "#14-16 L223-254,928"
+    layer: "Core"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-013
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "`visibilitychange` 於 `.jslib` 以 `performance.now()` 標記；≤5s catch-up（公式③純邏輯）／>5s teardown；僅 InShift"
+    section: "#17 L257-270,909-926"
+    layer: "Core"
+    adr: "0005/0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-014
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "teardown 不變式：任何 InShift→Idle 先 `Shutdown()`+`ISession.LeaveAsync()` 再切 UI"
+    section: "#17a L272-283"
+    layer: "Core"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: "2026-10-01"
+    status: active
+
+  - id: TR-netcode-015
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "Host 消失排歧：MPS 層與 Relay 層獨立；序：session 事件→`onLine` false→`HasPlayer(Host)`→`State`"
+    section: "#18 L284-348"
+    layer: "Core"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-016
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "單物件 sequence（併 ClaimGeneration）、無全域序號；跨 channel 順序待驗"
+    section: "#19 L356-360"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-017
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "app 心跳 2s/8s 自 NGO 連線起；payload `{seq,last_peer_seq_seen,host_shift_end_ts,host_now_ms}`；雙向存活→單向失效走 #24；offset≤100ms 與 ping 同源；87s→12s 唯一機制"
+    section: "#20 L362-406,864-868"
+    layer: "Foundation"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: "2026-10-01"
+    status: active
+
+  - id: TR-netcode-018
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "UTP send queue 溢位防護：Host 每 tick payload 上限＋佇列深度監控"
+    section: "L398,P-16,OQ12"
+    layer: "Foundation"
+    adr: "0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-019
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "Lobby 延後建連：`WithNetworkOptions(WSS)` 不啟動；開始上班才 `StartRelayNetworkAsync`；局間 `StopNetworkAsync` 回 MPS-only；重建成本入 T_spawn"
+    section: "#23/23a/26 L415-506,663"
+    layer: "Foundation"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-020
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "WSS 每角色各自宣告（Join 亦需）＋`UseWebSockets=true`，集中 helper"
+    section: "L468-485"
+    layer: "Foundation"
+    adr: "0005"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-021
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "UTP 常數契約：`HeartbeatTimeoutMS=500` 不得動（兼 Relay PING）；`DisconnectTimeoutMS` 30s；`ClientConnectionBufferTimeout` 10s；連線總逾時 60s 應調小"
+    section: "L529,1187,1230"
+    layer: "Foundation"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-022
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "複製邀請連結：Clipboard 需 gesture＋`.jslib`；itch.io iframe 無 `clipboard-write`→文字框 fallback"
+    section: "L573,1638"
+    layer: "Feature"
+    adr: "0005"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-023
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "道具 `DontDestroyWithOwner=true`、Host 自行 unparent＋落地座標；斷線處置 7 步原子序列≤2s"
+    section: "#24 L580-605"
+    layer: "Core"
+    adr: "0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-024
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "MPS 成員唯一寫入者＝Host（`AsHost().RemovePlayerAsync`）；`max_players` 執行點＝MPS join；`session_member_count`≠`online_player_count`"
+    section: "#24a L607-617,192"
+    layer: "Core"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-025
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "Lobby Host 離開＝訂閱 `ISession` 事件＋本地 `lobby_host_silence_timeout_sec` 30s"
+    section: "#25 L619-661"
+    layer: "Core"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-026
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "冷啟動 stall 偵測在 loader HTML 層→LoadFailed；客製 Web Template 取代預設 loader"
+    section: "#27 L672-677,76-85"
+    layer: "Presentation"
+    adr: "0005"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-027
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "Relay region 貼著 Host：`.jslib` `Intl` 查表→fallback→可覆寫→`RelayNetworkOptions`；同區 RTT≤300、跨區降級契約"
+    section: "#28 L679-702,1238,AC22a"
+    layer: "Core"
+    adr: "0005/0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-028
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "狀態機 12 態（適用性矩陣 32 列 × 11 欄，Booting／LoadFailed 合欄）；Disconnected 僅由 InShift 進入；Lobby* 同 session 合流、沙盒不共享狀態；Host 獨留不結束"
+    section: "L704-776,408"
+    layer: "Core"
+    adr: "0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: "2026-10-01"
+    status: active
+
+  - id: TR-netcode-029
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "本層輸入訊號表（NGO 四 callback、MPS 事件、瀏覽器三組）＋下游 11 系統契約表"
+    section: "L780-810"
+    layer: "Core"
+    adr: "0006/0002/0003/0005"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-030
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "同步頻率：`NetworkConfig.TickRate=10`（連帶 NetworkVariable 10Hz 須確認無害）；NPC 事件≥0.2s；RPC 不受 tick"
+    section: "L812-818,1185"
+    layer: "Foundation"
+    adr: "0001"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-031
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "單一場景、不啟用 `NetworkSceneManager`；更衣室為本地 UI 疊層、定長 3–5s、同步未完仍進場"
+    section: "L821-822,177-185"
+    layer: "Foundation"
+    adr: "0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-032
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "狀態真相走 NetworkVariable（Host 寫），RPC 只驅動表現層；不重播歷史 RPC"
+    section: "L823-826"
+    layer: "Foundation"
+    adr: "0003"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-033
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "同步物件一律 Host 動態 spawn＋`NetworkPrefabsList`；禁 scene-placed；Addressables 共存、單執行緒寫死待 Web 平台 ADR"
+    section: "L827-829,1165,OQ6/11"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-034
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "RPC 一律 `[Rpc]` 禁 `[ServerRpc]/[ClientRpc]`；不繼承 `NetworkTransform`、`Update` 不可 override"
+    section: "L838-843"
+    layer: "Foundation"
+    adr: "0001/0002"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-035
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "重連身分 `PlayerId`↔slot 自建對照（ClientId 會變）；Post 重連窗口受 Relay 每 client TTL 10s 限制"
+    section: "L849-851,886-896,1229"
+    layer: "Core"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-036
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "班次時鐘真相＝Host `shift_end_ts` NetworkVariable；`end_shift_early` 直接改寫；剩餘判定一律 Host 側"
+    section: "L853-868,212"
+    layer: "Core"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-037
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "模擬不快轉不補跑；三類物件顯示層各自追平；client NPC 凍結只套最新 milestone"
+    section: "L870-882"
+    layer: "Core"
+    adr: "0003"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-038
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "建置規範：Gzip＋`decompressionFallback=false`、≤44MB、Stripping High＋`[Preserve]`、CJK 字型子集化"
+    section: "L1017-1049,1338"
+    layer: "Foundation"
+    adr: "0005"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-039
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "上游 UGS 初始化／匿名登入失敗→ServiceError；單人模式不經 UGS"
+    section: "L1136,753"
+    layer: "Foundation"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-040
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "退路 plan B：Distributed Authority（官方 Web 支援）／自架 headless＋wss 反代"
+    section: "L1142-1153"
+    layer: "Foundation"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-041
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "常數 data-driven 登錄 registry；約束①–⑮ 非法組態應可機械驗證"
+    section: "L1173-1241"
+    layer: "Foundation"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-042
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "約束⑧ 互動請求／結果一律走 RPC（越權 owner-write delta 中止整則訊息解析）"
+    section: "L1233,1639"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-043
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "`interpolation_buffer_ms=150` 不對應 NGO（≥2 tick 隨 RTT）；`remote_step_tolerance` 未定義"
+    section: "L1188,AC15/23"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-044
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "測試分層：EditMode 純邏輯（心跳／公式③④／排歧／世代）；PlayMode 多實例；Playwright 實機 Release；鉤子 build flag 隔離"
+    section: "L1493-1542"
+    layer: "Foundation"
+    adr: "0006/0001/0002/0003/0005"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-045
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "`connection_state` 枚舉→店語字串表 data-driven，禁技術詞"
+    section: "L1300-1336"
+    layer: "Presentation"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-046
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "未建 NGO 連線的端（Lobby 預檢、Lobby* 等待畫面）須能顯示班次剩餘時間；表示法不得依賴心跳 offset"
+    section: "#9 L161；Lobby* 約束 (c) L776"
+    layer: "Core"
+    adr: "0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-001
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "求解器純 C#，不引用 UnityEngine／NGO／InputSystem；31 條 T0 可 EditMode 跑"
+    section: "AC 分層 :1141-1145；C1 :154；OQ-F11 :1605"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-002
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "無移動狀態機／無姿態 enum；Movement action map 恰 `{Move2D, Look2D}`；反射列舉可行"
+    section: "C1 :157-166；AC1 :1156-1168"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-003
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "`player_move_speed_max` 具名、`provisional` 標記、記錄三輸入、無其他速度字面量、資料驅動可調"
+    section: ":15-20；AC2 :1172-1181；AC32 :1513"
+    layer: "Foundation"
+    adr: "0001"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-004
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "單幀預算 `v×min(dt,0.10)` 涵蓋輸入＋解除穿透；斜向正規化；整條鏈路（含 Unity 層）成立"
+    section: "C12 :306-327；AC3/4 :1183-1200"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-005
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "解除穿透先於加總；超預算時犧牲輸入、不等比縮放"
+    section: "C9 :255-258；Edge :815-817；AC10/11 :1295-1308"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-006
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "碰撞一律以本端渲染（內插後）位置解算；無仲裁、無回滾"
+    section: "C8 :230-244；G12 :495-498；AC8a :1259-1275"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-007
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "求解器型別上取不到 owner 真值：唯一位置介面 readonly 無 setter"
+    section: "AC8b :1277-1283"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-008
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "雙向自我解除穿透，位移全額施加於自己，對他人零寫入"
+    section: "C9 :246-254；AC9 :1285-1293"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-009
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "NPC 硬擋、玩家對 NPC 零寫入、NPC 側恆 `Separated`、`npc_depenetration_scale=1`"
+    section: "C11 :291-304；F4 :686-710；AC13 :1319-1337"
+    layer: "Core"
+    adr: "0001/0003"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-010
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "有向對狀態機三態；`PassThrough` 唯一出口為完全分離；兩端獨立不保證同步"
+    section: "States A :387-426；AC15/18 :1354-1383"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-011
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "狀態實例以玩家 id 為鍵非 slot；一端 despawn 銷毀兩實例；無膠囊不建實例"
+    section: ":397-399；Edge :841-842；AC19/20 :1385-1396"
+    layer: "Core"
+    adr: "0001/0003/0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-012
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "C10 計時主詞＝本機輸入；`IsInputCanceled` 述詞；歸零／遞增／維持三語意"
+    section: "C10 :266-285；Edge :832-835；AC14/16 :1341-1368"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-013
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "多體：解除穿透向量相加一次施加、與順序無關；多對計時器並行推進"
+    section: "Edge :858-863；AC21/22 :1400-1416"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-014
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "dt 夾制 `min(dt,0.10)` 不補跑；`Update()` 非 `FixedUpdate()`"
+    section: "C13 :329-335；F2 :670-676；AC24 :1431-1438"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-015
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "背景偵測只消費 netcode 已裁決 `visibilitychange` 通道，不自建"
+    section: "C13 :334-335"
+    layer: "Feature"
+    adr: "0001/0005"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-016
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "隱藏／失鎖時輸入與速度歸零、回前景首幀不動、仍解除穿透可被推（`adoptInput`）"
+    section: "C14 :337-353；C7 :224-228；AC25 :1440-1449"
+    layer: "Core"
+    adr: "0001/0005"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-017
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "輸入真相＝本幀按鍵狀態，非事件差分（黏鍵免疫）"
+    section: "C14 :344；:1448-1449；AC37 :1518"
+    layer: "Feature"
+    adr: "0001"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-018
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "指標鎖定三態；`Unlocked≡Lost`；角色仍在場、可被推、計入他人計時"
+    section: "C15 :355-368；States B :428-444；AC26 :1451-1460"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-019
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "不自動重鎖；重鎖手勢由 #11 提供；該點擊須吞掉；鎖定狀態輸出 HUD"
+    section: "C15 :363-365；:479；UI :1099-1103；AC27 :1462-1468"
+    layer: "Feature"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-020
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "Web pointer lock 平台能力：iframe 可用（僅 Chrome/macOS 實測）、Esc 解除、焦點遺失≠分頁隱藏"
+    section: "OQ-F1 :1595；AC35-37 :1516-1518；:463-467"
+    layer: "Feature"
+    adr: "0001/0005"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-021
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "俯仰不出本機；payload 無 pitch、無走／停；走停由內插位置微分導出"
+    section: "C6 :210-216；C16 :375-377；AC28 :1472-1475"
+    layer: "Core"
+    adr: "0001/0002"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-022
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "對外廣播邊緣觸發、無每幀路徑、不另建管道"
+    section: "C16 :370-374；AC28③ :1475-1480"
+    layer: "Feature"
+    adr: "0001/0003"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-023
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "G2 本機即時／遠端內插；`AuthorityMode=Owner` 顯式＋runtime guard"
+    section: ":34-38；:487-493；AC33 :1514"
+    layer: "Foundation"
+    adr: "0001"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-024
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "班次零傳送：無 `SetPosition/Teleport`；本機 NT 永不 `SetState()`"
+    section: "C12 :326-327；AC12 :1310-1317"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-025
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "實作模式：`CharacterController`、不繼承 `NetworkTransform`"
+    section: ":154-155；:1557"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-026
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "場景碰撞不穿牆不離地；CC 三旗標歸零；`Move()` 投影 ≤ \\|delta\\|；場景位移在預算外只能縮短"
+    section: "AC34 :1515；C2 :177-179"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-027
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "過場結束即可移動（netcode AC40）；`local_ready`＝已有可收輸入的角色；更衣室與店面同場景與否"
+    section: "States C :454-467；Edge :878-880；OQ-F8 :1602"
+    layer: "Feature"
+    adr: "0001/0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-028
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "與 #2 事件介面：送 `local_ready`、消費 `player_joined/left`、各階段輸入採納由 #2 驅動"
+    section: ":55；:475；States C :446-457"
+    layer: "Feature"
+    adr: "0003/0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-029
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "攝影機常數本系統擁有且資料驅動：near clip 0.10 覆寫 URP 預設 0.30、eye height、FOV；攝影機在膠囊中軸；transform 輸出 #11"
+    section: "F0 :544-562；F1 :598-603；AC5j :1216；:479"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-030
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "常數層：推導值非旋鈕；跨 GDD 常數（tick_rate、interp buffer、bg threshold、r_c）可被 AC5 同一測試讀取"
+    section: "F2/F4 :670-689；Tuning :1018-1039；AC5 :1202-1218"
+    layer: "Foundation"
+    adr: "0001"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-031
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "視角：線性、無平滑、硬夾 <90° 不回彈；`movementX/Y` 唯一訊號；`look_deg_per_unit` 校正"
+    section: "F6 :759-770；OQ-F2 :1596；AC29/30 :1482-1495"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-032
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "F7 `ShouldWarn` 純函式；短路順序為規格；`closing_speed` 夾制；取渲染值"
+    section: "F7 :772-795；AC31 :1497-1507"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-033
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "`PassThrough` 時對 #7 膠囊查詢同步停供；回傳本端渲染位置；跨端最終一致有界"
+    section: "Edge :836-837；AC17 :1370-1375"
+    layer: "Feature"
+    adr: "0003"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-034
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "`PassThrough` 對 #11 雙向可見，同一旗標不另建管道"
+    section: ":425-426；:533；UI :1101"
+    layer: "Presentation"
+    adr: "0003"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-035
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "對 #4 輸出：座標、yaw、手持掛載點 transform、膠囊尺寸；流進為空"
+    section: ":476；:937；:502-515"
+    layer: "Feature"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-036
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "對 #5：僅本機俯仰與射線起點；Host 只驗水平；離開半徑 >0.6 m；不鎖移動"
+    section: ":477；:517-527；C6 :214-216"
+    layer: "Feature"
+    adr: "0002"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-037
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "C7 其他系統不得鎖移動；#4 硬拒絕：手持物不改速度、不參與角色碰撞"
+    section: "C7 :218-222；:502-515"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-038
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "Presentation 回饋：C5 偏移 MVP 預設關且可關；碰撞衝擊事件雙方皆收；位置給 #14 空間化"
+    section: "C5 :203-208；:1057-1087；:941；OQ-F9 :1603"
+    layer: "Presentation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-039
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "浮點／遲滯：`PassThrough` 退出餘裕、零中心距容差、F7 NaN 短路、IL2CPP 浮點行為"
+    section: "Edge :845-848、:881-882、:899；F7 :790-792"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-040
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "netcode 側實測義務：`remote_step_tolerance`（U1）、`L_p95` 三進程實測、HOL burst、`interpolation_buffer_ms` 對應 NGO"
+    section: "U1 :797-805；:617-644；OQ-F4/F7/F10；:1548"
+    layer: "Foundation"
+    adr: "0002"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-041
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "效能：每幀純向量運算零配置；12 有向對；唯一每幀系統守 60 fps"
+    section: ":25；:389-390"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-042
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "測試落點 `Tests/EditMode/FirstPersonController/`；T0 runner；原型斷言搬遷"
+    section: ":1112-1113；:1121；:1127"
+    layer: "Foundation"
+    adr: "0001"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-043
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "NPC 位置／在場狀態讀「該端顯示中」值；在場走 NetworkVariable 非 RPC"
+    section: ":478；C11 :292-294；Edge :841"
+    layer: "Core"
+    adr: "0001/0003"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-fpc-044
+    system: first-person-controller
+    gdd: design/gdd/first-person-controller.md
+    requirement: "玩家可調值（`look_scale`、C5 開關）MVP 以資料驅動預設值交付、無 UI；持久化未定"
+    section: ":1041-1050；OQ-F9 :1603；:536"
+    layer: "Feature"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-001
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "`ClaimState{bool IsClaimed; byte ClaimedBy; uint ClaimGeneration}`（`ClaimedBy`＝slot，`NoSlot=255`）為 Host 寫、全員讀的獨立 NetworkVariable struct"
+    section: "C20 L268；States L295"
+    layer: "Foundation"
+    adr: "0006/0002"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: "2026-10-01"
+    status: active
+
+  - id: TR-machine-002
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "`StationStatus{byte Phase; int WorkStartTick; byte Sku; ulong PendingProductNetId}` 為另一獨立 Host 寫 NV，unmanaged／blittable"
+    section: "C20 L269；OQ-M15 L851"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-003
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "`StockState` 定長 `byte[N]`（N＝#6 Active 上限）掛 Host 動態 spawn 的 `StockRegistry`，全域一份，`StockChanged` 回呼"
+    section: "C20 L270；C11 L200"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-004
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "三則 client→Host RPC：`InteractRpc(stationId, sku, action∈{Interact,Restock}, gen, selfX, selfZ, selfYaw)`／`TakeOutputRpc(stationId, pose)`／`InterruptRpc(stationId, gen)`"
+    section: "C20 L257-263"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-005
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "`InteractResponseRpc` 只送發起者（`RpcTarget.Single`），承載 `RejectReason`"
+    section: "C20 L264"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-006
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "`RejectReason` 擴為八成員（＋`NothingToTake`），述詞只產前七個"
+    section: "C11 L205；E1 L514；AC1 L762"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-007
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "`sku` 一律為 #6 `network_index`（byte）；`FamilyParam` 不存在；`Sku` 於 `Claimed→Working` 寫一次不可改"
+    section: "C14 L226；C20 L272"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-008
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "`ProductInstance` 唯一建構 `Create(networkIndex, isSpoiled)`；`is_spoiled`／`network_index` 在 `Spawn()` 前寫、無 setter"
+    section: "C13 L217-218；L42；E1 L513"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-009
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "實例不掛 `NetworkTransform`；`Transform.SetParent()` 掛站台出貨位／owner 手部 socket，零位置同步"
+    section: "C13 L220"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-010
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "`AutoObjectParentSync = false` 為 prefab 契約；禁 `NetworkObject.TrySetParent()`；T1 斷言"
+    section: "C13 L221"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-011
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "掛靠容忍 `PendingProductNetId`（NV）與 Spawn 訊息到達序，雙向重試"
+    section: "C13 L222"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-012
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "spawn 時 Host 持有；Take 通過後 `ChangeOwnership(requester)` 並回讀 `OwnerClientId`；6b 冷卻起點＝transfer 非 spawn"
+    section: "C13 L219；AC14 L779"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-013
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "收銀 Host 自 ownership 查 client 手上實例，不信 RPC 商品參數"
+    section: "C12 L209；AC12 L777"
+    layer: "Feature"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-014
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "每站一台 Host 權威狀態機（Idle／Claimed／Working／Ready／Spoiled／Failed／Taken／Restocking／Faulted 預留）；`OutOfStock` 為每 SKU 全域條件非 Phase"
+    section: "States L297-308；E0.1 L502"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-015
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "兩種驗證：claim 走①–⑥只在到站；手勢結果為單一真相，以 Host 收到 RPC 的 tick 計時、不讀 client 時間戳、不綁公差"
+    section: "C1 L114-119；AC1②"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-016
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "持有者後續動作只跑②③④、⑤⑥ 0 次（轉頭≠`NotFacing`）；1.1–1.3 m 帶狀區動作接受"
+    section: "C6 L163；E3 L531；AC6／49"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-017
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "倒數在 Host 自走：`WorkStartTick`＝Host 收 RPC tick，與持有者在場無關；`Working`／`Ready` 可 `IsClaimed=false`"
+    section: "C3 L137-141；AC3 L764"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-018
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "每次接受的 `InteractRpc`／`TakeOutputRpc` 重設 5 s 保險絲（續租）；保險絲對 `Ready` 亦生效"
+    section: "C7 L167-169；AC7 L768"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-019
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "強制釋放（保險絲／斷線／走開／E0.3）只放 claim：`IsClaimed→false`、gen+1、Phase 不變；`Restocking→Idle` 不加庫存；`Failed` 唯一來源 `shift_end_ts`"
+    section: "C10 L182-189；E1 L515-517；AC10a-e"
+    layer: "Core"
+    adr: "0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-020
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "`ClaimGeneration` 每次 true→false +1、`Idle→Claimed` +0；仲裁＝述詞②在 Host 單執行緒處理順序"
+    section: "States L312；AC26 L791"
+    layer: "Core"
+    adr: "0002/0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-021
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "第一下＝claim＋第一個家族動作，一則 RPC、同一次 Host 處理；Shelf／Oden 一趟跑完 `Claimed→…→Idle`"
+    section: "E0.4 L508；States L310；AC25"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-022
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "第四中斷觸發源：對 B 送 claim 先釋放 A，先放後驗、不回滾"
+    section: "E0.3 L506；C8 L174；AC24"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-023
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "同 tick 先處理已到 RPC 再逾時掃描；掃描掛 `OnNetworkTick`／`INetworkUpdateSystem`（10 Hz）非 `Update()`；`t ≤ timeout` 含端點"
+    section: "E2 L524；AC39 L805"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-024
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "`TakeOutputRpc` 不看 claim：跑①④⑤⑥、跳②③"
+    section: "C9 L180；E1 L514；AC9"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-025
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "Shelf 為計數：`Claimed→Working` 預扣；補貨完成把本架所有未滿 SKU 設為 `stock_max`（設值冪等）；Host 單執行緒保證不為負"
+    section: "C11 L199-203；E4 L540-544"
+    layer: "Feature"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-026
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "NV 只在轉移時寫（邊緣觸發）；`progress` 不送 float，各端由 `WorkStartTick` 自算"
+    section: "C18 L249；AC20 L785"
+    layer: "Core"
+    adr: "0003"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-027
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "五台與 `StockRegistry` 開班由 Host 動態 `Spawn()`，不得 scene-placed（前提：關閉 `NetworkSceneManager`＋中途加入）"
+    section: "C18 L249；AC21；E1 L519"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-028
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "client 顯示只讀 NV 回呼；`ClaimState`／`StationStatus` 任一回呼觸發皆重讀兩者整套重算"
+    section: "States L316；UI L748"
+    layer: "Presentation"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-029
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "樂觀動畫 ≤ 100 ms 零流量；承諾瞬間恰 1 則 RPC；不等 ack 播下一步；`action_min_interval_ms ≡ optimistic_anim_max_ms`"
+    section: "C5 L157-159；F8 L470；AC5"
+    layer: "Presentation"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-030
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "互動延遲 300 ms（約束⑧）須在 4 人併發（單一 WSS、HOL 阻塞）下驗證"
+    section: "Interactions L353"
+    layer: "Foundation"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-031
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "每幀恰 1 次 `Physics.Raycast`：專用 interactable layer、長 `interact_ray_length_m`、`QueryTriggerInteraction.Collide`，回 `(stationId, sku)?` 同餵 HUD 與送出"
+    section: "C15 L228-234；AC17 L782"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-032
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "述詞⑤⑥錨點＝被瞄準槽的錨點；Host 由 `sku` 查槽錨點"
+    section: "C15 L231；E3 L532；AC46"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-033
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "Host 只驗 `sku ∈ GetByMachineFamily(family)`，不驗瞄準；非法／Deprecated sku → no-op＋撲空，非安全事件"
+    section: "E0.1 L502；E3 L535；AC16"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-034
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "非持有者提示＝本機以自報姿態跑同一⑤⑥純函式、無遲滯；持有者提示到 `station_leave_m` 才滅"
+    section: "C15 L236；E3 L531；AC46"
+    layer: "Presentation"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-035
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "`Interaction` action map 恰為 `{Interact}`、`Movement` 不動；按住式只取 `started`／`canceled` 邊界，時長由 Core `dt` 累加"
+    section: "C17 L245；AC19 L784"
+    layer: "Foundation"
+    adr: "0001"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-036
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "`visibilitychange` 由轉接層直接呼叫 Core 手勢中斷，不接 Input System `canceled`"
+    section: "C16 L241；AC18 L783"
+    layer: "Foundation"
+    adr: "0005"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-037
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "同源可見性匯流排同時餵 ADR-0001 `adoptInput` 與 C16 邊緣事件"
+    section: "OQ-M14 L850"
+    layer: "Foundation"
+    adr: "0005"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-038
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "Host 玩家走同一 RPC 路徑（`LocalSendRpcTarget` 同步遞迴），不得捷徑改狀態"
+    section: "E2 L524"
+    layer: "Foundation"
+    adr: "0002"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-039
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "音效雙觸發源：站台狀態邊緣＝NV 回呼；個人結果＝`InteractResponseRpc`，不得從 NV 推斷"
+    section: "Interactions L343；V/A L701"
+    layer: "Presentation"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-040
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "`IShelfAvailabilityQuery.GetAvailableStock(byte networkIndex)` Host-only 純函式，回含預扣即時值"
+    section: "C11 L204；Interactions L340"
+    layer: "Feature"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-041
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "`ICheckoutCustomerQuery` Host-only 讀 #7 NV 現值，以 Host 處理 RPC 那一刻為準；null → 不中"
+    section: "C12 L212；E5 L550；AC40"
+    layer: "Feature"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-042
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "「訂單完成」邊緣事件於最後一槽補滿時發 #7／#15；`Matches()`／`AllocateSlot()`／`MatchResult` 為 #6 純函式，`Unevaluated` 即斷言失敗"
+    section: "C12 L210；E5 L548；AC28"
+    layer: "Feature"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-043
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "HUD 供料：`StationStatus`／`ClaimState`／`StockState`／`(stationId, sku)?`／`RejectReason`；進度邊界用 `ServerTime.Tick − WorkStartTick`、插值用 `NetworkTime.TimeAsFloat`"
+    section: "UI L734-739"
+    layer: "Presentation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-044
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "對 #4：6b 冷卻起點＝transfer；不中實例留手上；手滿時 client 已知無效即不送 RPC"
+    section: "Interactions L348／356"
+    layer: "Feature"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-045
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "時基 `ServerTime.Tick`（`WorkStartTick`）與 `shift_end_ts` 來自 #2；班次結束後拒收所有站台 RPC"
+    section: "E1 L517；Deps L576"
+    layer: "Foundation"
+    adr: "0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-046
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "`station_reach_m=0.8`、`accept_radius_m=R+r_c=1.1`、`station_leave_m=max(R+r_c+H, 2·r_c)=1.3`、`H=0.20`：值歸 GDD、關係式歸 ADR"
+    section: "F1 L366；F2 L380"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-047
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "撲空演出對齊贏家內插位置進 `accept_radius_m`；`whiff_arrival_wait_max_ms = 2-tick 地板 + one_way_p95 = 350→400`"
+    section: "States L330；F4 L422-434"
+    layer: "Presentation"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-048
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "client 已知無效按鍵不送 RPC（Working 再按、空手刷、手滿）；只有 Host 端才知的不一致經回應收斂為撲空"
+    section: "E1 L520；C12 L211；C15 L237"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-049
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "斷線實走保險絲（Host 判定 8–87 s）；「強制釋放 ≤ 2 s」為判定後預算；Host 自身斷線機台層零處理"
+    section: "C10 L193；E1 L518"
+    layer: "Foundation"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-050
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "遲加入者由 NV 初始同步取得 `ClaimState`／`StationStatus`（Spawn 前寫入值隨初始同步），同式自算進度"
+    section: "E1 L519；OQ-M12 L848"
+    layer: "Foundation"
+    adr: "0003"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-051
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "站台狀態機為純 C#、T0 不碰 NGO；fake 接縫 `ISpawner`／`IOwnershipTransferer`／`IStockWriter`／`IStationStatusWriter`／`ICheckoutCustomerQuery`；約 40 條 T0"
+    section: "AC 前言 L756；C20 L272"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-052
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "一站一個出貨位：Ready／Spoiled 時 Start no-op；`Ready→Spoiled` despawn Fresh、spawn Spoiled 同位；Take 以站台為目標不帶實例 id"
+    section: "E1 L512-513；AC38"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-053
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "`Faulted` 預留狀態與介面形狀、MVP 零觸發源；靜態列舉斷言無轉移目標"
+    section: "C19 L253；AC22 L787"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-054
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "九旋鈕進 registry；推導量為純函式不得獨立常數；`cook_cap_sec=30` 固定；AC32 讀 registry 現值"
+    section: "F 淨旋鈕 L480-494；Tuning L620；AC32／35"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-055
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "版面約束：站台錨點定義、可互動體不重疊、異家族淨距 ≥ 1.2 m、槽高度帶 [0.75, 1.60] m"
+    section: "E3 L532-534；F6 L461"
+    layer: "Feature"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-056
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "一律程式 tween、禁骨架動畫（Animator 為 WebGL CPU 瓶頸）；世界內進度為實體視覺本機自算"
+    section: "V/A L690-691"
+    layer: "Presentation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-machine-057
+    system: machine-interaction
+    gdd: design/gdd/machine-interaction.md
+    requirement: "NV 承載 struct 保持 blittable（bytewise memcmp、無 boxing）；本系統每幀預算 < 0.1 ms"
+    section: "OQ-M15 L851"
+    layer: "Core"
+    adr: "0003"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-001
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "SKU 身份、`machine_family` 歸屬、`ProductInstance` 形狀、`Matches()` 判定只在本系統定義；#5／#7／#15 不自帶商品知識"
+    section: "Overview L28-35；規則 4 L390-397"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-002
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "兩層 ID：`sku_id` string 設計期鍵、不進封包；`network_index` byte 1-255 循序、永不重用、0=Invalid；線路只傳 byte，SKU 表不跨端同步"
+    section: "規則 1 L234-235；規則 2 L317-342"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-003
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "零值即無效：所有 enum 顯式整數值、`Invalid=0` 哨兵、只可附加不可重排不可改值；`MatchResult.Unevaluated=0`"
+    section: "規則 1b L253-289；Edge L935-942"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-004
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "序列化欄位名／型別一經上線永不變更；改名必加 `[FormerlySerializedAs]`；snake_case→`_camelCase` 對應表於第一筆資產前定案；byte→ushort 需實測遷移＋`[P-17]` token 遞增"
+    section: "規則 1c L291-310；L959-965"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-005
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "`ProductDefinition : ScriptableObject` 僅作者期容器，catalog 建置時一次性轉 immutable POCO／struct；`ProductEntry`／`ProductInstance`／`CustomerDemand` 不繼承 `UnityEngine.Object`"
+    section: "Interactions L531-538；AC14②"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-006
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "容器 `ProductCatalogAsset` 持 `ProductDefinition[]`，由 boot scene `[SerializeField]` 引用走序列化依賴鏈進 build；執行期零發現、零 async、零 `Resources`、零 `AssetDatabase`"
+    section: "OQ-P11 L1589"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-007
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "`mesh_ref`／`icon_ref` 直接強引用；`Deprecated` 時必清 null；不採 Addressables／`Resources`；下架殘留納 44MB 硬標"
+    section: "規則 2 L323-338；Overview L48-57；Deps L996-1001"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-008
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "`ProductInstance { network_index: byte, is_spoiled: bool }`；唯一公開建構點 `Create(networkIndex, isSpoiled)`，無 public 無參建構／設值器；`Create(0,_)` 拋"
+    section: "States B L417；L468-470、L512-515；AC23"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-009
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "`CustomerDemand` 攤平 tagged-union struct（無 GC alloc），無 public 建構子；由 catalog 工廠 `FamilyDemand`／`NamedDemand` 建構時驗證拋；`default` 落哨兵由 `Matches()` 攔"
+    section: "L457-459、L480-511；AC6c"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-010
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "`CustomerOrder { slots: CustomerDemand[] }`；「兩串」= 兩槽，無 `qty`；修飾語不進資料結構"
+    section: "L652-669"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-011
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "`IProductCatalog` 四個唯讀查詢：`Get()` 含 deprecated、未指派值無條件 throw（禁 `[Conditional]` assert）；`GetByMachineFamily`／`GetOrderable`／`GetNameable` 只回 Active、建置時算一次快取、回同一 `IReadOnlyList` 引用；空池回空陣列"
+    section: "L450-455、L523-530；Edge L921-931；AC9／10／16"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-012
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "`Matches()`／`AllocateSlot()` 住 `static ProductMatching`、不在介面上（fake 只供資料不供邏輯）；全函式無狀態；可完全不建 catalog 呼叫"
+    section: "L461-479；L827-831；AC14③"
+    layer: "Core"
+    adr: "ADR-0001"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-013
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "`Matches` 輸入域驗證先於判定、回四值 enum 無部分分數；`AllocateSlot` 前置 `filled.Length == slots.Length` 否則 `ArgumentException`、資格述詞＝`Match`"
+    section: "Formulas L677-697、L774-799"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-014
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "資料庫無執行期狀態、無任何寫入者、不接網路同步層與遊戲時鐘；載入期固定靜態表隨 build 出貨"
+    section: "States L400-402；L448；L340-342"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-015
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "asmdef 邊界：`NightShift.ProductDatabase` 可引 `UnityEngine.CoreModule`，不得引 `Unity.Netcode.Runtime`／`UnityEditor`／自家 `.Editor`；以 `CompilationPipeline.GetAssemblies(Player)` 遞迴閉包驗證"
+    section: "L540-548；AC14①"
+    layer: "Foundation"
+    adr: "ADR-0001／0005"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-016
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "四個組件：runtime／`Tests.EditMode`／`Tests.EditMode.Content`／`.Editor`（`includePlatforms:[\"Editor\"]`、`defineConstraints:[]`）；runtime 不得引 `.Editor`"
+    section: "L1417-1426"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-017
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "無 per-SKU 硬編：組件內不得有以 `sku_id`／`network_index` 分支的 switch／if、不得自動產生 per-SKU enum（靜態掃描）"
+    section: "AC11b L1353"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-018
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "資料不變量除 EditMode 外必同時實作於 `IPreprocessBuildWithReport.OnPreprocessBuild`，失敗 `throw BuildFailedException`；共用純函式 `ProductCatalogValidator.Validate(entries, snapshot)`"
+    section: "Edge L851-861；AC17a"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-019
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "繞過路徑對策：驗證器 asmdef 釘 Editor＋空 defineConstraints；`TypeCache` 確認鉤子型別唯一（AC17b）；`-batchmode` 須 `EditorApplication.Exit(1)`；Addressables／SBP build 不經此鉤子需另建閘"
+    section: "L863-889；AC17b"
+    layer: "Foundation"
+    adr: "ADR-0001／0005"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-020
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "快照檔 `design/registry/sku-shipped-snapshot.txt`：append-only 事件日誌＋`frozen_enum:` 可解析鍵；`[FrozenEnum]` 屬性掃描、雙向比對含 underlying type；快照缺席一律失敗；以 `System.IO` 相對 `Application.dataPath` 讀"
+    section: "AC1a／1b／15a／15b；L1431-1437；L1450-1476"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-021
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "資產不變量建置檢查：icon 64×64 Sprite、mipmap、被 `Atlas_Ui` 收錄；Active 必有 mesh；∀家族有 `Ui_Icon_[family]`；`Ui_IconTier_*` 存在且層級正確；Deprecated 清 null；審查紀錄 `gateN_verdict:` 可解析＋新鮮度"
+    section: "Edge L895-915；AC4／4b／4c／12b／18／19"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-022
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "建置期資料治理閘門為跨切面基礎設施，拆獨立 ADR-XXX＋工具任務；兩軸：證據閘今日生效、建置期強制待 ADR（僅資料不變量 14 條，不含 AC6c）"
+    section: "L891-893；L1367-1413；OQ-P11"
+    layer: "Foundation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-023
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "`network_index`／`is_spoiled` 以 server-write `NetworkVariable` 分開掛 #5 的 `NetworkBehaviour`；必於 `Spawn()` 之前寫入、之後不可變；遲加入者靠 spawn 同步取現值"
+    section: "L576-634；AC22"
+    layer: "Core"
+    adr: "ADR-0003"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-024
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "不把 `ProductInstance` 整包過線（資料組件不宣告 `INetworkSerializable`）；#4／#5 不得以 `NetworkVariable`／`NetworkList` 承載其集合，若要須 W1 式實測並重裁 AC14；`UserNetworkVariableSerialization<T>` 存在性待查"
+    section: "L635-651；OQ-P12"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-025
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "`RequestHandoff.itemId` 型別為 `NetworkObjectId (ulong)`，與 SKU 身份分離；Host 必驗 `itemId` 仍在 `SpawnedObjects`，查無回明確失敗不得靜默 no-op"
+    section: "L558-575；OQ-P7"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-026
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "兩端 SKU 表一致性依 `[P-17]` 版本 token，其粒度須涵蓋純內容變更（或自建 SKU 表雜湊）；舊 client 收新 `network_index` → `Get()` 拋，目前零 AC 覆蓋"
+    section: "規則 2 L344-360；OQ-P8"
+    layer: "Core"
+    adr: "0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-027
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "給 #5：`GetByMachineFamily()` 決定菜單；#5 建 `ProductInstance` 並蓋 `is_spoiled`；#5 須提供 `Shelf` 可得性查詢，查詢存在前 #7 不得從 `Shelf` 抽 `Named`"
+    section: "L552-553；L976-986；OQ-P15"
+    layer: "Feature"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-028
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "給 #7／#8：`GetOrderable()`／`GetNameable()` 池、兩個需求工廠；levy `sku_concurrent_distinct_max=4`（計槽）、指名比例由 #7 定並反向引用"
+    section: "L485-489；L553；L1133-1140"
+    layer: "Feature"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-029
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "給 #15／#4：`Matches()` 四值 `MatchResult`、`AllocateSlot()` 單訂單內有效；槽位佔用狀態歸 #15／#4；跨訂單分配歸 #4；#15 必含整合測並反向引用"
+    section: "L554；L820-836；L972-975"
+    layer: "Feature"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-030
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "給 #11／#13：`machine_family`／`network_index` 為 icon 鍵；`display_label` 給 #13；層級標記於 Sprite Atlas 打包期合成、不得執行期疊加"
+    section: "L555-556；L1243-1248；L1308-1311"
+    layer: "Presentation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-031
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "內容配額資料驅動常數（`sku_holler_max_chars=4`、`sku_display_label_max_chars=6`、`sku_nameable_max=6`、nameable 下限 2、每家族 Active≥1、`sku_count_target`）；以 `StringInfo.LengthInTextElements` 計數、`Normalize(FormKC)` 查重"
+    section: "Tuning L1069-1077；AC2a／2b／3／20"
+    layer: "Feature"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-032
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "資產命名綁定 `sku_id`／enum 名：`Mesh_[sku_id]`、`Ui_Icon_[sku_id]`、`Ui_Icon_[family]`、`Ui_IconTier_Family／Named`；手持模型禁貼圖、icon 為貼圖"
+    section: "Visual/Audio L1144-1152、L1202-1208"
+    layer: "Presentation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-033
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "本地化：明示假設繁中單一語系；新增語系時 `display_label` 須拆兩欄（喊名／顯示 key），不得動 `sku_id`"
+    section: "L1074；OQ-P17 L1595"
+    layer: "Presentation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-product-034
+    system: product-database
+    gdd: design/gdd/product-database.md
+    requirement: "內容審查輔助工具（advisory）：注音距離腳本（門檻 3）、icon 機器前篩（門檻 6）；重跑觸發器＝審查紀錄的內容雜湊"
+    section: "L178-191；L1484-1487"
+    layer: "Presentation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-001
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "Web/WebGL、開連結＋房間碼即玩、進房 ≤60 s"
+    section: "概 L21、L163-166"
+    layer: "Foundation"
+    adr: "0005/0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-002
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "2–4 人（MVP 2）、一班 8–10 分、連續值班 30–90 分"
+    section: "概 L23-24"
+    layer: "Foundation"
+    adr: "0006/0003"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-003
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "itch.io iframe 發行（pointer lock、clipboard、permissions policy）"
+    section: "概 L25、L260；索 L22、L145①"
+    layer: "Platform"
+    adr: "0005"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-004
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "隊友即障礙：窄空間互撞、借過、PassThrough 降級"
+    section: "概 L44、L158、L234②"
+    layer: "Core"
+    adr: "0001, 0003"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-005
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "客人＝個性狀態機；Host 權威 NPC、里程碑事件複製"
+    section: "概 L74"
+    layer: "Core"
+    adr: "0003"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-006
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "機台互動 request→validate→broadcast"
+    section: "概 L75"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-007
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "兩段式節奏：波次導演＋遊戲時鐘（含突發事件）"
+    section: "概 L76、L118-119"
+    layer: "Feature"
+    adr: "0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-008
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "星級評分＋結算：純邏輯、EditMode 可測、槽位分配整合測項"
+    section: "概 L77、L284；索 L62、L135"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-009
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "房間碼進房、大廳、斷線重連；Session 走 MPS Sessions"
+    section: "概 L78；索 L53、L58"
+    layer: "Foundation"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-010
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "斷線基本保障（MVP）：偵測、物品掉落、站台解鎖、留守者降載"
+    section: "概 L289-293"
+    layer: "Core"
+    adr: "0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-011
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "WebGL 無 UDP → WSS 傳輸鏈路"
+    section: "概 L234①"
+    layer: "Foundation"
+    adr: "0005"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-012
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "NGO client-server ＋ Relay ＋ Sessions、client-hosted"
+    section: "概 L233、L238"
+    layer: "Foundation"
+    adr: "0006"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-013
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "互動事件同步、非物理精準同步"
+    section: "概 L238"
+    layer: "Core"
+    adr: "0001, 0002"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-014
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "建置 ≤44 MB gzip；Gzip＋`decompressionFallback=false`；Stripping High"
+    section: "概 L233、L254；tech-prefs L24-65"
+    layer: "Platform"
+    adr: "0001, 0005"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-015
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "URP 渲染：燈光即場景、零美術素材、程序化材質、頭頂 icon 可讀"
+    section: "概 L187-197、L235-236"
+    layer: "Presentation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-016
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "機台音效＝手感核心；Web 首次手勢前禁自動播放"
+    section: "概 L237；tech-prefs L26-27"
+    layer: "Presentation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-017
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "資料驅動內容：店型＝參數集、程序波次；店面手工佈局"
+    section: "概 L239-240"
+    layer: "Feature"
+    adr: "0001"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-018
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "鍵鼠主、觸控／手把次；手機瀏覽器後期"
+    section: "概 L222、L254、L302；tech-prefs L20-23"
+    layer: "Core"
+    adr: "0001"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-concept-019
+    system: game-concept
+    gdd: design/gdd/game-concept-night-shift.md
+    requirement: "Steam 桌面版（Alpha）"
+    section: "概 L260"
+    layer: "Platform"
+    adr: "0005"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-001
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "#5←#3：僅本機俯仰＋射線起點；自報 (x,z,yaw)"
+    section: "索 L24"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-002
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "#5→ADR-0002 硬依賴：Host 只驗水平距離＋朝向"
+    section: "索 L24、L129③"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-003
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "`ICheckoutCustomerQuery`（Host-only，讀 #7 NV 現值，同 tick 自洽）"
+    section: "索 L24、L141①、L151"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-004
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "`IShelfAvailabilityQuery.GetAvailableStock`；「有人正在拿＝不可得」"
+    section: "索 L26、L126①、L141③"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-005
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "訂單完成／交付邊緣事件契約（#5→#7、#4→#7）"
+    section: "索 L26、L105、L141②"
+    layer: "Feature"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-006
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "`ISolidCapsuleQuery` #7←#3 膠囊（軟）"
+    section: "索 L26、L61"
+    layer: "Core"
+    adr: "0003"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-007
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "`ProductInstance` 攜帶：禁 NetworkList 承載；ownership transfer；冷卻起點＝Taken"
+    section: "索 L125②、L126③、L140①③"
+    layer: "Feature"
+    adr: "0003"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-008
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "`is_spoiled`／`network_index` server-write、Spawn 前寫入、之後不可變"
+    section: "索 L126②"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-009
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "#11 PassThrough 雙向可見用同一遮罩"
+    section: "索 L128②、L132②"
+    layer: "Presentation"
+    adr: "0003"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-010
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "非語音「我要這個」ping"
+    section: "索 L128④"
+    layer: "Presentation"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-011
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "走道幾何：無兩具身體互釘死；spawn 進幾何無保險絲"
+    section: "索 L128⑤、L132④"
+    layer: "Feature"
+    adr: "0001"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-012
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "不鎖移動、離開即中斷半徑 >0.6 m、無垂直互動"
+    section: "索 L129①②④"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-013
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "#8 節拍邊界；`2×beat ≥ player_pin_timeout_sec`；穿越店面時間上限三方聯署"
+    section: "索 L130、L132⑤"
+    layer: "Feature"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-014
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "`npc_id_reuse_cooldown_sec ≥1.0`；NPC 在場讀 NV 不讀 RPC"
+    section: "索 L131①②"
+    layer: "Core"
+    adr: "0003"
+    adr_coverage: covered
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-015
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "#7 避讓二選一（自訂 steering vs `NavMeshAgent` → AC17 作廢）"
+    section: "索 L131③"
+    layer: "Core"
+    adr: "0003"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-016
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "#14：遠端碰撞音自內插位置微分；邊緣事件走 NV 回呼；衰減／發聲數／遮蔽／混音"
+    section: "索 L133、L143、L156②"
+    layer: "Presentation"
+    adr: "0001, 0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-017
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "#18 動暈／靈敏度／FOV／鍵位重綁在 MVP 曝險"
+    section: "索 L134、L148③④"
+    layer: "Polish"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-018
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "版本 token 涵蓋純內容變更；兩平台同版本同時發版"
+    section: "索 L136①、L160④"
+    layer: "Platform"
+    adr: "0005/0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-019
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "約束⑧讀法：結果走 RPC、狀態走 NV；netcode 自相矛盾；`is_spoiled` 歸屬"
+    section: "索 L136②"
+    layer: "Core"
+    adr: "0002, 0003"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-020
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "延遲模型：4 段 relay 腿；內插 ≥200 ms（TickLatency）；`remote_step_tolerance`；判準側 dt 上限；併發負載下驗"
+    section: "索 L137①③⑤、L138、L144③"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-021
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "撲空對稱：房主永不撲空"
+    section: "索 L139①"
+    layer: "Core"
+    adr: "0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-022
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "claim 租約續期（每次接受動作 RPC 重設）；到期只釋放 claim"
+    section: "索 L139②、L144②、L158④"
+    layer: "Core"
+    adr: "0002/0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-023
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "撲空畫面順序（等贏家內插進 reach）；進度由 `WorkStartTick` 各端自算"
+    section: "索 L142"
+    layer: "Presentation"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-024
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "ADR-0002 待加註：持有期只驗②③④；⑤⑥錨點以槽為單位；`NothingToTake`；第四中斷源；C20 RPC 集取代 `RequestInteractRpc`"
+    section: "索 L144①、L150①②、L158①⑤"
+    layer: "Core"
+    adr: "0002"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-025
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "同 tick 順序（先 RPC 再逾時掃描）；E2 掛 `OnNetworkTick`；`AutoObjectParentSync=false`"
+    section: "索 L150③、L158②③"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-026
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "ADR-XXX 建置期資料治理閘門（14 條資料不變量）"
+    section: "索 L146"
+    layer: "Platform"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-027
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "#20 平台鉤子：region／背景分流／sendBeacon／帶碼連結↔Rich Presence；心跳；分頁隱藏≠失焦"
+    section: "索 L39、L63、L137④"
+    layer: "Platform"
+    adr: "0005/0006"
+    adr_coverage: partial
+    created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-index-028
+    system: systems-index
+    gdd: design/gdd/systems-index.md
+    requirement: "攝影機常數（near clip 0.10）擁有者；#11 讀攝影機 transform"
+    section: "索 L22、L71"
+    layer: "Core"
+    adr: "—"
+    adr_coverage: gap
+    created: 2026-10-01
+    revised: ""
+    status: active
