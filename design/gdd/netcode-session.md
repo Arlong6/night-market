@@ -203,7 +203,7 @@ transport 無官方端到端範例），因此是第一個做技術原型的系�
       關分頁、導頁、按離開這些最常見動作能否走到主動通知，直接決定 Lobby 的體驗
       是否違反支柱 5。
     - **離開通知必須用 `sendBeacon`／`keepalive` 語義**（r4 新增）：一般 async HTTP 請求
-      在 unload 時會被瀏覽器取消，SDK 的 `LeaveSessionAsync` 幾乎必然來不及送出 `[P-18]`。
+      在 unload 時會被瀏覽器取消，SDK 的 `LeaveAsync` 幾乎必然來不及送出 `[P-18]`。
       ⚠ **`[P-18]` 的重要性因此同步升格**——它先前的 fallback 是「退回心跳路徑」，
       而實測證明那條路徑在 Lobby 要 132 秒。**若 `sendBeacon` 不可行，必須另尋
       在 unload 期間可靠送出刪除請求的手段，不能只是接受降級。**
@@ -272,7 +272,7 @@ transport 無官方端到端範例），因此是第一個做技術原型的系�
 **17a. teardown 不變式（r4 新增，狀態機層級）**
     **任何從 InShift 離開至 Idle 的路徑**——#17 的 >5 秒分支、#18 排歧表的
     「Host 消失」與「無法排歧」兩個分支、玩家主動離開——**一律先執行 client teardown，
-    再切 UI**：呼叫 `NetworkManager.Shutdown()`＋best-effort `LeaveSessionAsync()`。
+    再切 UI**：呼叫 `NetworkManager.Shutdown()`＋best-effort `ISession.LeaveAsync()`（SDK 實名，ADR-0006 以 2.3.1 原始碼核對；舊名 LeaveSessionAsync 不存在）。
     不得只切本地 UI 而讓底層連線活著（會出現 client 已回主選單、Host 尚未判定的
     「陰陽人」狀態）。
     r3 只把 teardown 寫在 #17 的 >5 秒分支，而 #18 的兩個 →Idle 分支沒有——**AC43 的
@@ -376,7 +376,7 @@ transport 無官方端到端範例），因此是第一個做技術原型的系�
     Lobby 與更早的狀態依 #23 尚未建立 NGO 連線，自然不跑心跳——Lobby 的 Host 離開
     偵測改由 MPS session 事件負責，見 **#25**。
 
-    **心跳 payload（r4 定案）**：`{ seq, last_peer_seq_seen, host_shift_end_ts }`，約 8-16 bytes。
+    **心跳 payload（r4 定案）**：`{ seq, last_peer_seq_seen, host_shift_end_ts, host_now_ms }`，16 bytes（ADR-0006 補 `host_now_ms`：它是下方 offset 公式的 `host_value`，r4 漏列）。
     一個封包同時供給三件事，因此**刪除「時鐘每 60s resync」這條獨立通道**：
     - **雙向存活確認**（B3 的修法）：Host 收到某 client 的心跳時，若其回報的
       `last_peer_seq_seen` 已落後超過 `heartbeat_timeout_sec`，即判定該連線**單向失效**，
@@ -606,7 +606,7 @@ transport 無官方端到端範例），因此是第一個做技術原型的系�
 
 24a. **MPS session 成員的唯一寫入者是 Host（r4 新增）**：
     `max_players` 由 **MPS／Lobby 服務端**在 `JoinSessionByCodeAsync` 就擋下——那是 NGO
-    connection approval **之前**的一道獨立閘門。拔線者的 C# 不會執行，`LeaveSessionAsync`
+    connection approval **之前**的一道獨立閘門。拔線者的 C# 不會執行，`LeaveAsync`
     永遠不會被呼叫；WebGL 關分頁時 `OnApplicationQuit` 同樣不可靠。因此若無人代為移除，
     2 人 MVP 房的斷線者點連結回來會撞「這班人滿了」（AC33／AC36 與 AC8 互相打架）。
     - **`max_players` 的唯一執行點＝MPS join**；NGO 側只做二次驗證
@@ -862,7 +862,7 @@ offset 掛在心跳上。Tuning Knobs 的「時鐘同步間隔 1s」已更名為
 - `shift_length_sec` 登錄為常數，是 `shift_end_ts` 的**初值**（`shift_end_ts = 建立時刻 + shift_length_sec`）
 - **`end_shift_early` 直接改寫 `shift_end_ts`**——這是它能被表達的唯一方式
 - **client↔Host 的時鐘 offset 由既有的 2s 心跳持續估計**（#20 的 payload 帶
-  `host_shift_end_ts`）：`offset = host_value − (local_value + RTT/2)`，RTT 由心跳往返得出。
+  `host_shift_end_ts` 與 `host_now_ms`）：`offset = host_now_ms − (local_now + RTT/2)`（ADR-0006 補列），RTT 由心跳往返得出。
   收斂精度目標 ≤`clock_offset_tolerance_ms`（100ms）
 - **所有「班次剩餘」的權威判定一律在 Host 側**（#9 的 approval 閘門即依此）；client 側的
   倒數顯示是套用 offset 後的估計值，不具權威

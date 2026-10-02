@@ -4,7 +4,7 @@
 Proposed
 
 ## Date
-2026-10-01
+2026-10-01（r1：2026-10-03，依 `architecture-review-2026-10-01.md` §3 C6／§5／§6 與 `architecture-review-2026-10-01-r2.md` §3A X2／X3、§3B 修訂，與 ADR-0006 r1 成對；逐條對照見文末「r1 修訂紀錄」）
 
 ## Engine Compatibility
 
@@ -13,18 +13,18 @@ Proposed
 | **Engine** | Unity 6.3 LTS（6000.3）、IL2CPP＋Managed Stripping High、NGO 2.13.2、MPS 2.3.1、UTP 2.x |
 | **Domain** | Core / Platform（Web 橋接 ＋ Networking 的平台鉤子） |
 | **Knowledge Risk** | HIGH——6.1–6.3 超出模型訓練資料；本 ADR 只引用 engine-reference 與 W1 實測已證實的行為 |
-| **References Consulted** | `docs/engine-reference/unity/VERSION.md`；`modules/web.md`（:17-18 WebSocket 僅 UTP↔UTP、:40-60 背景分頁主迴圈、:130 硬指標）；`modules/multiplayer.md`（:109 `ReconnectionTimeoutMS` 僅 DTLS、:143-145 Relay 三協定與 `UseWebSockets`、:159-172 首選拓撲）；`breaking-changes.md`（:11 Windows 預設 DX12、:45 Instant Games 棄用）；`deprecated-apis.md`（:17-18 通用 `[Rpc]`、MPS Sessions）；`design/gdd/netcode-session.md`（#8／#12／#17／#20／#27／#28，`[P-7]`／`[P-13]`／`[P-14]`／`[P-18]`／`[P-19]`）；ADR-0001 Decision 9；`prototypes/w1-netcode/Assets/Scripts/W1WebProbe.cs`；`docs/research/steam-feasibility-2026-10-01.md` |
+| **References Consulted** | `docs/engine-reference/unity/VERSION.md`；`modules/web.md`（:17-18 WebSocket 僅 UTP↔UTP、:40-60 背景分頁主迴圈、:130 硬指標）；`modules/multiplayer.md`（:109 `ReconnectionTimeoutMS` 僅 DTLS、:143-145 Relay 三協定與 `UseWebSockets`、:159-172 首選拓撲）；`breaking-changes.md`（:11 Windows 預設 DX12、:45 Instant Games 棄用）；`deprecated-apis.md`（:17-18 通用 `[Rpc]`、MPS Sessions）；`design/gdd/netcode-session.md`（#8／#12／#17／#20／#27／#28，`[P-7]`／`[P-13]`／`[P-14]`／`[P-18]`／`[P-19]`）；ADR-0001 Decision 9；`prototypes/w1-netcode/Assets/Scripts/W1WebProbe.cs`；`docs/research/steam-feasibility-2026-10-01.md`；**r1 新增**：`docs/architecture/architecture-review-2026-10-01.md`（§3 C6、§5 ADR Revision Flags、§6）、`docs/architecture/architecture-review-2026-10-01-r2.md`（§3A X2／X3、§3B）、ADR-0006（Decision 4／9／10）、netcode GDD `[P-4]`（:1614）與 #12（:229-236）、`com.unity.services.wire` 1.5.0 的 `unity-websocket-sharp.asmdef`（asmdef 平台字串旁證） |
 | **Post-Cutoff APIs Used** | ① MPS 2.3.1 `RelayProtocol.WSS`／`Default`（`Default` 在非 WebGL 變 DTLS，`RelayProtocol.cs:34-38`——technical-director 與 unity-specialist 兩次獨立原始碼核對）② `UnityTransport.UseWebSockets`（UTP 2.x，`multiplayer.md:143`）③ `com.unity.services.qos` 1.4.1 於桌面平台：套件已在相依樹，桌面路徑為 `#if UGS_QOS_SUPPORTED && !UNITY_WEBGL`（`UGS_QOS_SUPPORTED` 由 asmdef versionDefines 賦值，理應涵蓋 6000.3，**未實機確認**）；WebGL 端拋 `PlatformNotSupportedException` 已核實（`WrappedQosService.cs:107-109`）。其餘 `Application.wantsToQuit`／`Application.Quit`／`Application.runInBackground`／`Application.internetReachability`／`Time.realtimeSinceStartupAsDouble`／`GUIUtility.systemCopyBuffer`（standalone 可寫）皆為訓練截止前 API，6.1–6.3 無異動紀錄 |
-| **Verification Required** | T1-Web：既有 W1 第 2／4 批（`[P-7]` stripping 存活、`[P-18]` beacon 8/8、`[P-19]` 剪貼簿）改經本層重跑，結果不得變 ｜ T1-Desktop（**只在 Windows standalone 測，不得用 Editor Play Mode 頂替**——停止 Play Mode 不是應用程式 Quit，`wantsToQuit` 極可能不觸發，未對 6.3 覆核）：①a 點 X／Alt-F4（皆走 WM_CLOSE）→ `wantsToQuit` 路徑 ≤ 1 s 完成 `NetworkManager.Shutdown()`＋session leave 後才真正退出 ①b 工作管理員強殺 → 確認本層不承諾、#20 心跳接手 ②`IRegionSelector` 桌面 QoS 在 ≤ 2 s 內回 region，失敗退時區鏈；同時確認 `UGS_QOS_SUPPORTED` 在 6000.3 確有定義 ③`IPageLifecycle.IsHidden` 於桌面失焦、最小化時皆為 false 且主迴圈不節流（`Application.runInBackground = true`）④DX12 預設下 build 可跑（Steam Overlay 另於 Steam 整合 ADR 驗）⑤**Windows IL2CPP standalone 連結成功**——`.Web` 組件被 asmdef 排除後，桌面 build 不得含任何 `DllImport("__Internal")`（Editor 走 Mono、P/Invoke 延遲解析，測不出這個） ｜ 建置期：`DllImport("__Internal")` 只允許出現在 `NightShift.Platform.Web`；`#if UNITY_WEBGL` 在遊戲程式碼恰 1 處且位於 `NightShift.Platform.Web` |
+| **Verification Required** | T1-Web：既有 W1 第 2／4 批（`[P-7]` stripping 存活、`[P-18]` beacon 8/8、`[P-19]` 剪貼簿）改經本層重跑，結果不得變 ｜ T1-Desktop（**只在 Windows standalone 測，不得用 Editor Play Mode 頂替**——停止 Play Mode 不是應用程式 Quit，`wantsToQuit` 極可能不觸發，未對 6.3 覆核）：①a 點 X／Alt-F4（皆走 WM_CLOSE）→ `wantsToQuit` 路徑 ≤ 1 s 完成 `NetworkManager.Shutdown()`＋session leave 後才真正退出 ①b 工作管理員強殺 → 確認本層不承諾、#20 心跳接手 ②`IRegionSelector` 桌面 QoS 在 ≤ 2 s 內回 region，失敗退時區鏈；同時確認 `UGS_QOS_SUPPORTED` 在 6000.3 確有定義 ③`IPageLifecycle.IsHidden` 於桌面失焦、最小化時皆為 false 且主迴圈不節流（`Application.runInBackground = true`）④DX12 預設下 build 可跑（Steam Overlay 另於 Steam 整合 ADR 驗）⑤**Windows IL2CPP standalone 連結成功**——`.Web` 組件被 asmdef 排除後，桌面 build 不得含任何 `DllImport("__Internal")`（Editor 走 Mono、P/Invoke 延遲解析，測不出這個） ｜ 建置期：`DllImport("__Internal")` 只允許出現在 `NightShift.Platform.Web`；`#if UNITY_WEBGL` 在遊戲程式碼恰 1 處且位於 `NightShift.Platform.Web` ｜ **r1 新增**：①T1-Web：離開通知改走 keepalive `fetch` 後，自 itch.io iframe 對 UGS Lobby REST 送出帶 `Authorization: Bearer` 的 `DELETE` 能成功（＝ADR-0006 V10）。⚠ 這種請求一定觸發 CORS preflight，unload 期間的 keepalive＋preflight 在各瀏覽器支援到什麼程度，目前不知道，Chrome／Firefox／Safari 都要測；`pagehide`＋`beforeunload` 雙觸發時只發出一筆 ②T1-Web：`RoomCode` 自 itch.io 的 `document.referrer` 解析成功（`[P-4]` 重跑）③建置期：asmdef 平台字串以 6000.3 Editor 的 Inspector 勾選產生、不手刻 JSON；EditMode 以 `CompilationPipeline.GetAssemblyDefinitionPlatforms()` 斷言 `WebGL` 是有效名稱——unity-specialist 判斷 Unity 會靜默忽略無法辨識的平台字串，那樣 `.Web` 會進所有平台編譯。旁證：Unity 自家 `com.unity.services.wire` 1.5.0（`unity: 6000.0`）的 `unity-websocket-sharp.asmdef` 正以 `"excludePlatforms": ["WebGL"]` 排除 WebGL |
 
 ## ADR Dependencies
 
 | Field | Value |
 |-------|-------|
-| **Depends On** | ADR-0001（Proposed）——轉接層契約：Core 只收 `adoptInput` 布林，`visibilitychange` 通道由轉接層消費（Decision 9）。本 ADR 是那條通道的供給側 |
-| **Enables** | Steam 桌面 build（Alpha，`docs/research/steam-feasibility-2026-10-01.md`）；日後「傳輸協定與混房」ADR（DTLS×WSS 探針）；「Steam 整合範圍」ADR（Rich Presence、成就、雲存檔） |
+| **Depends On** | None（r1 依 r2 §3B Resolution 1：原列 ADR-0001。本 ADR 依賴的是分層紀律 `movement_logic_outside_core`——那已是 registry 的全專案禁用模式，不是 ADR-0001 的決策輸出；真正的消費方向相反，是 ADR-0001 的轉接層取用本 ADR 的 `IPageLifecycle`。保留原列會在 ADR-0001 r1 引用 ADR-0006 的 `PeerKey` 時成環 0001→0006→0005→0001。ADR-0001 改列於 Related Decisions） |
+| **Enables** | ADR-0006 連線會談生命週期（`IPageLifecycle`／`IUnloadNotifier`／`ILaunchParams`／`IRegionSelector` 是它的平台輸入，r1 成對 Accept）；ADR-0001 的 `adoptInput` 供給側（ADR-0001 Decision 9 的 `visibilitychange` 通道）；Steam 桌面 build（Alpha，`docs/research/steam-feasibility-2026-10-01.md`）；日後「傳輸協定與混房」ADR（DTLS×WSS 探針）；「Steam 整合範圍」ADR（Rich Presence、成就、雲存檔） |
 | **Blocks** | 所有會新增 `DllImport("__Internal")` 的 story（netcode #12／#17／#28、大廳 #8 帶碼連結、剪貼簿）——必須經本層；第一個正式 netcode 實作 story 前本 ADR 應 Accepted |
-| **Ordering Note** | 與 ADR-0004（機台互動組 Core 分層，保留編號）互不依賴、可並行。ADR-0001 仍 Proposed 時本 ADR 可先寫，但兩者需一起在 `/architecture-review` 過關 |
+| **Ordering Note** | **與 ADR-0006 r1 成對 Accept**（它依賴本 ADR r1 的 `InstallLeaveBeacon` 簽章與 `RoomCode` 來源）。Accept 順序依 r2 §3B：ADR-0005 r1＋ADR-0006 r1 → ADR-0001 r1 → ADR-0002／0003 r1。**本 ADR 不得把 ADR-0006 列入 Depends On**——ADR-0006 已依賴本 ADR，反向再列即成兩點環。與 ADR-0004（機台互動組 Core 分層，保留編號）互不依賴、可並行 |
 
 ## Context
 
@@ -36,9 +36,9 @@ netcode GDD、第一人稱控制器 GDD、機台互動組 GDD 與 ADR-0001 共�
 |---|---|---|
 | `visibilitychange`（背景分頁當下標記時刻） | netcode #17 背景分流、FP C14、MI C16 | netcode `:258`、`[P-7]` |
 | `performance.now()` 單調時鐘 | netcode #17 的 `t_hidden`／`t_visible` | netcode `:264-265` |
-| `beforeunload`＋`sendBeacon` 離開通知 | netcode #12 | `:205-210`、`[P-18]` 8/8 實證 |
+| `pagehide`＋`beforeunload` 離開通知（r1：改走 keepalive `fetch` 帶 `Authorization`，見 Decision 5） | netcode #12、ADR-0006 Decision 9 | `:205-210`、`:229-236`；`[P-18]` 8/8 實證的是 `sendBeacon` 打測試端點，帶 Bearer 打 UGS Lobby REST 待 V10 |
 | `navigator.onLine` | netcode #20 判定表第 2 列（快速否定） | `:301` |
-| 帶碼連結（自身與 iframe 父頁的 query） | netcode #8、大廳 UI | `[P-4]`、`:140` |
+| 帶碼連結（iframe 內只能讀 `document.referrer`，r1） | netcode #8、大廳 UI | `[P-4]`（:1614）、`:140` |
 | 剪貼簿（需 user gesture） | 大廳 UI 複製房間碼 | `[P-19]` |
 | 時區（`Intl.DateTimeFormat`，不可用 .NET `TimeZoneInfo`） | netcode Core Rule #28 選 region | `:680-700` |
 | 下載卡住偵測 | netcode #27 | loader 層，Unity 啟動前 |
@@ -56,7 +56,7 @@ W1 原型的寫法是每個消費者自己 `#if UNITY_WEBGL && !UNITY_EDITOR` �
 - 一人團隊：介面要少、fake 要便宜。
 
 ### Requirements
-- R1 每項瀏覽器能力都有一個介面，桌面實作提供**語意等價**的行為，或明寫「不適用」的固定值——不得是假值。
+- R1 **需要 `.jslib` 的**瀏覽器能力，每一項都有一個介面；本 ADR 收編的清單就是 Decision 2 的五個介面（列舉制；r1 依首輪 review C6 改寫——原文「每項瀏覽器能力都有一個介面」把 pointer lock 與 `AudioContext` 也含了進去，卻沒有給它們介面）。Unity 跨平台 API 已涵蓋的能力不在本層：pointer lock 由 Unity 的 `Cursor.lockState` 提供（瀏覽器層的可用性已由 `[OQ-F1]` 實測：itch.io iframe 可鎖、Esc 後一次點擊可重鎖；Unity 這一層的行為由 ADR-0001 的 T1-Web 驗），歸 ADR-0001 轉接層與 #11 HUD 的重鎖提示（TR-fpc-019／020）；Web 首次手勢前禁自動播放與 `AudioContext` 的恢復歸 #14 音效 ADR，以 Release Web build 驗證 Unity 自帶的恢復是否足夠（TR-concept-016）。**任一能力日後若需要 `.jslib`，一律在本組件新增介面**，不得在他處 `DllImport`（`dllimport_outside_platform_web`）。桌面實作提供**語意等價**的行為，或明寫「不適用」的固定值——不得是假值。
 - R2 遊戲程式碼中 `#if UNITY_WEBGL && !UNITY_EDITOR` **恰好一處**，且住在 Web 實作組件的註冊入口；`DllImport("__Internal")` 只存在於 Web 實作組件，而該組件以 asmdef 平台約束在桌面 build 根本不編譯（雙鎖：asmdef＋建置期 grep，缺一不可——比照 ADR-0001）。
 - R3 Core 組件（`NightShift.*.Core`）不引用本層；轉接層把介面結果轉成 Core 已定義的純值（如 `adoptInput`）。
 - R4 每個介面有 T0 可用的 fake。
@@ -70,7 +70,7 @@ W1 原型的寫法是每個消費者自己 `#if UNITY_WEBGL && !UNITY_EDITOR` �
 
 1. **組件**：`NightShift.Platform`（asmdef，可引用 UnityEngine，不引用任何 Core 或 Netcode）。子組件 `NightShift.Platform.Web`（含全部 `DllImport("__Internal")` 與唯一的 `.jslib`）、`NightShift.Platform.Desktop`。Core 組件的 asmdef 不得引用 `NightShift.Platform`——`/story-readiness` 與建置期 grep 同時擋。
 2. **五個介面**（見 Key Interfaces）：`IPageLifecycle`（可見性＋單調時鐘＋連線狀態）、`IUnloadNotifier`（離開通知）、`ILaunchParams`（帶碼連結）、`IClipboard`、`IRegionSelector`。每個消費者的建構子只收自己需要的那一個；沒有「`IPlatformBridge` 大介面」。
-3. **選擇實作靠 asmdef 平台約束＋自我註冊，組合根本身沒有 `#if`**（r1 依 unity-specialist B2 修正）：
+3. **選擇實作靠 asmdef 平台約束＋自我註冊，組合根本身沒有 `#if`**（撰寫期依 unity-specialist B2 修正）：
    - `NightShift.Platform.Web.asmdef`：`"includePlatforms": ["WebGL"]`——桌面 build **根本不編譯**這個組件，`DllImport("__Internal")` 不可能進到 Windows IL2CPP 的原生連結期（單靠 IL2CPP 可達性分析排除從未驗證過，而且 Editor 走 Mono、P/Invoke 延遲解析，測不出連結失敗）。
    - `NightShift.Platform.Desktop.asmdef`：`"excludePlatforms": ["WebGL"]`——Editor 與所有 standalone 都編譯，Editor 因此天然就是 Desktop（R6）。
    - 兩個實作組件各以 `[RuntimeInitializeOnLoadMethod(SubsystemRegistration)]` 向 `PlatformRoot` 註冊；`.Web` 的註冊入口用 `#if UNITY_WEBGL && !UNITY_EDITOR` 包住（這是遊戲程式碼裡**唯一**的 `#if UNITY_WEBGL`，擋的是「Editor 切到 WebGL 目標時 `.Web` 也會被編譯」的情況）。`PlatformRoot.Create()` 回傳已註冊者，無人註冊時回 Desktop。
@@ -83,8 +83,8 @@ W1 原型的寫法是每個消費者自己 `#if UNITY_WEBGL && !UNITY_EDITOR` �
 | `IPageLifecycle.IsHidden` | `document.visibilityState == "hidden"`，邊緣事件 `HiddenChanged` | **恆 false**——桌面失焦、最小化時主迴圈不節流（`Application.runInBackground = true` 為契約）；netcode #17 在桌面「一律在前景」。焦點**不在**本介面：`adoptInput` 的焦點來源是 `Cursor.lockState`（ADR-0001 Decision 9），失焦時指標本就解鎖 |
 | `IPageLifecycle.NowMs` | `performance.now()` | `Time.realtimeSinceStartupAsDouble × 1000`（單調） |
 | `IPageLifecycle.IsOnline` | `navigator.onLine`（只作快速否定，netcode #20） | `Application.internetReachability != NotReachable`（同樣只作快速否定） |
-| `IUnloadNotifier` | `beforeunload` → `sendBeacon(url, payload)`（`[P-18]`） | `Application.wantsToQuit` 回 false → 執行 `NetworkManager.Shutdown()`＋session leave（netcode 實測 `Shutdown()` 0.08 s）→ 完成或 ≤ 1 s 逾時後 `Application.Quit()`。桌面不需要 beacon：關閉是有序的 |
-| `ILaunchParams.RoomCode` | 自身 query `?code=` → iframe 父頁 query（`[P-4]`） | 命令列 `--code=XXXX`；**Steam 延伸點**：Rich Presence `connect` 落到同一欄位（Steam 整合 ADR 再定） |
+| `IUnloadNotifier` | `pagehide`（主）＋`beforeunload`（備援）→ `fetch(url, { method, headers, body, keepalive: true })`。兩個事件相隔 1–24 ms 都會觸發，`.jslib` 以單發旗標**只送第一次**（`[P-18]` 16/16；ADR-0006 Decision 9）。不用 `sendBeacon`：它只能 POST、帶不了自訂標頭，而 UGS Lobby REST 的 `DELETE` 需要 `Authorization: Bearer`（r1 依 r2 X2）。token 換發後轉接層重新 `InstallLeaveBeacon` 覆寫；正常離開房間時 `ClearLeaveBeacon()` | `Application.wantsToQuit` 回 false → 執行 `NetworkManager.Shutdown()`＋session leave（netcode 實測 `Shutdown()` 0.08 s）→ 完成或 ≤ 1 s 逾時後 `Application.Quit()`。桌面不需要 beacon：關閉是有序的。先 `Shutdown()` 再 leave 會讓 MPS 記一條預期中的警告，順序不得為了消警告而改（ADR-0006 Decision 9） |
+| `ILaunchParams.RoomCode` | `IsEmbedded` 時解析 **`document.referrer`** 的 `?code=`（r1 依 r2 X3；`[P-4]` 實測：itch.io 把自身 `location.search` 改寫成 `?v=…`，父頁 `parent.location.search` 跨域被擋，唯一可讀的是 referrer）；非 iframe 部署（如 GitLab Pages 直開）讀自身 `location.search`。referrer 可能被瀏覽器隱私設定或 `Referrer-Policy` 削減，所以回 `null` 是正常情況，輸碼備援不可砍（netcode AC2） | 命令列 `--code=XXXX`；**Steam 延伸點**：Rich Presence `connect` 落到同一欄位（Steam 整合 ADR 再定） |
 | `ILaunchParams.IsEmbedded` | `window.self !== window.top` | 恆 false |
 | `IClipboard.TryCopyAsync` | Clipboard API **本質非同步**（`.then/.catch` 經 `SendMessage` 回呼，`W1Web.jslib:33-43`）；需 user gesture，iframe 可能被 permissions policy 擋（`[P-19]`）→ `Task<bool>` 在回呼抵達時完成 | `GUIUtility.systemCopyBuffer = text`，`Task.FromResult(true)` |
 | `IRegionSelector.SelectRegionAsync` | `Intl.DateTimeFormat().resolvedOptions().timeZone` 查 `relay_region_by_timezone` → `relay_region_offset_fallback` → 預設值（Core Rule #28 原鏈） | QoS（`com.unity.services.qos`）取最低延遲 region → 失敗或逾時 2 s 時退到同一條時區鏈（桌面可用 `TimeZoneInfo.Local`）。規則「貼著 Host 選」不變，只是桌面多一個更準的第一步 |
@@ -133,20 +133,23 @@ public interface IPageLifecycle
 
 public interface IUnloadNotifier
 {
-    void InstallLeaveBeacon(string url, string payload);   // Web: beforeunload→sendBeacon；Desktop: no-op
+    // Web：pagehide（主）＋beforeunload（備援）→ fetch keepalive；.jslib 單發旗標，只送第一次。重複呼叫即覆寫（token 換發後重裝）。
+    // Desktop：no-op。r1：原 (url, payload) 走 sendBeacon，帶不了 Authorization 標頭（r2 X2）。
+    void InstallLeaveBeacon(string url, string method, IReadOnlyDictionary<string, string> headers, string body = null);
+    void ClearLeaveBeacon();               // 正常離開房間（Teardown）時拆除，之後關分頁不再送
     event Func<bool> QuitRequested;        // Desktop: Application.wantsToQuit；回 false = 延後退出；Web: 不觸發
     void CompleteQuit();                   // Desktop: 有序關閉完成後真正 Application.Quit()
 }
 
 public interface ILaunchParams
 {
-    string RoomCode { get; }               // 無則 null；Steam Rich Presence connect 的落點
+    string RoomCode { get; }               // 無則 null（Web 的 referrer 被削減時常見——輸碼備援不可砍）；Steam Rich Presence connect 的落點
     bool IsEmbedded { get; }               // Web: iframe 內；Desktop: false
 }
 
 public interface IClipboard
 {
-    Task<bool> TryCopyAsync(string text);  // Web: Clipboard API 非同步、需 user gesture；false 時 UI 顯示手動複製（r1：原同步 bool 無法承載 W1 已證的回呼流程）
+    Task<bool> TryCopyAsync(string text);  // Web: Clipboard API 非同步、需 user gesture；false 時 UI 顯示手動複製（撰寫期修正：原同步 bool 無法承載 W1 已證的回呼流程）
 }
 
 public interface IRegionSelector
@@ -163,6 +166,7 @@ public static class PlatformRoot
 // NightShift.Platform.Web.asmdef   →  "includePlatforms": ["WebGL"]
 // NightShift.Platform.Desktop.asmdef →  "excludePlatforms": ["WebGL"]
 // .Web 註冊入口：#if UNITY_WEBGL && !UNITY_EDITOR（遊戲程式碼唯一的一處）
+// 平台字串以 6000.3 Editor 的 asmdef Inspector 勾選產生、不手刻；EditMode 以 CompilationPipeline.GetAssemblyDefinitionPlatforms() 斷言 "WebGL" 有效（r1）
 
 public sealed class PlatformServices          // 五個介面的簡單容器，供轉接層拆用；不是 service locator
 {
@@ -208,6 +212,7 @@ T0 fake 各一個（`FakePageLifecycle` 可手動切 hidden／online；`FakeUnlo
 - 多兩個 asmdef 與一個 `.jslib` 的搬遷；W1 的 `W1WebProbe` 要對照重驗三批實測。
 - `IPageLifecycle.IsHidden` 在桌面恆 false，等於桌面放棄 netcode #17 的背景分流——這是刻意的（桌面主迴圈不節流），但 `Application.runInBackground = true` 成為契約，忘記設會讓桌面失焦時整個 Host 停擺。
 - QoS 套件只在桌面載入，多一個平台專屬相依。
+- 離開通知改用 keepalive `fetch` 之後，成敗取決於瀏覽器在 unload 期間對 CORS preflight 的支援（V10）；W1 `sendBeacon` 的 8/8 實證不能直接沿用（r1）。
 
 ### Risks
 - **`Application.runInBackground` 漏設**（桌面失焦 → 主迴圈停 → Host 心跳斷）→ 緩解：`PlatformRoot.Create()` 的 Desktop 分支在建構時斷言並強制設為 true；T1-Desktop ③ 驗證。
@@ -217,21 +222,26 @@ T0 fake 各一個（`FakePageLifecycle` 可手動切 hidden／online；`FakeUnlo
 - **QoS 於桌面的行為未實測**（本專案只知道 WebGL 會拋例外）→ 緩解：T1-Desktop ②；失敗退時區鏈，功能不受影響只是 region 較差。
 - **有人在本層外新增 `DllImport`** → 緩解：建置期 grep（`grep -rn 'DllImport("__Internal")' Assets --include=*.cs` 必須只命中 `NightShift.Platform.Web`）。
 - **MPS 升版改變 `RelayProtocol.Default` 語意** → 緩解：Decision 6 顯式指定，不依賴 `Default`。
+- **keepalive `fetch` 被 CORS preflight 或 token 過期擋下**（V10，r1）→ Host 關頁退化為服務端約 132 s 才回收，但 ADR-0006 的本地 30 s 靜默提示已保底；client 關頁退化為 Host 的心跳路徑 8 s。若三大瀏覽器之一不支援，備案是一個只收 `sendBeacon`、代為帶 Bearer 呼叫 Lobby REST 的極小轉發端點——那會引入新的伺服器元件，需另寫 ADR。
+- **`Referrer-Policy` 或瀏覽器隱私設定削減 referrer**（r1）→ `RoomCode` 回 `null`、退到輸碼（netcode AC2 保底）。`[P-4]` 在 itch.io 實測可讀，但使用者端的設定不在我們控制內。
+- **asmdef 平台字串打錯會被靜默忽略**（unity-specialist 判斷）→ `.Web` 進所有平台編譯，桌面 IL2CPP 連結期失敗 → 緩解：Inspector 產生字串＋`GetAssemblyDefinitionPlatforms()` EditMode 斷言（r1）；T1-Desktop ⑤ 仍是最後一道。
 
 ## GDD Requirements Addressed
 
 | GDD System | Requirement | How This ADR Addresses It |
 |------------|-------------|--------------------------|
 | netcode-session.md | #17 背景分流：以 `visibilitychange` 在背景當下標記 `t_hidden`／`t_visible`，時間源必須單調（`:258-265`） | `IPageLifecycle.HiddenChanged`＋`NowMs`；桌面恆前景、主迴圈不節流 |
-| netcode-session.md | #12 離開通知須 `sendBeacon`／`keepalive` 語義，`beforeunload` 需 `.jslib`（`:205-210`，`[P-18]`） | `IUnloadNotifier.InstallLeaveBeacon`；桌面改 `wantsToQuit` 有序關閉 |
+| netcode-session.md | #12 離開通知須 `sendBeacon`／`keepalive` 語義，`pagehide`＋`beforeunload` 需 `.jslib`、雙觸發須冪等（`:205-210`、`:229-236`，`[P-18]`；TR-netcode-010） | `IUnloadNotifier.InstallLeaveBeacon(url, method, headers, body)`：keepalive `fetch`＋送出端單發去重（r1）；桌面改 `wantsToQuit` 有序關閉 |
 | netcode-session.md | #20 判定表第 2 列 `navigator.onLine`（`:301`） | `IPageLifecycle.IsOnline`，兩平台皆只作快速否定 |
-| netcode-session.md | #8 帶碼連結是主要入口；iframe 父頁 query 轉發（`:140`、`[P-4]`） | `ILaunchParams.RoomCode`／`IsEmbedded`；桌面命令列；Steam 延伸點 |
+| netcode-session.md | #8 帶碼連結是主要入口（`:140`、`[P-4]`；TR-netcode-007） | `ILaunchParams.RoomCode`：iframe 內讀 `document.referrer`（r1）、可能為 `null`，輸碼備援不可砍；`IsEmbedded`；桌面命令列；Steam 延伸點 |
 | netcode-session.md | Core Rule #28 region 貼著 Host 選；時區須經 `.jslib` `Intl`（`:680-700`）；QoS 不支援 WebGL（`:487`） | `IRegionSelector`：Web 時區鏈、桌面 QoS → 時區鏈；規則不變、機制分平台 |
-| netcode-session.md | `[P-19]` 剪貼簿需 user gesture＋`.jslib` | `IClipboard.TryCopy` 回 false 時 UI 退手動複製 |
+| netcode-session.md | `[P-19]` 剪貼簿需 user gesture＋`.jslib` | `IClipboard.TryCopyAsync` 回 false 時 UI 退手動複製 |
 | netcode-session.md | 兩平台 tick rate 一致（`NetworkConfig.cs:351` 連線雜湊） | 本 ADR 不動 tick；Decision 6 固定 WSS |
 | first-person-controller.md | C14 分頁隱藏時移動輸入歸零、回前景第一幀不移動 | FP 轉接層由 `IPageLifecycle` 產 `adoptInput`（ADR-0001 Decision 9） |
 | machine-interaction.md | C16 分頁隱藏由轉接層主動中斷手勢，不依賴 Input System `canceled` | MI 轉接層訂閱 `IPageLifecycle.HiddenChanged` |
 | systems-index.md | #20 平台服務：Web 橋接 MVP、Steam Alpha | 本 ADR 定 MVP 的那一半；Steam 一半留 Alpha ADR |
+| first-person-controller.md | TR-fpc-019／020 pointer lock（重鎖手勢、吞掉重鎖點擊、iframe 可用性） | **不在本層**（r1 列舉制）：由 Unity `Cursor.lockState` 提供，歸 ADR-0001 轉接層與 #11；日後若需 `.jslib`，依 R1 於本組件新增介面 |
+| game-concept-night-shift.md | TR-concept-016 Web 首次手勢前禁自動播放 | **不在本層**（r1 列舉制）：歸 #14 音效 ADR；若 Unity 自帶的 `AudioContext` 恢復不足而需 `.jslib`，依 R1 於本組件新增介面 |
 
 ## Performance Implications
 - **CPU**：`HiddenChanged` 邊緣觸發、`NowMs` 為一次 `.jslib` 呼叫或一個屬性讀取；每幀成本可忽略（< 0.01 ms）。`SelectRegionAsync` 每班次一次。
@@ -244,16 +254,34 @@ T0 fake 各一個（`FakePageLifecycle` 可手動切 hidden／online；`FakeUnlo
 2. `W1WebProbe.cs`／`.jslib` 保留為原型對照，不遷移；W1 第 2／4 批的三項實測改經本層重跑（T1-Web）。
 3. CI（尚未建立）加入兩條 grep：`DllImport("__Internal")` 只在 `NightShift.Platform.Web`；`#if UNITY_WEBGL` 只在 `PlatformRoot`。
 4. Steam 桌面 build 於 Alpha 啟動時，只需新增 `NightShift.Platform.Desktop` 的 QoS 相依與命令列解析，轉接層零改動。
+5. **r1 遷移**：W1 `.jslib` 的 `sendBeacon` 路徑改為 keepalive `fetch`＋單發旗標；`[P-18]` 改以帶 `Authorization` 的 `DELETE` 對 UGS Lobby REST 重跑（V10）；`RoomCode` 改讀 `document.referrer`（`[P-4]` 重跑）。
 
 ## Validation Criteria
 - T0：五個 fake 存在且 netcode #12／#17／#28 的純邏輯測試只依賴 fake（不引用 UnityEngine）。
-- T1-Web：`[P-7]`／`[P-18]`／`[P-19]` 三批實測經本層重跑，結果與 W1 相同（stripping 存活、beacon 8/8、剪貼簿 gesture 條件）。
+- T1-Web：`[P-7]`／`[P-18]`／`[P-19]` 三批實測經本層重跑，結果與 W1 相同（stripping 存活、beacon 8/8、剪貼簿 gesture 條件）。r1 新增：離開通知以 keepalive `fetch` 帶 `Authorization` 對 UGS Lobby REST 送出 `DELETE` 成功、雙觸發只發出一筆（Chrome／Firefox／Safari；V10）；`RoomCode` 自 itch.io 的 `document.referrer` 解析成功。
 - T1-Desktop（Windows standalone，非 Editor Play Mode）：①a 點 X／Alt-F4 退出路徑 ≤ 1 s 完成 Shutdown＋leave ①b 強殺不承諾、心跳接手 ②QoS ≤ 2 s 回 region、失敗退時區鏈 ③失焦／最小化 `IsHidden` 恆 false 且主迴圈持續 ④`runInBackground` 斷言生效 ⑤IL2CPP 連結成功、build 內零 `DllImport("__Internal")`。
-- 建置期：兩條 grep 皆通過（`DllImport("__Internal")` 只在 `.Web`；`#if UNITY_WEBGL` 恰 1 處且在 `.Web`）；`.Web.asmdef` 含 `"includePlatforms": ["WebGL"]`；Core asmdef 無 `NightShift.Platform` 參照。
+- 建置期：兩條 grep 皆通過（`DllImport("__Internal")` 只在 `.Web`；`#if UNITY_WEBGL` 恰 1 處且在 `.Web`）；`.Web.asmdef` 含 `"includePlatforms": ["WebGL"]`；Core asmdef 無 `NightShift.Platform` 參照；EditMode 以 `CompilationPipeline.GetAssemblyDefinitionPlatforms()` 斷言 `WebGL` 是有效平台名（r1）。
 - 決策正確的訊號：Alpha 開 Steam 版時，netcode／FP／MI 轉接層零改動。
 
 ## Related Decisions
-- ADR-0001（轉接層契約、`adoptInput`、grep 守門）；ADR-0002（Verification ③ WSS 上 RPC 順序——Decision 6 固定 WSS 的理由之一）；ADR-0003（預設值靜默生效的先例）。
+- ADR-0001（r1 由 Depends On 改列 Related：轉接層契約、`adoptInput`、grep 守門）；ADR-0002（Verification ③ WSS 上 RPC 順序——Decision 6 固定 WSS 的理由之一）；ADR-0003（預設值靜默生效的先例）。
+- ADR-0006 連線會談生命週期（消費 `IPageLifecycle`／`IUnloadNotifier`／`ILaunchParams`／`IRegionSelector`；與本 ADR r1 成對 Accept；`InstallLeaveBeacon` 的 `method`／`headers` 與 `RoomCode` 的 referrer 來源都是它提出的義務）。
 - `docs/research/steam-feasibility-2026-10-01.md`（本 ADR 的動機與 Steam 時程）。
 - `design/gdd/netcode-session.md`、`design/gdd/systems-index.md` #20。
 - 後續：ADR「傳輸協定與 DTLS×WSS 混房」（VS 前探針後）、ADR「Steam 整合範圍」（Alpha）。
+
+## r1 修訂紀錄（2026-10-03）
+
+依 `architecture-review-2026-10-01.md`（首輪）與 `architecture-review-2026-10-01-r2.md` 修訂，與 ADR-0006 r1 成對。撰寫期 unity-specialist 兩條 BLOCKING 的修正（`IClipboard` 改非同步、`.Web` asmdef 平台約束）原本標為「r1」；為了與兩輪審查和 ADR-0006 的引用一致，改稱「撰寫期修正」，本次才是 r1。
+
+| 來源 | 修訂 | 位置 |
+|---|---|---|
+| r2 X2；首輪 §5（`pagehide`＋冪等） | `IUnloadNotifier` 改為 `pagehide`（主）＋`beforeunload`（備援）→ keepalive `fetch` 帶 `method`／`headers`；送出端單發去重；新增 `ClearLeaveBeacon()` | Decision 5 表；Key Interfaces |
+| r2 X3；首輪 §6（`[P-4]`） | `RoomCode` 在 iframe 內讀 `document.referrer`；可能為 `null`，輸碼備援不可砍 | Decision 5 表；Context 表；Risks |
+| 首輪 §3 C6 | R1 改為列舉制；pointer lock 歸 ADR-0001／#11，`AudioContext` 歸 #14；需要 `.jslib` 時一律進本組件 | Requirements R1；GDD 對照表 |
+| 首輪 §6 specialist CONCERN | asmdef 平台字串以 Inspector 產生，並以 `GetAssemblyDefinitionPlatforms()` 斷言；找到 Unity 6 仍用 `WebGL` 的旁證 | Verification Required；Risks；Validation |
+| r2 §3B | Depends On ADR-0001 → None（ADR-0001 改列 Related）；Enables 補 ADR-0006；不得反向依賴 ADR-0006 | ADR Dependencies；Related Decisions |
+| r2 E13 | 桌面退出路徑同樣先 `Shutdown()` 再 leave，MPS 的警告是預期的 | Decision 5 表 |
+| 一致性 | GDD 對照表的 `IClipboard.TryCopy` 改為 `TryCopyAsync`；補 TR 編號 | GDD Requirements Addressed |
+
+arlong 2026-10-03 裁示：C6 採列舉制，pointer lock 與 `AudioContext` 不放進平台層。

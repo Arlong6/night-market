@@ -1,6 +1,6 @@
 # Active Session State
 
-> Last Updated: 2026-09-30
+> Last Updated: 2026-10-03
 > Purpose: Living checkpoint. Read this first after compaction or new session.
 
 **目前唯一在推進的專案＝大夜班 (Night Shift)。** Road Rage 與其他遊戲皆為已完成／暫停
@@ -11,6 +11,28 @@
 # 現行專案：大夜班 (Night Shift)
 
 **階段：Pre-production。** 2026-09-03 開案，至今 13 天。
+
+## 目前任務（2026-10-03）
+
+- **Task**：**ADR-0006 r1＋ADR-0005 r1 已寫入**（成對；依 `architecture-review-2026-10-01-r2.md`），registry 同步完成。本 session 以 `/architecture-review` 開場，但 r2 之後審查輸入一份都沒變（檔案修改時間為證），arlong 裁決先修 r1 再審
+- **ADR-0006 r1**（508→619 行，文末「r1 修訂紀錄」逐條對照）：必修 E1（avatar 也須 `DontDestroyWithOwner = true`；道具須在每個 client 上存活、不得只靠 NV；推薦 G2 以 avatar `OnNetworkDespawn()` 把手上道具移到根節點自救）、E2（Solo／Lobby\* 沙盒 `HostView.MemberIds = { 本機 PlayerId }`＋三道防線）、E6（新增第 5a 步 `DisconnectTransport = 45`、`SlotOf` 回 `NoSlot` 一律丟棄）、E8（Core 純 BCL `HeartbeatPayload`＋轉接層 `HeartbeatWire : INetworkSerializable`，20 bytes）；應修 E4（矩陣 32×11、列分本機／peer 主詞、Onboarding 斷線回收路徑）、E5（session property 改發 `shift_eta` 相對量）；LOW：E3 改用 NGO 內建 `SinglePlayerTransport`、E7 送出端去重、E9 `Validate()` 只涵蓋 11 條、E10 刪指派冷卻、E11 `StartFailed` 復原、E12 補 13 列 TR、E13、X4 改名（`SessionPhase`／`JoinRejectReason`）、X5；依賴：`PeerKey` 等移到零依賴的 `NightShift.Identity`，NPC id 值域歸 0006
+- **ADR-0005 r1**（259→287 行）：`InstallLeaveBeacon(url, method, headers, body)`＋`pagehide`＋送出端單發＋新增 `ClearLeaveBeacon()`；`RoomCode` 在 iframe 內讀 `document.referrer`；R1 改列舉制（pointer lock→ADR-0001／#11、`AudioContext`→#14）；Depends On ADR-0001→None（ADR-0001 改列 Related，拆掉 0001→0006→0005→0001 潛在環）；asmdef 平台字串旁證（Unity 自家 `com.unity.services.wire` 1.5.0 仍寫 `WebGL`）＋`GetAssemblyDefinitionPlatforms()` 斷言；原內文標的「r1」改稱「撰寫期修正」
+- **registry**：13 條 `revised: 2026-10-03`（舊值留註解）＋3 條新增（api `lobby_rest_leave_notification`；forbidden `avatar_destroyed_with_owner`、`avatar_ownership_callback_side_effects`）；`session_events` 移除 customer-system；PyYAML 解析通過（state 5／interface 12／api 13／forbidden 17）
+- **arlong 裁決（2026-10-03）**：兩份 ADR 與 registry 照草稿寫入；E8 採 `INetworkSerializable` 包裝（不採 r2 建議的 `ForceNetworkSerializeByMemcpy`：線上格式綁原生佈局，與 Web×桌面同房的方向相衝）；C6 採列舉制；**審查開新 session 跑**
+- **本 session 核對原始碼新發現（r2 沒寫到，已寫進 ADR-0006 r1）**：①被拒的 Host 連 avatar 都沒有（NGO 強制核准時照 `CreatePlayerObject` 建物件，`NetworkManager.cs:1516`）②avatar 設 `DontDestroyWithOwner` 後，Host 端該 avatar 短暫 `IsOwner`／`IsLocalPlayer` 皆 true 並觸發 ownership 回呼 ③NV 寫入一定晚於 despawn 訊息送達（下一個 tick 才送）④離開 Solo 不指回 `UnityTransport`，下次上線 MPS 拋 `TransportComponentMissing`，在自動加入路徑上變成靜默錯過整班
+- **未 commit**：ADR-0006（新）、ADR-0005、`docs/registry/architecture.yaml`、active.md——連同 2026-10-01 起的既有未 commit 變更，待 arlong 指示
+- **Next**：**新 session 跑 `/architecture-review`（r3）**→ ADR-0001／0002／0003 r1（義務清單見 ADR-0006 Migration Plan 3，含 ADR-0001 的 ownership 回呼紀律、ADR-0003 :95 改述）→ G2 `network-object-lifecycle-ownership`（掉落路由二選一、avatar prefab 契約）→ ADR-0004 → G4 → G8。GDD r5 回填（ADR-0006 Migration Plan 4：netcode #24 前置條件、#9／Lobby\* (c) 改讀 `shift_eta`、:379 改 20 bytes、矩陣加「主詞」欄；FPC :397-399 與 AC19）**尚未做**
+- **不在範圍、已登記**：`BuildId` 雜湊輸入須含 `ProductCatalogAsset`（G4）；`modules/multiplayer.md` 四處缺口（`SinglePlayerTransport`、成員端自動加入、`Shutdown()` 警告、房間碼範例用了 `WithRelayNetwork()`）
+
+## 目前任務（2026-10-01）
+
+- **Task**：G1 → **ADR-0006 連線會談生命週期已寫入**（`/architecture-decision netcode-session-lifecycle`，Proposed；review mode solo → TD-ADR 略過；unity-specialist 以套件原始碼核對 7 組簽章、無 BLOCKING，抓到兩個陷阱：Host 自己的 approval 拒絕會被 NGO 靜默強制核准、`RelayNetworkOptions` 帶協定的建構子已 `[Obsolete]`）
+- **File**：`docs/architecture/adr-0006-netcode-session-lifecycle.md`（508 行、14 條 Decision、26 列 TR 對照、Verification Required V1–V10）
+- **arlong 裁決（2026-10-01）**：identity 契約併入本 ADR（玩家鍵＝slot byte、`PeerKey{Kind, Index}`、clientId 只在 NGO 邊界、`PlayerLeft(slot)` 為孤兒回收唯一時刻）；MVP 無 host migration（`SessionMigrated`／`Migrating` 一律視同 Host 消失，三項擴充前提列明）；單人練習＝NGO Host＋`OfflineTransport`（零 UGS 依賴）；同步載體＝Host 擁有的單一 `SessionRoot`（`Roster`／`ShiftEndTs` NV＋兩支 Unreliable 心跳 RPC）
+- **同步改動**：`machine-interaction.md:268` `ClaimedBy` ulong→byte（slot）；`netcode-session.md` `LeaveSessionAsync`→`LeaveAsync` ×3、心跳 payload 補 `host_now_ms` ×2；`architecture.yaml` +2 state／+4 interface／+5 api／+4 forbidden，8 條既有條目補 referenced_by（PyYAML 解析通過）
+- **既有 ADR r1 義務**（本 ADR Accepted 後）：ADR-0001 `CapsuleGhost.Id`／`PairKey`→`PeerKey`＋`FreezeInput` 參與者；ADR-0002 `ClaimedBy`→slot；ADR-0003 `PairKey`→`PeerKey`、遮罩消費 `PlayerLeft(slot)`；ADR-0005 `InstallLeaveBeacon` 增 headers（keepalive fetch）、`RoomCode` 改讀 `document.referrer`、加 `pagehide`
+- **未 commit**：ADR-0006（新）、machine-interaction.md、netcode-session.md、architecture.yaml、active.md；**r2 審查新增** `architecture-review-2026-10-01-r2.md`（新）、`traceability-index.md`、`tr-registry.yaml`（v3）、`systems-index.md`（#1–#3 備註）——連同既有未 commit 變更，待 arlong 指示
+- **Next**：~~新 session 跑 `/architecture-review`~~ ✅ **已跑 r2（2026-10-01，見下方 Session Extract r2）**——arlong 裁決下一步：新 session 修 **ADR-0006 r1＋ADR-0005 r1**（成對；必修 E1／E2／E6／E8＋依賴邊改向）✅ **2026-10-03 已寫入（見上方）** → 重跑 `/architecture-review` → G2 `network-object-lifecycle-ownership` → ADR-0004 `machine-interaction-core` → G4 → G8
 
 ## 目前任務（2026-09-30）
 
@@ -27,6 +49,28 @@
 - **本週里程碑**（2026-09-26～28，四個 commit）：FP GDD 十位專家評審 → 修訂 → 32/32 T0 純 C# 實測；
   OQ-F1 itch.io pointer lock 實測通過；ADR-0001／0002／0003 寫入，registry 3/3/5/8
 - **下次新 session 先做**：`/architecture-review`（三份 ADR 的覆蓋率與互相一致性，不得在本 session 跑）
+
+## Session Extract — /architecture-review 2026-10-01（r2，ADR-0006 寫入後重跑）
+- Verdict: **FAIL**（Foundation Gap 30→20；身份契約裁決已解、待 r1 傳播；ADR-0006 四條 Accept 前必修）
+- Requirements: 228 total — 71 covered, 74 partial, 83 gaps（首輪 227：50／70／107；首輪報告的 Foundation Gap 29 應為 30，漏算 TR-fpc-040）
+- New TR-IDs registered: TR-netcode-046（未建 NGO 連線的端要能顯示班次剩餘時間、不依賴心跳 offset）；registry v3：33 條狀態更新、4 條措辭修訂（netcode-014／017／028、machine-001）
+- GDD revision flags: netcode-session.md（#24 前置條件補 avatar `DontDestroyWithOwner = true`＋掉落須在 avatar despawn 前對 client 可見；#9 預檢／Lobby\* 剩餘時間不得依賴 offset；OQ#4／#18 回填；:379 的 16 bytes；:794／:801／:807）、first-person-controller.md（:397-399／AC19 以 id 為鍵 vs ADR-0006 slot 鍵）、machine-interaction.md（C13 註明掉落複製歸 G2）；延續未處理：`interpolation_buffer_ms` 兩條 HIGH
+- ADR-0006 r1 必修（unity-specialist 原始碼核對、主審抽查）：E1 斷線時手持物在 Host 存活、在每個 client 消失（NGO 在回呼前即 despawn avatar；client 端無移到根節點的保護）；E2 Solo 的 approval 被 NGO 靜默強制核准、`SlotTable` 無 slot 0；E6 心跳判定不 `DisconnectClient`，鬼連線 RPC 可被處理 30 s；E8 `HeartbeatPayload` 過不了 ILPP（改 `ForceNetworkSerializeByMemcpy<T>`；實為 20／24 bytes）。應修：E4 適用性矩陣實為 32×11 且主詞混用；E5 預檢時間基準。另：NGO 內建 `SinglePlayerTransport` 可取代手刻 `OfflineTransport`；V2 已由原始碼證實
+- 依賴：ADR-0002／0003／0005 皆未補列 ADR-0006（0002／0003 r1 應補；0005 不可補，會成環）；ADR-0001 r1 一改用 `PeerKey` 即形成 0001→0006→0005→0001 潛在環 → 推薦 ADR-0005 對 ADR-0001 改為 Related、NPC id 值域收歸 ADR-0006、`PeerKey` 移到零依賴組件
+- Top ADR gaps: ADR-0006 r1＋ADR-0005 r1（成對）；G2 同步物件生命週期與所有權轉移（須登記 avatar `DontDestroyWithOwner` 與掉落複製途徑）；ADR-0004 機台互動組 Core
+- Report: `docs/architecture/architecture-review-2026-10-01-r2.md`；索引 `docs/architecture/traceability-index.md`（r2）；registry `docs/architecture/tr-registry.yaml` v3
+- **Next（arlong 2026-10-01 裁決）**：新 session 修 ADR-0006 r1＋ADR-0005 r1 → 重跑 `/architecture-review`
+
+## Session Extract — /architecture-review 2026-10-01
+- Verdict: **FAIL**（覆蓋率失敗；四份 ADR 互相零矛盾、棄用 API 零命中、版本一致；unity-specialist 另升級 1 條 BLOCKING：跨 ADR 身份編碼無轉換契約）
+- Requirements: 227 total — 50 covered, 70 partial, 107 gaps（Foundation 層 Gap 29：netcode 9／product 13／machine 6／fpc 1）
+- New TR-IDs registered: 227（`docs/architecture/tr-registry.yaml` v2；netcode 45／fpc 44／machine 57／product 34／concept 19／index 28）
+- GDD revision flags: netcode-session.md, first-person-controller.md（`interpolation_buffer_ms = 150` 在 NGO 2.13.2 無對應機制 → netcode 旋鈕表／AC23 GIVEN、FP F1／`player_move_speed_max = 1.47` 須重推；索引 #1／#2／#3 已標 Needs Revision）；低嚴重度：machine OQ-M14 第 6 項已由 ADR-0005 承接、concept 體積單位／Relay+Lobby 命名、索引「19 個系統」
+- ADR revision flags: ADR-0002（與 machine C20 分叉 8 處，registry `interact_request` 失真）、ADR-0005（P-4 只能讀 `document.referrer`；P-18 須 `pagehide`＋冪等；asmdef `WebGL` 字串未查證；R1 漏 pointer lock／AudioContext）、ADR-0001（`UseQuaternionSynchronization` guard；D7 措辭；動態 Rigidbody 前提）
+- Top ADR gaps: G1 網路拓撲、Session 生命週期與連線健康（含 identity 契約）；G2 同步物件生命週期與所有權轉移；ADR-0004 機台互動組 Core 分層與 RPC 契約（吸收 ADR-0002 漂移）
+- Report: `docs/architecture/architecture-review-2026-10-01.md`；索引：`docs/architecture/traceability-index.md`
+- **Next（arlong 2026-10-01 裁決）**：~~新 session 跑 `/architecture-decision netcode-session-lifecycle`（G1）~~ ✅ **G1 已落地＝ADR-0006（2026-10-01，見上方「目前任務（2026-10-01）」）**；之後 G2 → ADR-0004 → G4 → G8，每寫完一份重跑 `/architecture-review`——**下一個動作：新 session 跑 `/architecture-review`**
+- 未 commit：上述三份新檔＋systems-index.md＋active.md（連同 2026-09-29／10-01 既有未 commit 變更）——待 arlong 指示
 
 ## 一句話現況
 

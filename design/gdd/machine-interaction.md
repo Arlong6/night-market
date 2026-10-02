@@ -265,7 +265,7 @@ r0 第 112 行說「承載與封裝已定形」，評審證實沒有：正文出
 
 | 複製狀態（Host 寫、Everyone 讀） | 欄位（皆 unmanaged、blittable） | 誰寫、何時 |
 |---|---|---|
-| `ClaimState` | `bool IsClaimed; ulong ClaimedBy; uint ClaimGeneration` | netcode Core Rule #4 既定 |
+| `ClaimState` | `bool IsClaimed; byte ClaimedBy; uint ClaimGeneration`（`ClaimedBy` 為 slot，`NoSlot = 255`；r1 原為 `ulong` clientId，依 ADR-0006 identity 契約改型） | netcode Core Rule #4 既定；型別歸 ADR-0006 |
 | `StationStatus` | `byte Phase; int WorkStartTick; byte Sku; ulong PendingProductNetId` | `Sku`：`Claimed → Working` 寫（C14）；`WorkStartTick`：同時寫 Host 收到 RPC 的 tick；`PendingProductNetId`：spawn 成品時寫該 `NetworkObjectId`，`Taken` 清 0；`Phase`：每次轉移 |
 | `StockState`（r0 稱 `StationStock`，已改名——它不屬於任何站台） | 定長 `byte[N]`，以 `network_index` 索引，N ＝ #6 的 Active SKU 上限 | 掛在 Host 開班動態 spawn 的 `StockRegistry` NetworkObject 上（C18）；全域一份（C11）；`StockChanged` 回呼＝它的變更回呼 |
 
