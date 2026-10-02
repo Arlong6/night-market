@@ -1,0 +1,2 @@
+- [Subagent report-only mode](feedback_subagent_report_only_mode.md) — when invoked as a Task subagent told "only report, don't write files," skip the ask/approve ritual and answer directly
+- [Night Shift visual delegation pattern](project_night_shift_visual_delegation.md) — gameplay GDDs pull Visual/Audio Requirements from art-director; art bible + MVP visual scope boundaries (e.g. OutOfStock is Shelf-only)

@@ -1,0 +1,4 @@
+- [Night Shift MVP audio scope](project_night-shift-mvp-audio-scope.md) — MVP is machine/station SFX only, no music ("音效是手感，音樂是氣氛"); music deferred to VS+
+- [Night Shift audio-director workflow](project_night-shift-audio-director-workflow.md) — audio-director gives requirements/constraints in other systems' GDDs by report only; sound-designer owns #14's actual SFX/events
+- [Night Shift art bible pointer](reference_night-shift-art-bible.md) — comedic (not punishing) failure tone, curved=alive/right-angle=static motif, oden=hero object; keep audio tonally aligned
+- [arlong's GDD style](user_arlong-gdd-style.md) — dense, citation-heavy, dated inline decisions, 🔬/⏳/🔴 flags; match register, don't pad with prose

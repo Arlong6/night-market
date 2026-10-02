@@ -33,3 +33,7 @@ for in future netcode/session AC reviews on this project.
 re-check these six areas first, since they were the gaps found in the initial pass.
 Also this is a separate active project alongside Lexicon Village — see the user's
 global memory `project_active_direction` for cross-project prioritization context.
+
+For non-netcode Night Shift GDDs (gameplay systems like machine-interaction #5), see
+[[project-gdd-ac-review-patterns]] for the general-purpose sibling checklist (ADR
+status gate, formula range-endpoint checking, forward-obligation registration lag).

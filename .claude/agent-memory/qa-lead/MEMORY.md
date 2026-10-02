@@ -1,1 +1,2 @@
 - [Night Shift netcode project](project_night_shift.md) — 大夜班 co-op netcode facts + recurring AC gap categories (throttle/RPC/smoothness/RTT/NPC sync/settlement redirect)
+- [GDD AC review patterns](project_gdd_ac_review_patterns.md) — non-netcode recurring gaps: ADR Proposed-status blocks stories, check formula ranges at endpoints, forward-obligation registration lag
