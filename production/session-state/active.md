@@ -21,8 +21,34 @@
 - **arlong 裁決（2026-10-03）**：兩份 ADR 與 registry 照草稿寫入；E8 採 `INetworkSerializable` 包裝（不採 r2 建議的 `ForceNetworkSerializeByMemcpy`：線上格式綁原生佈局，與 Web×桌面同房的方向相衝）；C6 採列舉制；**審查開新 session 跑**
 - **本 session 核對原始碼新發現（r2 沒寫到，已寫進 ADR-0006 r1）**：①被拒的 Host 連 avatar 都沒有（NGO 強制核准時照 `CreatePlayerObject` 建物件，`NetworkManager.cs:1516`）②avatar 設 `DontDestroyWithOwner` 後，Host 端該 avatar 短暫 `IsOwner`／`IsLocalPlayer` 皆 true 並觸發 ownership 回呼 ③NV 寫入一定晚於 despawn 訊息送達（下一個 tick 才送）④離開 Solo 不指回 `UnityTransport`，下次上線 MPS 拋 `TransportComponentMissing`，在自動加入路徑上變成靜默錯過整班
 - **未 commit**：ADR-0006（新）、ADR-0005、`docs/registry/architecture.yaml`、active.md——連同 2026-10-01 起的既有未 commit 變更，待 arlong 指示
-- **Next**：**新 session 跑 `/architecture-review`（r3）**→ ADR-0001／0002／0003 r1（義務清單見 ADR-0006 Migration Plan 3，含 ADR-0001 的 ownership 回呼紀律、ADR-0003 :95 改述）→ G2 `network-object-lifecycle-ownership`（掉落路由二選一、avatar prefab 契約）→ ADR-0004 → G4 → G8。GDD r5 回填（ADR-0006 Migration Plan 4：netcode #24 前置條件、#9／Lobby\* (c) 改讀 `shift_eta`、:379 改 20 bytes、矩陣加「主詞」欄；FPC :397-399 與 AC19）**尚未做**
+- **Next**：~~新 session 跑 `/architecture-review`（r3）~~ ✅ **已跑（2026-10-03，FAIL，見下方 Session Extract r3）** → **ADR-0006 r2＋ADR-0005 r2（成對，7 條必修）** → ADR-0001／0002／0003 r1（義務清單見 ADR-0006 Migration Plan 3，含 ADR-0001 的 ownership 回呼紀律、ADR-0003 :95 改述）→ G2 `network-object-lifecycle-ownership`（掉落路由二選一、avatar prefab 契約）→ ADR-0004 → G4 → G8。GDD r5 回填（ADR-0006 Migration Plan 4：netcode #24 前置條件、#9／Lobby\* (c) 改讀 `shift_eta`、:379 改 20 bytes、矩陣加「主詞」欄；FPC :397-399 與 AC19）**尚未做**
 - **不在範圍、已登記**：`BuildId` 雜湊輸入須含 `ProductCatalogAsset`（G4）；`modules/multiplayer.md` 四處缺口（`SinglePlayerTransport`、成員端自動加入、`Shutdown()` 警告、房間碼範例用了 `WithRelayNetwork()`）
+
+## Session Extract — /architecture-review 2026-10-03（r3，ADR-0006 r1＋ADR-0005 r1 寫入後重跑）
+- Verdict: **FAIL**（覆蓋與 r2 相同；Foundation Gap 20；ADR-0006／0005 Accept 前必修 7 條，其中 FV-1 需裁決）
+- Requirements: 228 total — 71 covered, 74 partial, 83 gaps（TR-netcode-007 ⚠️→✅：referrer 已由 0005 r1 承接；TR-netcode-010 ✅→⚠️：確認框無 ADR 決策＋FV-4）
+- New TR-IDs registered: None（`tr-registry.yaml` v4 只改上述兩列 `adr_coverage`）
+- r2 必修核對：E1／E6／E8 已修（對抗驗證 CONFIRMED）；E2 只修一半（Host 自核准時 `ShiftEndTs`／`SessionPhase` 未定義、第三道防線在 Online 無掛點 → FV-3）
+- **Accept 前必修 7 條**：
+  - **FV-1 🔴**：Lobby\* 入口在 MPS 2.3.1 下不可達——被 approval 拒絕的中途加入者，會被 SDK 的 `CleanupSessionAsync` → `LeaveAsync` 移出 session（`SessionManager.cs:311-347`）。主審抽查全鏈吻合，未實跑。需裁決入口：(a) 轉接層掌握 client 何時啟網（主審傾向）／(b) 核准但不建 avatar／(c) session 外等待
+  - FV-3（E2 殘留）
+  - CX-2：`PlayerLeft` 在非 Host 端沒有來源
+  - EA-1：REST 路徑多了 `lobbies/`（實為 `/v1/{id}`），而「404 視為成功」會把錯吞掉
+  - FV-4：單發旗標下實際送出的是 `beforeunload`，與確認框衝突
+  - FV-5：`SessionConfig` 是 ScriptableObject，卻放在 Core
+  - EA-4：ADR-0005 的自我註冊組件缺 `[assembly: AlwaysLinkAssembly]`；「無人註冊回 Desktop」需要 asmdef 環
+- 應修：FV-2（`shift_eta` 對晚到讀者失效）、FV-6／CX-5（`ClearLeaveBeacon`／token 重裝無人承接）、EA-2（NGO 設定雜湊先於 approval 擋人）、EA-3（transport 切換落在延後關機窗口）；另有 LOW 多條（r3 報告 §3C、§4）
+- 依賴：宣告環已拆（ADR-0005 Depends On → None）；潛在 0001↔0006（TickRate 三方擁有，CX-4：改歸 0006）
+- GDD revision flags（20 條：4 HIGH／7 MEDIUM／9 LOW）：
+  - netcode-session.md：GF-1 HIGH 延續、GF-7 HIGH 改 r1 措辭、**GF-20 HIGH 新**（:758 Lobby\* 定義）、GF-14～17 MEDIUM 新
+  - first-person-controller.md：GF-2 HIGH、GF-8
+  - machine-interaction.md：GF-12 MEDIUM（C13 零位置同步、`OwnerClientId` 掛手）→ 索引 #5 改 **Needs Revision**
+- 參考庫 `docs/engine-reference/unity/`：r2 的四條缺口仍缺，另新增 11 條（r3 報告 §6）
+- 審查方法：所有 agent 定義都有 `maxTurns`（unity-specialist 為 20），三次原始碼查證被截斷；改用不設上限的 agent 扮演 unity-specialist 補跑，9/9 CONFIRMED。agent 定義未改
+- Top ADR gaps: ADR-0006 r2＋ADR-0005 r2（成對）；ADR-0001／0002／0003 r1；G2
+- Report: `docs/architecture/architecture-review-2026-10-03-r3.md`；索引 `traceability-index.md`（r3）；registry `tr-registry.yaml` v4；`systems-index.md` #1／#2／#5 備註
+- **Next（arlong 2026-10-03 裁決）**：新 session 修 ADR-0006 r2＋ADR-0005 r2。FV-1 先在那個 session 以原始碼查證方向 (a) 可行（例如 `WithNetworkHandler<T>`，或加入時不帶 network options 是否就不自動啟網），再請 arlong 裁決 Lobby\* 入口
+- 未 commit：r3 報告（新）、`traceability-index.md`、`tr-registry.yaml`、`systems-index.md`、`active.md`——待 arlong 指示
 
 ## 目前任務（2026-10-01）
 

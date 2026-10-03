@@ -26,8 +26,8 @@
 # EXTRA FIELDS (added 2026-10-01): section = GDD 節／行；layer = Foundation|Core|Feature|Presentation|Platform|Polish；
 #   adr_coverage = covered|partial|gap（審查當日快照；權威來源為 docs/architecture/traceability-index.md）
 
-version: 3
-last_updated: "2026-10-01"   # r2：ADR-0006 寫入後同日重跑（docs/architecture/architecture-review-2026-10-01-r2.md）
+version: 4
+last_updated: "2026-10-03"   # r3：ADR-0006 r1＋ADR-0005 r1 寫入後重跑（docs/architecture/architecture-review-2026-10-03-r3.md）；只改兩列 adr_coverage，無新 TR
 
 requirements:
   - id: TR-netcode-001
@@ -108,8 +108,8 @@ requirements:
     requirement: "房間碼＝`session.Code`，大小寫不敏感、可貼上；輸碼必備備援；帶碼連結須解析 `document.referrer`"
     section: "#8 L140-150,1614"
     layer: "Feature"
-    adr: "0005"
-    adr_coverage: partial
+    adr: "0005/0006"
+    adr_coverage: covered   # r3（2026-10-03）partial→covered：ADR-0005 r1 改讀 document.referrer（X3 已修）
     created: 2026-10-01
     revised: ""
     status: active
@@ -144,8 +144,8 @@ requirements:
     requirement: "Host 關頁＝局終（無 migration）；`beforeunload`+`pagehide`→`sendBeacon`／`DeleteAsync`；處理冪等；確認框 best-effort"
     section: "#12 L195-237"
     layer: "Core"
-    adr: "0006"
-    adr_coverage: covered
+    adr: "0006/0005"
+    adr_coverage: partial   # r3（2026-10-03）covered→partial：「確認框 best-effort」無 ADR 決策，且 beforeunload 為實際送出點（r3 FV-4）
     created: 2026-10-01
     revised: ""
     status: active
