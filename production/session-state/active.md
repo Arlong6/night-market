@@ -1,6 +1,6 @@
 # Active Session State
 
-> Last Updated: 2026-10-03
+> Last Updated: 2026-10-04
 > Purpose: Living checkpoint. Read this first after compaction or new session.
 
 **目前唯一在推進的專案＝大夜班 (Night Shift)。** Road Rage 與其他遊戲皆為已完成／暫停
@@ -11,6 +11,30 @@
 # 現行專案：大夜班 (Night Shift)
 
 **階段：Pre-production。** 2026-09-03 開案，至今 13 天。
+
+## Session Extract — /architecture-review 2026-10-04（r4，ADR-0006 r2＋ADR-0005 r2 寫入後重跑）
+- Verdict: **FAIL**（Foundation Gap 20 不變；CX-1 未傳播；ADR-0006 仍不能 Accept——r3 必修 7／7 已修，新必修 9 條，全部局部、無需裁決）
+- Requirements: 229 total — 72 covered, 73 partial, 84 gaps（TR-netcode-010 ⚠️→✅，對 GF-21 敏感；新登記 TR-netcode-047 ❌）
+- New TR-IDs registered: TR-netcode-047（AC51 Lobby\* 在場隊友人數，Core 層，gap）；registry v5 另改 TR-netcode-010 covered、TR-netcode-030 adr 0001→0006
+- **ADR-0006 r3 的 Accept 前必修 9 條**（報告 §3A）：
+  - **M1 🔴** client 在 Settlement 收到 #23a 斷線沒有轉移；NGO 對所有 Host 關機送同一原因字串 → 照寫每班結束 client 全員回主選單。修法：Host 先 `DisconnectClient(id, "ShiftEnded")`（主審親讀 `NetworkManager.cs:545-575`）
+  - M2 Host slot 0：`PlayerJoined(0)` 兩處來源矛盾，`OnClientConnectedCallback(0)` 無處置（三位審查者獨立找到）
+  - M3 沙盒 Core 只限輸入、沒限輸出（確認框、Teardown、離開通知）
+  - M4 #23a 存檔失敗無出口；之後 MPS 每次 `LobbyChanged` 拋 NRE（`SessionHandler.cs:1131`）
+  - M5 H2 的 `Failed` 是靜默死路；approval 逾時不送通用字串（0006:162 錯）
+  - M6 `NotAMember` pending 晚到 → 鬼 client／無人 avatar
+  - M7 `SessionRoot.Ready` 是實例事件 → 改 `NgoBridge.SessionRootSpawned`＋`Current`
+  - M8 輸入閘門沒有事件 → Core `LocalInputGateChanged(bool)`
+  - M9 看門狗從 LobbyWaiting 復原時的轉移
+- 應修（報告 §3B）：K12 Host 屬性字典隱性前提、K13 殘留成員／`SessionConflict`、R4C-10／12／13、R4A-4、T1-Web 測試規格（Playwright 的 `page.close()` 會跑 `pagehide`、預設關 bfcache、WebKit 卡住）、Chrome bfcache 中 WebSocket 不立即斷、Safari 讀不到帶碼 referrer
+- ADR-0005 r2：本身無必修，須與 ADR-0006 r3 成對 Accept（只需小修 Chrome／Safari 敘述與 Verification ④）
+- GDD revision flags（28 條：3 HIGH／11 MEDIUM／14 LOW）：netcode-session.md（GF-20 降 LOW；**GF-21 需裁決**：Lobby 是否掛確認框；**GF-22 需設計釐清**：延後 spawn 與 AC4／AC40；新 GF-23–28）、first-person-controller.md（GF-22、23）、machine-interaction.md（R4G-CX-7）；systems-index #1／#2／#3／#5／#19／#20 備註已更新
+- 證據：MPS 15 跳確認 FV-1 修法成立；UGS preflight 主審親跑吻合；本機 Playwright 首次證明跨站 iframe 的 keepalive DELETE＋preflight 三引擎送達（腳本在 `$CLAUDE_JOB_DIR/tmp/r4/F-browser-harness/`，job 刪除即消失）
+- 審查方法：7 審查＋2 反駁（皆不設回合上限的 general-purpose agent）；瀏覽器查證者第一次謊報已寫檔，補寫後才採用
+- Top ADR gaps: ADR-0006 r3（9 條必修）＋ADR-0005 小修；ADR-0001／0002／0003 r1；G2
+- Report: `docs/architecture/architecture-review-2026-10-04-r4.md`；索引 `traceability-index.md`（r4）；registry `tr-registry.yaml` v5；`systems-index.md` 備註
+- **Next（arlong 2026-10-04 裁決）**：新 session 修 **ADR-0006 r3**（r4 報告 §3A 九條，M1 優先；順手收 §3B 的 K12、R4C-10／12／13、T1-Web 測試規格）＋**ADR-0005 小修**（Chrome bfcache／Safari referrer 敘述、Verification ④ 限定引擎）；草稿先寫 `$CLAUDE_JOB_DIR/tmp/`，審過、arlong 同意後才覆寫 `docs/`。GF-21（Lobby 確認框）與 GF-22（延後 spawn 的 AC4／AC40 時間語意）待裁決，不擋 r3
+- 已 commit（r4 報告、traceability-index、tr-registry v5、systems-index、active.md）
 
 ## 目前任務（2026-10-04，ADR-0006 r2＋ADR-0005 r2 已寫入）
 

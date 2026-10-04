@@ -1,22 +1,23 @@
 # Architecture Traceability Index — 大夜班 (Night Shift)
 
-> Last Updated: 2026-10-03（r3：ADR-0006 r1＋ADR-0005 r1 寫入後重跑）
+> Last Updated: 2026-10-04（r4：ADR-0006 r2＋ADR-0005 r2 寫入後重跑）
 > Engine: Unity 6.3 LTS (6000.3) ／ NGO 2.13.2 ／ MPS 2.3.1 ／ UTP 2.7.4
-> Source: `/architecture-review` full——r3 報告 `docs/architecture/architecture-review-2026-10-03-r3.md`；r2 報告 `architecture-review-2026-10-01-r2.md`；首輪報告 `architecture-review-2026-10-01.md`
+> Source: `/architecture-review` full——r4 報告 `docs/architecture/architecture-review-2026-10-04-r4.md`；r3 報告 `architecture-review-2026-10-03-r3.md`；r2 報告 `architecture-review-2026-10-01-r2.md`；首輪報告 `architecture-review-2026-10-01.md`
 > TR-ID 權威來源：`docs/architecture/tr-registry.yaml`（本檔的 ADR 欄為審查當日快照）
-> 狀態欄的「（r3 ↑／↓）」標記本輪變動，「（r2 ↑／↓）」為前一輪；理由欄以「r3：」起頭的部分為本輪更新，其中 FV／EA／CX／GF 編號指 r3 報告；§3A／§3C／§4 指 r2 報告章節
+> 狀態欄的「（r4 ↑）」標記本輪變動，「（r3 ↑／↓）」「（r2 ↑／↓）」為前幾輪；理由欄以「r4：」起頭的部分為本輪更新，其中 M／K／R4x／GF-21 以後的編號指 r4 報告；「r3：」段落的 FV／EA／CX／GF 編號指 r3 報告；§3A／§3C／§4 指 r2 報告章節
 
 ## Coverage Summary
-- Total requirements: **228**
-- Covered: 71（31.1%）
-- Partial: 74（32.5%）
-- Gaps: 83（36.4%）
+- Total requirements: **229**（r4 新登記 TR-netcode-047）
+- Covered: 72（31.4%）
+- Partial: 73（31.9%）
+- Gaps: 84（36.7%）
 - Foundation 層 Gap：20（product 13／machine 4／fpc 2／netcode 1）——首輪為 30（首輪報告誤記 29，漏算 TR-fpc-040）
-- r3 與 r2 數字相同：TR-netcode-007 ↑、TR-netcode-010 ↓ 互相抵銷；另 22 列理由更新
+- r4：TR-netcode-010 ↑（⚠️→✅）；新增 TR-netcode-047（❌，Core 層，不計入 Foundation Gap）；另 23 列理由更新；TR-netcode-030 的 ADR 欄 0001→0006
+- r3 與 r2 數字相同：TR-netcode-007 ↑、TR-netcode-010 ↓ 互相抵銷
 
 | GDD | TR | ✅ | ⚠️ | ❌ | 首輪 |
 |---|---|---|---|---|---|
-| netcode-session.md（#1/#2） | 46 | 25 | 19 | 2 | 7／18／20 |
+| netcode-session.md（#1/#2） | 47 | 26 | 18 | 3 | 7／18／20 |
 | first-person-controller.md（#3） | 44 | 26 | 11 | 7 | 27／10／7 |
 | machine-interaction.md（#5） | 57 | 7 | 18 | 32 | 6／16／35 |
 | product-database.md（#6） | 34 | 0 | 5 | 29 | 0／4／30 |
@@ -37,45 +38,46 @@
 | TR-netcode-005 | 交接＝`ChangeOwnership` 同步原子；回讀 `OwnerClientId` 才廣播；僅 server；拋物線不同步、socket 遮蔽 | #6/#7 L116-137 | Net | Core | — | ❌ Gap | 0002 僅稱述詞可沿用 |
 | TR-netcode-006 | 交接冷卻≥6 tick；攜帶物狀態不得放 owner-write NetworkVariable（遺失窗口≈1 tick） | L131-134,1639 | Net | Core | 0002 | ⚠️ Partial | 約束⑧只涵蓋互動結果 |
 | TR-netcode-007 | 房間碼＝`session.Code`，大小寫不敏感、可貼上；輸碼必備備援；帶碼連結須解析 `document.referrer` | #8 L140-150,1614 | Plat | Feature | 0005/0006 | ✅ Covered（r3 ↑） | 0005 r1 iframe 內讀 `document.referrer`（:87）、可為 null、輸碼備援不可砍（:146）；房間碼走 `JoinSessionByCodeAsync`（0006 D2）。大小寫不敏感／可貼上屬 GDD #8 的 UI 規則（MPS 不做大小寫正規化，轉接層或 UI 自轉） |
-| TR-netcode-008 | 截止閘門唯一執行點＝`ConnectionApprovalCallback`，Host 側 `shift_end_ts−now`；MPS custom data 預檢非權威 | #9 L153-176 | Net | Core | 0006 | ✅ Covered（r2 ↑） | 0006 D5 第 4 項（含端點）為唯一執行點；預檢非權威。r3：預檢改讀 `shift_eta`，晚到者讀到舊值（FV-2）；被拒的中途加入者會被 MPS 移出 session（FV-1），影響 #9「拒絕後導向 Lobby\*」，那半句不在本 TR 文字內 |
-| TR-netcode-009 | approval payload 帶 build/protocol version，不符即拒（任何資料交換前） | L163-165,AC54 | Sec | Core | 0006 | ✅ Covered（r2 ↑） | 0006 D5 payload＋第 1 項 `StaleBuild`。r3：AC54 成立，但 NGO 設定雜湊（含 prefab 清單）先於 approval 擋人、給通用原因，真正的舊版 build 多半拿不到 `StaleBuild` 店語（EA-2） |
-| TR-netcode-010 | Host 關頁＝局終（無 migration）；`beforeunload`+`pagehide`→`sendBeacon`／`DeleteAsync`；處理冪等；確認框 best-effort | #12 L195-237 | Plat | Core | 0006/0005 | ⚠️ Partial（r3 ↓） | 0006 D9 雙掛＋keepalive fetch＋送出端單發、D11 無 migration。r3：TR 原文「確認框 best-effort」無 ADR 決策、`IUnloadNotifier` 無確認框介面（GDD AC42 MVP）；單發旗標下實際送出的是 `beforeunload`，按「留下」時 DELETE 已送出（FV-4）；REST 路徑見 EA-1；V10 未驗 |
-| TR-netcode-011 | 進房預算 T_load≤25／T_lobby≤10／T_spawn≤10 各自硬閘門；auth 預熱並行 | #13 L218,898-907 | Perf | Foundation | 0006 | ⚠️ Partial（r2 ↑） | 0006 D14 `T_lobby`／`T_spawn` 為 Core 狀態計時＋`MaxConnectAttempts=10`；`T_load` 只有 stall 偵測（TR-026 仍 Partial）；auth 預熱並行未定 |
+| TR-netcode-008 | 截止閘門唯一執行點＝`ConnectionApprovalCallback`，Host 側 `shift_end_ts−now`；MPS custom data 預檢非權威 | #9 L153-176 | Net | Core | 0006 | ✅ Covered（r2 ↑） | 0006 D5 第 4 項（含端點）為唯一執行點；預檢非權威。r3：預檢改讀 `shift_eta`，晚到者讀到舊值（FV-2）；被拒的中途加入者會被 MPS 移出 session（FV-1），影響 #9「拒絕後導向 Lobby\*」，那半句不在本 TR 文字內。r4：FV-3、FV-1 已修（`ShiftEndTs` 於 `OnServerStarted` 固定；被拒者留在 session）。`IsPrivate` 取消了加入前預檢，TR 措辭交 GF-9 |
+| TR-netcode-009 | approval payload 帶 build/protocol version，不符即拒（任何資料交換前） | L163-165,AC54 | Sec | Core | 0006 | ✅ Covered（r2 ↑） | 0006 D5 payload＋第 1 項 `StaleBuild`。r3：AC54 成立，但 NGO 設定雜湊（含 prefab 清單）先於 approval 擋人、給通用原因，真正的舊版 build 多半拿不到 `StaleBuild` 店語（EA-2）。r4：兩層閘門（EA-2 已修）＋加入後比對 `build_token`；但 `Failed` 分支是靜默死路（M5） |
+| TR-netcode-010 | Host 關頁＝局終（無 migration）；`beforeunload`+`pagehide`→`sendBeacon`／`DeleteAsync`；處理冪等；確認框 best-effort | #12 L195-237 | Plat | Core | 0006/0005 | ✅ Covered（r4 ↑） | 0006 D9 雙掛＋keepalive fetch＋送出端單發、D11 無 migration。r3：TR 原文「確認框 best-effort」無 ADR 決策、`IUnloadNotifier` 無確認框介面（GDD AC42 MVP）；單發旗標下實際送出的是 `beforeunload`，按「留下」時 DELETE 已送出（FV-4）；REST 路徑見 EA-1；V10 未驗。r4：FV-4（只在 `pagehide` 送出、`beforeunload` 只掛確認框，0006:232-236）、確認框介面 `SetLeaveConfirmation`（0005:147）、EA-1（完整 URL，0006:237-240）皆已修；本機實測 keepalive DELETE＋preflight 三引擎送達。殘留 V10 真實環境未測。**對 GF-21 敏感**：若裁決 Lobby 也要掛確認框，退回 ⚠️ |
+| TR-netcode-011 | 進房預算 T_load≤25／T_lobby≤10／T_spawn≤10 各自硬閘門；auth 預熱並行 | #13 L218,898-907 | Perf | Foundation | 0006 | ⚠️ Partial（r2 ↑） | 0006 D14 `T_lobby`／`T_spawn` 為 Core 狀態計時＋`MaxConnectAttempts=10`；`T_load` 只有 stall 偵測（TR-026 仍 Partial）；auth 預熱並行未定。r4：`AttemptStarted` 起由 `T_lobby` 改計 `T_spawn`；`T_load` 仍只有 stall 偵測；auth 預熱並行無決策 |
 | TR-netcode-012 | 離線立即重取樣 `online_player_count`；grace／`host_solo` 旗標→波次導演；#15a 身分＝`AuthenticationService.PlayerId` | #14-16 L223-254,928 | State | Core | 0006 | ✅ Covered（r2 ↑） | 0006 D7 第 7 步重取樣＋grace／`host_solo`；D4 #15a 以 `PlayerId` 為鍵、班次範圍；D13 `OnlinePlayerCountChanged` |
 | TR-netcode-013 | `visibilitychange` 於 `.jslib` 以 `performance.now()` 標記；≤5s catch-up（公式③純邏輯）／>5s teardown；僅 InShift | #17 L257-270,909-926 | Plat | Core | 0005/0006 | ⚠️ Partial | >5 s 分支已是 0006 D9 的 Teardown 邊；≤5 s 的公式③ catch-up 仍無擁有者（G9） |
-| TR-netcode-014 | teardown 不變式：任何 InShift→Idle 先 `Shutdown()`+`ISession.LeaveAsync()` 再切 UI | #17a L272-283 | Net | Core | 0006 | ✅ Covered（r2 ↑） | 0006 D9：每條進 Idle 的邊恰一個 `Teardown` 效果，固定順序 `Shutdown()`→`LeaveAsync()`／`DeleteAsync()`→切 UI（與 MPS 警告的關係見 §5） |
+| TR-netcode-014 | teardown 不變式：任何 InShift→Idle 先 `Shutdown()`+`ISession.LeaveAsync()` 再切 UI | #17a L272-283 | Net | Core | 0006 | ✅ Covered（r2 ↑） | 0006 D9：每條進 Idle 的邊恰一個 `Teardown` 效果，固定順序 `Shutdown()`→`LeaveAsync()`／`DeleteAsync()`→切 UI（與 MPS 警告的關係見 §5）。r4：Host 走 `DeleteAsync`，TR 與 GDD #17a 只寫 `LeaveAsync`（GF-24；措辭待 GDD r5） |
 | TR-netcode-015 | Host 消失排歧：MPS 層與 Relay 層獨立；序：session 事件→`onLine` false→`HasPlayer(Host)`→`State` | #18 L284-348 | Net | Core | 0006 | ✅ Covered（r2 ↑） | 0006 D8 `HostLossDisambiguator` 實作 GDD 六列優先表 |
 | TR-netcode-016 | 單物件 sequence（併 ClaimGeneration）、無全域序號；跨 channel 順序待驗 | #19 L356-360 | Data | Core | 0002 | ⚠️ Partial | 僅 Verification③／D8 |
-| TR-netcode-017 | app 心跳 2s/8s 自 NGO 連線起；payload `{seq,last_peer_seq_seen,host_shift_end_ts,host_now_ms}`；雙向存活→單向失效走 #24；offset≤100ms 與 ping 同源；87s→12s 唯一機制 | #20 L362-406,864-868 | Net | Foundation | 0006 | ✅ Covered（r2 ↑） | 0006 D6 全條。r3：E8 已修——Core 純 BCL `HeartbeatPayload`＋轉接層 `HeartbeatWire : INetworkSerializable`，酬載恰 20 bytes；GDD :379 仍寫 16，待 r5 |
+| TR-netcode-017 | app 心跳 2s/8s 自 NGO 連線起；payload `{seq,last_peer_seq_seen,host_shift_end_ts,host_now_ms}`；雙向存活→單向失效走 #24；offset≤100ms 與 ping 同源；87s→12s 唯一機制 | #20 L362-406,864-868 | Net | Foundation | 0006 | ✅ Covered（r2 ↑） | 0006 D6 全條。r3：E8 已修——Core 純 BCL `HeartbeatPayload`＋轉接層 `HeartbeatWire : INetworkSerializable`，酬載恰 20 bytes；GDD :379 仍寫 16，待 r5。r4：`InvokePermission = Server`（EA-5）；slot 重用時重置（FV-10） |
 | TR-netcode-018 | UTP send queue 溢位防護：Host 每 tick payload 上限＋佇列深度監控 | L398,P-16,OQ12 | Perf | Foundation | 0006 | ⚠️ Partial（r2 ↑） | 0006 D12 `MaxSendQueueSize` 顯式＋監控點必備；值與 Host 出站上限待 `[P-16]`（V6，W2） |
-| TR-netcode-019 | Lobby 延後建連：`WithNetworkOptions(WSS)` 不啟動；開始上班才 `StartRelayNetworkAsync`；局間 `StopNetworkAsync` 回 MPS-only；重建成本入 T_spawn | #23/23a/26 L415-506,663 | Net | Foundation | 0006 | ✅ Covered（r2 ↑） | 0006 D2 兩層壽命＋forbidden `lobby_with_live_relay`。r3：r1 新增的 `StartFailed` 復原對「中途加入被拒」無效（轉接層拿到 `ISession` 前就失敗，FV-1）；transport 切換時機見 EA-3 |
+| TR-netcode-019 | Lobby 延後建連：`WithNetworkOptions(WSS)` 不啟動；開始上班才 `StartRelayNetworkAsync`；局間 `StopNetworkAsync` 回 MPS-only；重建成本入 T_spawn | #23/23a/26 L415-506,663 | Net | Foundation | 0006 | ✅ Covered（r2 ↑） | 0006 D2 兩層壽命＋forbidden `lobby_with_live_relay`。r3：r1 新增的 `StartFailed` 復原對「中途加入被拒」無效（轉接層拿到 `ISession` 前就失敗，FV-1）；transport 切換時機見 EA-3。r4：自有 `SessionNetworkHandler` 是 NGO 啟停唯一擁有者，FV-1 從根上解決（MPS 原始碼 15 跳確認）；但 #23a 存檔失敗無出口（M4） |
 | TR-netcode-020 | WSS 每角色各自宣告（Join 亦需）＋`UseWebSockets=true`，集中 helper | L468-485 | Net | Foundation | 0005 | ✅ Covered | D6 |
 | TR-netcode-021 | UTP 常數契約：`HeartbeatTimeoutMS=500` 不得動（兼 Relay PING）；`DisconnectTimeoutMS` 30s；`ClientConnectionBufferTimeout` 10s；連線總逾時 60s 應調小 | L529,1187,1230 | Net | Foundation | 0006 | ✅ Covered（r2 ↑） | 0006 D12 常數表＋registry `utp_constants_contract` |
 | TR-netcode-022 | 複製邀請連結：Clipboard 需 gesture＋`.jslib`；itch.io iframe 無 `clipboard-write`→文字框 fallback | L573,1638 | Plat | Feature | 0005 | ✅ Covered | `IClipboard` |
 | TR-netcode-023 | 道具 `DontDestroyWithOwner=true`、Host 自行 unparent＋落地座標；斷線處置 7 步原子序列≤2s | #24 L580-605 | Net | Core | 0006（＋G2） | ⚠️ Partial（r2 ↑） | 0006 D7 定序與 2 s 上限。r3：E1 契約層已修（avatar 亦 `DontDestroyWithOwner`、道具須在每個 client 存活、推薦 client 端 `OnNetworkDespawn` 自救，原始碼可行）；Host 自行 unparent＋落地座標與 (a)／(b) 路由仍交 G2 |
-| TR-netcode-024 | MPS 成員唯一寫入者＝Host（`AsHost().RemovePlayerAsync`）；`max_players` 執行點＝MPS join；`session_member_count`≠`online_player_count` | #24a L607-617,192 | Net | Core | 0006 | ✅ Covered（r2 ↑） | 0006 D7 第 6 步 `RemovePlayerAsync`（Host 唯一寫入者）；`SlotTable.OnlineCount` 與 `session.PlayerCount` 分離 |
+| TR-netcode-024 | MPS 成員唯一寫入者＝Host（`AsHost().RemovePlayerAsync`）；`max_players` 執行點＝MPS join；`session_member_count`≠`online_player_count` | #24a L607-617,192 | Net | Core | 0006 | ✅ Covered（r2 ↑） | 0006 D7 第 6 步 `RemovePlayerAsync`（Host 唯一寫入者）；`SlotTable.OnlineCount` 與 `session.PlayerCount` 分離。r4：第 6 步 `try { await }`；`MaxPlayers = max_players` |
 | TR-netcode-025 | Lobby Host 離開＝訂閱 `ISession` 事件＋本地 `lobby_host_silence_timeout_sec` 30s | #25 L619-661 | Net | Core | 0006 | ✅ Covered（r2 ↑） | 0006 D8 末段：Lobby 訂閱 `ISession` 事件＋Core 計時 30 s，不等服務端 |
 | TR-netcode-026 | 冷啟動 stall 偵測在 loader HTML 層→LoadFailed；客製 Web Template 取代預設 loader | #27 L672-677,76-85 | Plat | Presentation | 0005 | ⚠️ Partial | 只標位置無介面 |
 | TR-netcode-027 | Relay region 貼著 Host：`.jslib` `Intl` 查表→fallback→可覆寫→`RelayNetworkOptions`；同區 RTT≤300、跨區降級契約 | #28 L679-702,1238,AC22a | Plat | Core | 0005/0006 | ⚠️ Partial | 0006 D2 定 `IRegionSelector`→`RelayNetworkOptions(region)` 於 #26；跨區降級契約（AC22a）仍無 |
-| TR-netcode-028 | 狀態機 12 態（適用性矩陣 32 列 × 11 欄，Booting／LoadFailed 合欄）；Disconnected 僅由 InShift 進入；Lobby* 同 session 合流、沙盒不共享狀態；Host 獨留不結束 | L704-776,408 | State | Core | 0006 | ⚠️ Partial（r2 ↑） | 0006 D3 12 態＋32×11 守衛表＋主詞表＋Onboarding 回收（E4 已修）。r3 殘留：Settlement 欄的 peer 分流與 D7 衝突（FV-8）；**Lobby\* 入口在 MPS 2.3.1 下不可達（FV-1，HIGH）** |
-| TR-netcode-029 | 本層輸入訊號表（NGO 四 callback、MPS 事件、瀏覽器三組）＋下游 11 系統契約表 | L780-810 | X-sys | Core | 0006/0002/0003/0005 | ⚠️ Partial | 0006 D13 `session_events`。r3：GDD :794／:801／:807 已列入 Migration 4；`local_ready` 仍無 ADR 定義；非 Host 端的事件來源未定（CX-2） |
-| TR-netcode-030 | 同步頻率：`NetworkConfig.TickRate=10`（連帶 NetworkVariable 10Hz 須確認無害）；NPC 事件≥0.2s；RPC 不受 tick | L812-818,1185 | Perf | Foundation | 0001 | ⚠️ Partial | 連帶效應未評 |
-| TR-netcode-031 | 單一場景、不啟用 `NetworkSceneManager`；更衣室為本地 UI 疊層、定長 3–5s、同步未完仍進場 | L821-822,177-185 | Scene | Foundation | 0006 | ⚠️ Partial（r2 ↑） | 0006 D1 `EnableSceneManagement=false`；D4 依賴更衣室 3.0 s 下限；「同步未完仍進場」runtime 規則無 ADR |
+| TR-netcode-028 | 狀態機 12 態（適用性矩陣 32 列 × 11 欄，Booting／LoadFailed 合欄）；Disconnected 僅由 InShift 進入；Lobby* 同 session 合流、沙盒不共享狀態；Host 獨留不結束 | L704-776,408 | State | Core | 0006 | ⚠️ Partial（r2 ↑） | 0006 D3 12 態＋32×11 守衛表＋主詞表＋Onboarding 回收（E4 已修）。r3 殘留：Settlement 欄的 peer 分流與 D7 衝突（FV-8）；**Lobby\* 入口在 MPS 2.3.1 下不可達（FV-1，HIGH）**。r4：FV-8、FV-1 已修；殘留：看門狗是「緩解」、client 在 Settlement 收到 #23a 斷線無轉移（M1）、LobbyWaiting 復原轉移（M9）、`ShiftStartAborted` 邊未回 GDD |
+| TR-netcode-029 | 本層輸入訊號表（NGO 四 callback、MPS 事件、瀏覽器三組）＋下游 11 系統契約表 | L780-810 | X-sys | Core | 0006/0002/0003/0005 | ⚠️ Partial | 0006 D13 `session_events`。r3：GDD :794／:801／:807 已列入 Migration 4；`local_ready` 仍無 ADR 定義；非 Host 端的事件來源未定（CX-2）。r4：CX-2 已修（分端來源表）；`local_ready` 有定義；GDD 的 `OnTransportFailure` 在 0006 零命中；下游契約多歸未寫 ADR |
+| TR-netcode-030 | 同步頻率：`NetworkConfig.TickRate=10`（連帶 NetworkVariable 10Hz 須確認無害）；NPC 事件≥0.2s；RPC 不受 tick | L812-818,1185 | Perf | Foundation | 0006 | ⚠️ Partial | 連帶效應未評。r4：**ADR 欄改為 0006**（TickRate 自 0006 r2 起由 0006 擁有，registry `session_topology`）；「NV 10 Hz 的連帶效應」仍無人評估 |
+| TR-netcode-031 | 單一場景、不啟用 `NetworkSceneManager`；更衣室為本地 UI 疊層、定長 3–5s、同步未完仍進場 | L821-822,177-185 | Scene | Foundation | 0006 | ⚠️ Partial（r2 ↑） | 0006 D1 `EnableSceneManagement=false`；D4 依賴更衣室 3.0 s 下限；「同步未完仍進場」runtime 規則無 ADR。r4：延後 spawn 後「同步未完仍準時進場」改由 Host 送來的 avatar spawn 決定，與 AC40 衝突（GF-22） |
 | TR-netcode-032 | 狀態真相走 NetworkVariable（Host 寫），RPC 只驅動表現層；不重播歷史 RPC | L823-826 | Data | Foundation | 0003 | ✅ Covered | 0002 D8 同 |
-| TR-netcode-033 | 同步物件一律 Host 動態 spawn＋`NetworkPrefabsList`；禁 scene-placed；Addressables 共存、單執行緒寫死待 Web 平台 ADR | L827-829,1165,OQ6/11 | Scene | Foundation | — | ❌ Gap | 無 |
+| TR-netcode-033 | 同步物件一律 Host 動態 spawn＋`NetworkPrefabsList`；禁 scene-placed；Addressables 共存、單執行緒寫死待 Web 平台 ADR | L827-829,1165,OQ6/11 | Scene | Foundation | — | ❌ Gap | 無。r4：邊界案例，維持 ❌——r2 只替 avatar 與 `SessionRoot` 定了動態 spawn，全專案規則仍歸 G2 |
 | TR-netcode-034 | RPC 一律 `[Rpc]` 禁 `[ServerRpc]/[ClientRpc]`；不繼承 `NetworkTransform`、`Update` 不可 override | L838-843 | Net | Foundation | 0001/0002 | ✅ Covered | D6／`[Rpc(SendTo.Server)]` |
 | TR-netcode-035 | 重連身分 `PlayerId`↔slot 自建對照（ClientId 會變）；Post 重連窗口受 Relay 每 client TTL 10s 限制 | L849-851,886-896,1229 | Data | Core | 0006 | ✅ Covered（r2 ↑） | 0006 D4 identity 契約：`PlayerId↔slot↔clientId`、MVP 重連＝新加入；Post-MVP 保留窗口列 V8 |
-| TR-netcode-036 | 班次時鐘真相＝Host `shift_end_ts` NetworkVariable；`end_shift_early` 直接改寫；剩餘判定一律 Host 側 | L853-868,212 | State | Core | 0006 | ✅ Covered（r2 ↑） | 0006 D13 `SessionRoot.ShiftEndTs`（Host 寫 NV）；`end_shift_early` 直接改寫 |
+| TR-netcode-036 | 班次時鐘真相＝Host `shift_end_ts` NetworkVariable；`end_shift_early` 直接改寫；剩餘判定一律 Host 側 | L853-868,212 | State | Core | 0006 | ✅ Covered（r2 ↑） | 0006 D13 `SessionRoot.ShiftEndTs`（Host 寫 NV）；`end_shift_early` 直接改寫。r4：初值在 `OnServerStarted` 寫入（FV-3）；但 0006:178 單位錯（ms＋秒，R4B-6） |
 | TR-netcode-037 | 模擬不快轉不補跑；三類物件顯示層各自追平；client NPC 凍結只套最新 milestone | L870-882 | State | Core | 0003 | ⚠️ Partial | 僅引為收斂前提 |
 | TR-netcode-038 | 建置規範：Gzip＋`decompressionFallback=false`、≤44MB、Stripping High＋`[Preserve]`、CJK 字型子集化 | L1017-1049,1338 | Plat | Foundation | 0005 | ⚠️ Partial | 僅 `[Preserve]` 位置 |
-| TR-netcode-039 | 上游 UGS 初始化／匿名登入失敗→ServiceError；單人模式不經 UGS | L1136,753 | Plat | Foundation | 0006 | ✅ Covered（r2 ↑） | 0006 D10 Solo 零 UGS、`SinglePlayerTransport`（E3）、Solo／沙盒 `MemberIds`（E2 第 2 項）。r3：Online Host 自核准的第 4 項與掛點殘留歸 FV-3，不在本 TR 文字內；V3 待驗 |
+| TR-netcode-039 | 上游 UGS 初始化／匿名登入失敗→ServiceError；單人模式不經 UGS | L1136,753 | Plat | Foundation | 0006 | ✅ Covered（r2 ↑） | 0006 D10 Solo 零 UGS、`SinglePlayerTransport`（E3）、Solo／沙盒 `MemberIds`（E2 第 2 項）。r3：Online Host 自核准的第 4 項與掛點殘留歸 FV-3，不在本 TR 文字內；V3 待驗。r4：Host 自身請求只判第 1–3 項、掛點 `OnServerStarted`（FV-3）；但 slot 0 的 `PlayerJoined` 來源矛盾（M2） |
 | TR-netcode-040 | 退路 plan B：Distributed Authority（官方 Web 支援）／自架 headless＋wss 反代 | L1142-1153 | Net | Foundation | 0006 | ✅ Covered（r2 ↑） | 0006 D1 兩條退路與觸發條件 |
-| TR-netcode-041 | 常數 data-driven 登錄 registry；約束①–⑮ 非法組態應可機械驗證 | L1173-1241 | Data | Foundation | 0006 | ✅ Covered（r2 ↑） | 0006 D12 `SessionConfig`＋`Validate()` 11 條（E9 已修）。r3：`SessionConfig` 為 ScriptableObject 卻放在 Core（FV-5），屬分層細節，不影響可機械驗證 |
+| TR-netcode-041 | 常數 data-driven 登錄 registry；約束①–⑮ 非法組態應可機械驗證 | L1173-1241 | Data | Foundation | 0006 | ✅ Covered（r2 ↑） | 0006 D12 `SessionConfig`＋`Validate()` 11 條（E9 已修）。r3：`SessionConfig` 為 ScriptableObject 卻放在 Core（FV-5），屬分層細節，不影響可機械驗證。r4：`SessionConfig` 改為 Core 純 C#（FV-5）；`Validate()` 12 條，漏 `MaxPlayers`（R4C-24） |
 | TR-netcode-042 | 約束⑧ 互動請求／結果一律走 RPC（越權 owner-write delta 中止整則訊息解析） | L1233,1639 | Net | Core | 0002 | ✅ Covered | Constraints 明列 |
 | TR-netcode-043 | `interpolation_buffer_ms=150` 不對應 NGO（≥2 tick 隨 RTT）；`remote_step_tolerance` 未定義 | L1188,AC15/23 | Perf | Core | 0002 | ⚠️ Partial | levy 已提未解 |
 | TR-netcode-044 | 測試分層：EditMode 純邏輯（心跳／公式③④／排歧／世代）；PlayMode 多實例；Playwright 實機 Release；鉤子 build flag 隔離 | L1493-1542 | Test | Foundation | 0006/0001/0002/0003/0005 | ⚠️ Partial | 0006 D3 `Session.Core`（noEngineReferences）＋T0／T1／T1-Web 分層補上 session 核心；公式③ 歸屬與測試鉤子的 build flag 隔離仍未定 |
 | TR-netcode-045 | `connection_state` 枚舉→店語字串表 data-driven，禁技術詞 | L1300-1336 | Pres | Presentation | 0006 | ✅ Covered（r2 ↑） | 0006 D13 `ConnectionState` 為 UI 唯一連線狀態來源，店語表 data-driven |
-| TR-netcode-046 | 未建 NGO 連線的端（Lobby 預檢、Lobby* 等待畫面）須能顯示班次剩餘時間；表示法不得依賴心跳 offset | #9 L161；Lobby* 約束 (c) L776 | State | Core | 0006 | ⚠️ Partial（r2 新增） | 0006 D5 改發 `shift_eta` 相對量（E5 時間基準已解）。r3：只在階段改變時重發、屬性不帶發布時刻，晚到讀者誤差等於屬性年齡（FV-2）；Lobby\* 等待者在主路徑上可能已不是成員（FV-1） |
+| TR-netcode-046 | 未建 NGO 連線的端（Lobby 預檢、Lobby* 等待畫面）須能顯示班次剩餘時間；表示法不得依賴心跳 offset | #9 L161；Lobby* 約束 (c) L776 | State | Core | 0006 | ⚠️ Partial（r2 新增） | 0006 D5 改發 `shift_eta` 相對量（E5 時間基準已解）。r3：只在階段改變時重發、屬性不帶發布時刻，晚到讀者誤差等於屬性年齡（FV-2）；Lobby\* 等待者在主路徑上可能已不是成員（FV-1）。r4：FV-2、FV-1 已修；但 `IsPrivate` 讓 TR 點名的「Lobby 預檢」讀者不存在，等 GDD r5（GF-9）與措辭同步後可轉 ✅ |
+| TR-netcode-047 | 未建 NGO 連線的 Lobby\* 等待畫面須顯示「在場隊友人數」（與前一班剩餘時間並列） | AC51 L1485；Lobby\* 約束 L770-776 | Net | Core | — | ❌ Gap（r4 新登記） | r4：前幾輪漏抽，arlong 2026-10-04 裁決登記。沒有 NGO 的端讀不到 `Roster`；`shift_eta`（0006:184）沒有人數欄；MPS 成員數 ≠ `online_player_count`（含其他等待者與已斷線未移除者）。修法二擇一：`shift_eta` 加 `online_count`，或 GDD 改顯示成員數並註明口徑（GF-25） |
 
 小計（r2）：Covered 25／Partial 19／Gap 2（共 46）〔前次 7／18／20〕。ADR-0006 收掉 G1；剩 Gap 只有 TR-netcode-005、033（皆歸 G2）。Partial 中屬 ADR-0006 r1 待修的：011、018、023、028、031、044（§3C）
 
@@ -97,7 +99,7 @@
 | TR-fpc-008 | 雙向自我解除穿透，位移全額施加於自己，對他人零寫入 | C9 :246-254；AC9 :1285-1293 | Movement/Netcode | Core | 0001 | ✅ Covered | `PeerWrites` 恆 0 |
 | TR-fpc-009 | NPC 硬擋、玩家對 NPC 零寫入、NPC 側恆 `Separated`、`npc_depenetration_scale=1` | C11 :291-304；F4 :686-710；AC13 :1319-1337 | Movement | Core | 0001/0003 | ✅ Covered | `IsNpc` ghost；0003 只看 player→npc 方向 |
 | TR-fpc-010 | 有向對狀態機三態；`PassThrough` 唯一出口為完全分離；兩端獨立不保證同步 | States A :387-426；AC15/18 :1354-1383 | Movement | Core | 0001 | ✅ Covered | `PairMachine` 有向對 |
-| TR-fpc-011 | 狀態實例以玩家 id 為鍵非 slot；一端 despawn 銷毀兩實例；無膠囊不建實例 | :397-399；Edge :841-842；AC19/20 :1385-1396 | Movement/Netcode | Core | 0001/0003 ⟂ 0006 | ⚠️ Partial（r2 ↓） | 0001／0003 以玩家 id 為鍵（未改），0006 D4 以 slot（`PeerKey`）為鍵；registry `player_identity_key` 已把 ADR-0001 的寫法列為 not（CX-1）。r3 加重：avatar 在 approval 當下即 spawn，ADR-0003 :95 的前提失效，Onboarding 期間的 avatar 是否進碰撞無人裁決（CX-3） |
+| TR-fpc-011 | 狀態實例以玩家 id 為鍵非 slot；一端 despawn 銷毀兩實例；無膠囊不建實例 | :397-399；Edge :841-842；AC19/20 :1385-1396 | Movement/Netcode | Core | 0001/0003 ⟂ 0006 | ⚠️ Partial（r2 ↓） | 0001／0003 以玩家 id 為鍵（未改），0006 D4 以 slot（`PeerKey`）為鍵；registry `player_identity_key` 已把 ADR-0001 的寫法列為 not（CX-1）。r3 加重：avatar 在 approval 當下即 spawn，ADR-0003 :95 的前提失效，Onboarding 期間的 avatar 是否進碰撞無人裁決（CX-3）。r4：CX-3 的加重理由已因延後 spawn 消失；CX-1 仍在（0001／0003 未改鍵） |
 | TR-fpc-012 | C10 計時主詞＝本機輸入；`IsInputCanceled` 述詞；歸零／遞增／維持三語意 | C10 :266-285；Edge :832-835；AC14/16 :1341-1368 | Movement | Core | 0001 | ✅ Covered | `Step(…, inputCanceled, dt)`＋`InputWasCanceled` |
 | TR-fpc-013 | 多體：解除穿透向量相加一次施加、與順序無關；多對計時器並行推進 | Edge :858-863；AC21/22 :1400-1416 | Movement | Core | 0001 | ⚠️ Partial | 只在 Consequences 提 AC21 可測，決策本文未寫 |
 | TR-fpc-014 | dt 夾制 `min(dt,0.10)` 不補跑；`Update()` 非 `FixedUpdate()` | C13 :329-335；F2 :670-676；AC24 :1431-1438 | Movement/Platform | Core | 0001 | ✅ Covered | D2 明文 |
@@ -105,16 +107,16 @@
 | TR-fpc-016 | 隱藏／失鎖時輸入與速度歸零、回前景首幀不動、仍解除穿透可被推（`adoptInput`） | C14 :337-353；C7 :224-228；AC25 :1440-1449 | Input/Movement | Core | 0001/0005 | ✅ Covered | Core 只收布林 |
 | TR-fpc-017 | 輸入真相＝本幀按鍵狀態，非事件差分（黏鍵免疫） | C14 :344；:1448-1449；AC37 :1518 | Input | Feature | 0001 | ⚠️ Partial | D7 用 Input System 但未定輪詢 `ReadValue` vs `performed/canceled` |
 | TR-fpc-018 | 指標鎖定三態；`Unlocked≡Lost`；角色仍在場、可被推、計入他人計時 | C15 :355-368；States B :428-444；AC26 :1451-1460 | Input/Platform | Core | 0001 | ✅ Covered | 折成 `adoptInput` 布林，行為等價成立 |
-| TR-fpc-019 | 不自動重鎖；重鎖手勢由 #11 提供；該點擊須吞掉；鎖定狀態輸出 HUD | C15 :363-365；:479；UI :1099-1103；AC27 :1462-1468 | Platform/Input | Feature | — | ❌ Gap | r3：ADR-0005 r1 明文把 pointer lock 交給 ADR-0001／#11，但 ADR-0001 未承接，ADR-0006 給 0001 r1 的義務也無此項；AC27 的假鎖定介面無擁有者 |
-| TR-fpc-020 | Web pointer lock 平台能力：iframe 可用（僅 Chrome/macOS 實測）、Esc 解除、焦點遺失≠分頁隱藏 | OQ-F1 :1595；AC35-37 :1516-1518；:463-467 | Platform | Feature | 0001/0005 | ⚠️ Partial | 0005 D5 焦點歸 `Cursor.lockState`、隱藏歸 `IPageLifecycle`。r3：0005 說 Unity 層「由 ADR-0001 的 T1-Web 驗」，但 ADR-0001 沒有 T1-Web；OQ-F1 只測 Chrome/macOS |
+| TR-fpc-019 | 不自動重鎖；重鎖手勢由 #11 提供；該點擊須吞掉；鎖定狀態輸出 HUD | C15 :363-365；:479；UI :1099-1103；AC27 :1462-1468 | Platform/Input | Feature | — | ❌ Gap | r3：ADR-0005 r1 明文把 pointer lock 交給 ADR-0001／#11，但 ADR-0001 未承接，ADR-0006 給 0001 r1 的義務也無此項；AC27 的假鎖定介面無擁有者。r4：交棒已登記為 ADR-0001 r1 的 T1-Web 義務（0006 Migration 3）；不自動重鎖、吞重鎖點擊、鎖定狀態輸出 HUD 仍無決策 |
+| TR-fpc-020 | Web pointer lock 平台能力：iframe 可用（僅 Chrome/macOS 實測）、Esc 解除、焦點遺失≠分頁隱藏 | OQ-F1 :1595；AC35-37 :1516-1518；:463-467 | Platform | Feature | 0001/0005 | ⚠️ Partial | 0005 D5 焦點歸 `Cursor.lockState`、隱藏歸 `IPageLifecycle`。r3：0005 說 Unity 層「由 ADR-0001 的 T1-Web 驗」，但 ADR-0001 沒有 T1-Web；OQ-F1 只測 Chrome/macOS。r4：同 019；「焦點≠隱藏」已由 0005:85 裁決 |
 | TR-fpc-021 | 俯仰不出本機；payload 無 pitch、無走／停；走停由內插位置微分導出 | C6 :210-216；C16 :375-377；AC28 :1472-1475 | Netcode | Core | 0001/0002 | ✅ Covered | per-axis 關 pitch；0002 以此為前提 |
 | TR-fpc-022 | 對外廣播邊緣觸發、無每幀路徑、不另建管道 | C16 :370-374；AC28③ :1475-1480 | Netcode | Feature | 0001/0003 | ✅ Covered | stock NT 門檻；NV `AreEqual` 後才 dirty |
 | TR-fpc-023 | G2 本機即時／遠端內插；`AuthorityMode=Owner` 顯式＋runtime guard | :34-38；:487-493；AC33 :1514 | Netcode | Foundation | 0001 | ✅ Covered | D4／D5 |
 | TR-fpc-024 | 班次零傳送：無 `SetPosition/Teleport`；本機 NT 永不 `SetState()` | C12 :326-327；AC12 :1310-1317 | Movement/Netcode | Core | 0001 | ✅ Covered | 型別＋契約（Unity 層僅紀律，ADR 自承） |
 | TR-fpc-025 | 實作模式：`CharacterController`、不繼承 `NetworkTransform` | :154-155；:1557 | Physics | Core | 0001 | ✅ Covered | D6；Alt 2 Rigidbody 否決 |
 | TR-fpc-026 | 場景碰撞不穿牆不離地；CC 三旗標歸零；`Move()` 投影 ≤ \|delta\|；場景位移在預算外只能縮短 | AC34 :1515；C2 :177-179 | Physics | Core | 0001 | ✅ Covered | D3；GDD 原本對此零字，ADR 補洞 |
-| TR-fpc-027 | 過場結束即可移動（netcode AC40）；`local_ready`＝已有可收輸入的角色；更衣室與店面同場景與否 | States C :454-467；Edge :878-880；OQ-F8 :1602 | Netcode/Platform | Feature | 0001/0006 | ⚠️ Partial | OQ-F8 已由 0006 D1 回答（單一場景、`EnableSceneManagement=false`）；`local_ready` 訊號仍未定 |
-| TR-fpc-028 | 與 #2 事件介面：送 `local_ready`、消費 `player_joined/left`、各階段輸入採納由 #2 驅動 | :55；:475；States C :446-457 | Netcode | Feature | 0003/0006 | ⚠️ Partial | 0006 D13 `PlayerJoined/PlayerLeft(slot)`、D7 `FreezeInput` 參與者；`local_ready` 與過場／結算期間誰翻 `adoptInput` 仍無 ADR |
+| TR-fpc-027 | 過場結束即可移動（netcode AC40）；`local_ready`＝已有可收輸入的角色；更衣室與店面同場景與否 | States C :454-467；Edge :878-880；OQ-F8 :1602 | Netcode/Platform | Feature | 0001/0006 | ⚠️ Partial | OQ-F8 已由 0006 D1 回答（單一場景、`EnableSceneManagement=false`）；`local_ready` 訊號仍未定。r4：`local_ready` 已有定義；AC40 時間語意（GF-22）；0006:771 漏 Host 特例 |
+| TR-fpc-028 | 與 #2 事件介面：送 `local_ready`、消費 `player_joined/left`、各階段輸入採納由 #2 驅動 | :55；:475；States C :446-457 | Netcode | Feature | 0003/0006 | ⚠️ Partial | 0006 D13 `PlayerJoined/PlayerLeft(slot)`、D7 `FreezeInput` 參與者；`local_ready` 與過場／結算期間誰翻 `adoptInput` 仍無 ADR。r4：非 Host 端在場來源已定；各階段輸入採納沒有事件（M8） |
 | TR-fpc-029 | 攝影機常數本系統擁有且資料驅動：near clip 0.10 覆寫 URP 預設 0.30、eye height、FOV；攝影機在膠囊中軸；transform 輸出 #11 | F0 :544-562；F1 :598-603；AC5j :1216；:479 | Camera | Foundation | — | ❌ Gap | 無任一 ADR 觸及攝影機；F0 自述預設值會靜默破 F1（安全速度 1.47→0.88 且症狀被歸因成網路） |
 | TR-fpc-030 | 常數層：推導值非旋鈕；跨 GDD 常數（tick_rate、interp buffer、bg threshold、r_c）可被 AC5 同一測試讀取 | F2/F4 :670-689；Tuning :1018-1039；AC5 :1202-1218 | Data | Foundation | 0001 | ⚠️ Partial | 只定 Movement 的 `K`；跨組件常數真相源未定 |
 | TR-fpc-031 | 視角：線性、無平滑、硬夾 <90° 不回彈；`movementX/Y` 唯一訊號；`look_deg_per_unit` 校正 | F6 :759-770；OQ-F2 :1596；AC29/30 :1482-1495 | Camera/Input | Core | 0001 | ⚠️ Partial | `LookState` 覆蓋 Core；WebGL 鎖定下滑鼠 delta 來源未定 |
@@ -268,7 +270,7 @@
 |---|---|---|---|---|---|---|---|
 | TR-concept-001 | Web/WebGL、開連結＋房間碼即玩、進房 ≤60 s | 概 L21、L163-166 | Platform | Foundation | 0005/0006 | ⚠️ Partial | 0006 D14 `T_lobby`／`T_spawn` 硬閘門；`T_load` 只有 stall 偵測。r3：開連結的 X3 已解（0005 r1 referrer） |
 | TR-concept-002 | 2–4 人（MVP 2）、一班 8–10 分、連續值班 30–90 分 | 概 L23-24 | Networking | Foundation | 0006/0003 | ✅ Covered（r2 ↑） | 0006 Constraints：`max_players` 容器按 4、MVP 2；D2 session 跨班次存活（連續值班） |
-| TR-concept-003 | itch.io iframe 發行（pointer lock、clipboard、permissions policy） | 概 L25、L260；索 L22、L145① | Platform | Platform | 0005 | ⚠️ Partial | `IsEmbedded`／`IClipboard`／referrer 帶碼（0005 r1）。r3：pointer lock 被 0005 r1 排除在平台層外，交棒的「ADR-0001 T1-Web」不存在 |
+| TR-concept-003 | itch.io iframe 發行（pointer lock、clipboard、permissions policy） | 概 L25、L260；索 L22、L145① | Platform | Platform | 0005 | ⚠️ Partial | `IsEmbedded`／`IClipboard`／referrer 帶碼（0005 r1）。r3：pointer lock 被 0005 r1 排除在平台層外，交棒的「ADR-0001 T1-Web」不存在。r4：確認框瀏覽器矩陣與跨源 preflight 證據已補；pointer lock 交棒已登記但 ADR-0001 未承接；Safari 讀不到帶碼 referrer（GF-27） |
 | TR-concept-004 | 隊友即障礙：窄空間互撞、借過、PassThrough 降級 | 概 L44、L158、L234② | Core/Physics | Core | 0001, 0003 | ✅ Covered | 純 C# 求解器＋`PairMachine`＋owner-write 遮罩 |
 | TR-concept-005 | 客人＝個性狀態機；Host 權威 NPC、里程碑事件複製 | 概 L74 | AI/Networking | Core | 0003 | ⚠️ Partial | 只定在場狀態走 NetworkVariable；狀態機複製無 ADR |
 | TR-concept-006 | 機台互動 request→validate→broadcast | 概 L75 | Networking | Core | 0002 | ⚠️ Partial | 驗證述詞已定；Core 分層／RPC 契約＝ADR-0004 未寫 |
@@ -311,7 +313,7 @@
 | TR-index-024 | ADR-0002 待加註：持有期只驗②③④；⑤⑥錨點以槽為單位；`NothingToTake`；第四中斷源；C20 RPC 集取代 `RequestInteractRpc` | 索 L144①、L150①②、L158①⑤ | Networking | Core | 0002 | ⚠️ Partial | 五項修正均未入 ADR；RPC 簽章已與 GDD 衝突（待 ADR-0004 同步） |
 | TR-index-025 | 同 tick 順序（先 RPC 再逾時掃描）；E2 掛 `OnNetworkTick`；`AutoObjectParentSync=false` | 索 L150③、L158②③ | Networking | Core | — | ❌ Gap | ADR-0004 範圍 |
 | TR-index-026 | ADR-XXX 建置期資料治理閘門（14 條資料不變量） | 索 L146 | Build/Data | Platform | — | ❌ Gap | 索引明列待寫 |
-| TR-index-027 | #20 平台鉤子：region／背景分流／sendBeacon／帶碼連結↔Rich Presence；心跳；分頁隱藏≠失焦 | 索 L39、L63、L137④ | Platform/Networking | Platform | 0005/0006 | ⚠️ Partial | 心跳 0006 D6；離開通知 0005 r1 keepalive fetch＋headers、送出端單發（r2 待辦已完成）。r3 新缺陷：`beforeunload` 為實際送出點、與確認框衝突（FV-4）；REST 路徑寫錯被 404 吞掉（EA-1）；V10 未驗；Rich Presence 歸 Alpha |
+| TR-index-027 | #20 平台鉤子：region／背景分流／sendBeacon／帶碼連結↔Rich Presence；心跳；分頁隱藏≠失焦 | 索 L39、L63、L137④ | Platform/Networking | Platform | 0005/0006 | ⚠️ Partial | 心跳 0006 D6；離開通知 0005 r1 keepalive fetch＋headers、送出端單發（r2 待辦已完成）。r3 新缺陷：`beforeunload` 為實際送出點、與確認框衝突（FV-4）；REST 路徑寫錯被 404 吞掉（EA-1）；V10 未驗；Rich Presence 歸 Alpha。r4：FV-4、EA-1 已修；Rich Presence 那一半歸 Alpha；V10 未實測；TR 原文 `sendBeacon` 待改（GF-26） |
 | TR-index-028 | 攝影機常數（near clip 0.10）擁有者；#11 讀攝影機 transform | 索 L22、L71 | Rendering/Core | Core | — | ❌ Gap | 曾為「無擁有者子系統」，仍無 ADR |
 
 小計（r2）：Covered 13／Partial 21／Gap 13（共 47）〔前次 10／22／15〕。002／009／012 →✅（拓撲、兩層會談、容器按 4）；concept-007、index-021 →⚠️。孤兒契約（#4／#7／#8／#9／#11–#15）不變
@@ -325,10 +327,10 @@
 **概念 vs technical-preferences 不一致**：①建置體積：概 L233「30-50MB」未標單位 vs tech-prefs「≤44 MB gzip」（2026-09-18 修訂）②連線服務命名：概「Unity Relay + Lobby」 vs MPS Sessions（`deprecated-apis.md` 走 Sessions）③Target Platforms 只列 Web，索 #20／ADR-0005 已加 Steam（Alpha）④Allowed Libraries 仍是「NGO／Relay／Lobby 待補」佔位，四份 ADR 已釘 NGO 2.13.2／MPS 2.3.1／UTP 2.x——版本真相只在 ADR 表頭 ⑤概念無幀率／記憶體陳述（缺口非矛盾）⑥索 L12、L223 寫「19 個系統」但表有 20 列；概 L308 仍寫「CLAUDE.md 釘的是 Godot 4.6」；`docs/CLAUDE.md` 末行仍指向 godot VERSION.md。
 
 
-## Known Gaps（依建議 ADR 分群；r3）
+## Known Gaps（依建議 ADR 分群；r4）
 
-見 r3 報告 §3、§8（分群沿用 r2 報告 §2）。摘要：
-- ~~**G1** 網路拓撲、Session 生命週期與連線健康~~ → **ADR-0006**（Proposed，r1）。殘留 Partial：TR-netcode-010/011/013/018/023/028/031/044/046。**ADR-0006 r2＋ADR-0005 r2 的 Accept 前必修 7 條**：FV-1（Lobby\* 入口不可達，需裁決）、FV-3、CX-2、EA-1、FV-4、FV-5、EA-4（r3 報告 §3A）
+見 r4 報告 §3、§8（分群沿用 r2 報告 §2）。摘要：
+- ~~**G1** 網路拓撲、Session 生命週期與連線健康~~ → **ADR-0006**（Proposed，r2）。r3 的 7 條必修已全數修好。殘留 Partial：TR-netcode-011/013/018/023/028/031/044/046；新 Gap：TR-netcode-047（Lobby\* 在場人數，GF-25）。**ADR-0006 r3 的 Accept 前必修 9 條**（r4 報告 §3A）：M1 🔴 client 在 Settlement 收到 #23a 斷線無轉移；M2 Host slot 0 的 `PlayerJoined`；M3 沙盒 Core 的輸出作用域；M4 #23a 存檔失敗出口；M5 H2 `Failed` 死路；M6 `NotAMember` pending 鬼 client；M7 `SessionRoot.Ready`；M8 輸入閘門事件；M9 LobbyWaiting 復原轉移
 - **G2** 同步物件生命週期與所有權轉移（Foundation/Core，HIGH）：TR-netcode-005/006/023/033；TR-machine-008/009/010/012/013/027；TR-product-023/024/025；TR-index-007/008。**須登記**（r3 更新）：avatar prefab `DontDestroyWithOwner = true`；第 5 步之後道具在每個 client 上存活並收斂到 Host 落地座標，路由 (a) client 端 `OnNetworkDespawn` 自救（推薦）／(b) 先於 despawn 的 reliable 訊息二選一；第 5 步以 destroy 方式 despawn、不池化；Onboarding avatar 的可見性與碰撞（CX-3）；`owner_write_networkvariable_on_transferable_object` 含 avatar 例外（CX-6）；道具的「地面」狀態與持有者欄（GF-12）；掉落後再拾取 ≥ 6 tick
 - **ADR-0004** 機台互動組 Core 分層與 RPC 契約（Core，MEDIUM）：TR-machine-002/003/004/007/014/015/017/019/020/021/024/025/033/040/041/042/045/048/051/052/053；TR-index-003/004/005/021/022/024/025；TR-product-027
 - **G4** SKU 資料格式、ID 與序列化凍結（Foundation，MEDIUM）：TR-product-001–005/008–017/026；TR-machine-007。r3：NGO 設定雜湊（含 prefab 清單）也是版本 token 的一部分（EA-2）
@@ -337,13 +339,13 @@
 - **G7** 攝影機與渲染基線（Core/Pres，HIGH）：TR-fpc-029；TR-index-028；TR-concept-015；TR-machine-056；TR-product-030
 - **G8** 延遲模型與容差（Core，HIGH）：TR-fpc-040；TR-netcode-016/030/043；TR-index-020；TR-machine-030
 - **G9** 遊戲時鐘與班次時基（Foundation，LOW；先寫 #9 GDD）：TR-concept-007；TR-machine-045；TR-netcode-013（公式③）。`ShiftEndTs` 真相已在 ADR-0006 D13
-- ~~**ADR-0005 r1**~~（2026-10-03 已寫；X2／X3／C6／DEP 已修）→ **ADR-0005 r2**：必修 FV-4（只在 `pagehide` 送出、確認框介面）、EA-4（`AlwaysLinkAssembly`、無人註冊即拋例外）；另 CX-8、EA-7、EA-9、FV-9。相關 TR：TR-netcode-010/013/026/027；TR-fpc-019/020；TR-concept-003/016/018；TR-index-027
+- ~~**ADR-0005 r2**~~（2026-10-03 已寫；FV-4、EA-4、CX-8、EA-7、EA-9、FV-9 已修）：本身無必修，須與 ADR-0006 r3 成對 Accept。應修：Chrome bfcache 中 WebSocket 不立即斷（0005:88、:148）、Safari 讀不到帶碼 referrer（Verification ④ 限定引擎，GF-27）、R4E-5／R4E-6 組合根可達性措辭。相關 TR：TR-netcode-013/026/027；TR-fpc-019/020；TR-concept-003/016/018；TR-index-027
 - **ADR-0002 r1**：TR-machine-006/016/018/022/032；TR-index-024；＋`ClaimedBy`／`requester` 改 slot、`RejectReason` 改名
 - **ADR-0001／0003 r1**：`PeerKey`（TR-fpc-011）、`FreezeInput` 參與者、遮罩清零的觸發點（非 Host 端仍以 avatar despawn 為主，見 CX-2）；r3 追加：`Solve` 的 `selfId`、Depends On 補列 ADR-0006、avatar 元件快取本機判定（CX-7）、「在場玩家」＝`PlayerJoined` 已發出（CX-3）、TickRate 改引用 ADR-0006（CX-4）、pointer lock 的 T1-Web 承接（TR-fpc-019／020）
 - **延後／需先有 GDD**：見首輪報告 §2 G12
 
 ## Superseded Requirements
-無 deprecated。r3 無措辭修訂。r2 修訂措辭（同一意圖、ID 不變）：TR-netcode-014（`LeaveSessionAsync`→`ISession.LeaveAsync`）、TR-netcode-017（payload 補 `host_now_ms`）、TR-netcode-028（12 態；矩陣 32 列 × 11 欄）、TR-machine-001（`ClaimedBy` ulong→byte slot）。
+無 deprecated。r4 無措辭修訂（TR-netcode-008／010／014／030／046 的措辭建議見 r4 報告附錄 B，待 GDD r5 回填後同步）；r4 新增 TR-netcode-047。r3 無措辭修訂。r2 修訂措辭（同一意圖、ID 不變）：TR-netcode-014（`LeaveSessionAsync`→`ISession.LeaveAsync`）、TR-netcode-017（payload 補 `host_now_ms`）、TR-netcode-028（12 態；矩陣 32 列 × 11 欄）、TR-machine-001（`ClaimedBy` ulong→byte slot）。
 
 ## History
 | Date | Covered | Partial | Gap | Verdict | Notes |
@@ -351,3 +353,4 @@
 | 2026-10-01 | 50 | 70 | 107 | FAIL（覆蓋＋1 BLOCKING 身份契約） | 首次審查；4 ADR（皆 Proposed）對 5 GDD |
 | 2026-10-01（r2） | 71 | 74 | 83 | FAIL（Foundation Gap 20；身份契約已裁決待傳播；ADR-0006 四條 Accept 前必修） | ADR-0006 寫入後重跑；5 ADR（皆 Proposed）；netcode Foundation Gap 9→1 |
 | 2026-10-03（r3） | 71 | 74 | 83 | FAIL（Foundation Gap 20；ADR-0006／0005 Accept 前必修 7 條，FV-1 需裁決） | ADR-0006 r1＋ADR-0005 r1 寫入後重跑；r2 必修 E1／E6／E8 已修、E2 半修；TR-netcode-007 ↑、010 ↓ |
+| 2026-10-04（r4） | 72 | 73 | 84 | FAIL（Foundation Gap 20；CX-1 未傳播；ADR-0006 Accept 前必修 9 條，全部局部、無需裁決） | ADR-0006 r2＋ADR-0005 r2 寫入後重跑；r3 必修 7／7 已修；TR-netcode-010 ↑；新登記 TR-netcode-047（Gap）；總數 229 |

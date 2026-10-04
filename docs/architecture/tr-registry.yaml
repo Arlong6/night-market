@@ -26,8 +26,9 @@
 # EXTRA FIELDS (added 2026-10-01): section = GDD 節／行；layer = Foundation|Core|Feature|Presentation|Platform|Polish；
 #   adr_coverage = covered|partial|gap（審查當日快照；權威來源為 docs/architecture/traceability-index.md）
 
-version: 4
-last_updated: "2026-10-03"   # r3：ADR-0006 r1＋ADR-0005 r1 寫入後重跑（docs/architecture/architecture-review-2026-10-03-r3.md）；只改兩列 adr_coverage，無新 TR
+version: 5
+last_updated: "2026-10-04"   # r4：ADR-0006 r2＋ADR-0005 r2 寫入後重跑（docs/architecture/architecture-review-2026-10-04-r4.md）；TR-netcode-010 partial→covered、TR-netcode-030 adr 0001→0006、新增 TR-netcode-047
+# v4 last_updated: "2026-10-03"   # r3：ADR-0006 r1＋ADR-0005 r1 寫入後重跑；只改兩列 adr_coverage，無新 TR
 
 requirements:
   - id: TR-netcode-001
@@ -145,7 +146,7 @@ requirements:
     section: "#12 L195-237"
     layer: "Core"
     adr: "0006/0005"
-    adr_coverage: partial   # r3（2026-10-03）covered→partial：「確認框 best-effort」無 ADR 決策，且 beforeunload 為實際送出點（r3 FV-4）
+    adr_coverage: covered   # r4（2026-10-04）partial→covered：只在 pagehide 送出、beforeunload 只掛確認框、SetLeaveConfirmation 介面、完整 URL（r3 FV-4／EA-1 已修）；對 r4 GF-21 敏感。r3（2026-10-03）曾 covered→partial
     created: 2026-10-01
     revised: ""
     status: active
@@ -384,7 +385,7 @@ requirements:
     requirement: "同步頻率：`NetworkConfig.TickRate=10`（連帶 NetworkVariable 10Hz 須確認無害）；NPC 事件≥0.2s；RPC 不受 tick"
     section: "L812-818,1185"
     layer: "Foundation"
-    adr: "0001"
+    adr: "0006"   # r4（2026-10-04）0001→0006：TickRate 自 ADR-0006 r2 起由 0006 擁有（registry session_topology）
     adr_coverage: partial
     created: 2026-10-01
     revised: ""
@@ -579,6 +580,18 @@ requirements:
     adr: "0006"
     adr_coverage: partial
     created: 2026-10-01
+    revised: ""
+    status: active
+
+  - id: TR-netcode-047
+    system: netcode-session
+    gdd: design/gdd/netcode-session.md
+    requirement: "未建 NGO 連線的 Lobby* 等待畫面須顯示「在場隊友人數」（與前一班剩餘時間並列）"
+    section: "AC51 L1485；Lobby* 約束 L770-776"
+    layer: "Core"
+    adr: ""
+    adr_coverage: gap   # r4（2026-10-04）前幾輪漏抽、arlong 裁決登記；shift_eta 沒有人數欄、無 NGO 端讀不到 Roster（r4 GF-25）
+    created: 2026-10-04
     revised: ""
     status: active
 
