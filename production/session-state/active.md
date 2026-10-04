@@ -12,6 +12,22 @@
 
 **階段：Pre-production。** 2026-09-03 開案，至今 13 天。
 
+## 目前任務（2026-10-04，ADR-0006 r2＋ADR-0005 r2 已寫入）
+
+- **Task**：依 `architecture-review-2026-10-03-r3.md` 修 **ADR-0006 r2＋ADR-0005 r2**（成對）＋registry。草稿先寫在 `$CLAUDE_JOB_DIR/tmp/draft/`，審查通過、arlong 同意後才覆寫 `docs/`
+- **查證**：workflow 7 個查證 agent（FV-1 a／bc、Host 時序、client 事件、Lobby REST＋token、瀏覽器、剝除＋雜湊＋SessionConfig）＋5 個反駁者；承重主張無一被整條推翻，部分修正 4 條（B2 下一班不必然重觸發、C2 StopAsync 建房起即被呼叫、D2/D5 NV 寫法與 despawn 過濾、E4 續發失敗走 30 s 重試）
+- **arlong 裁決（2026-10-03）**：①FV-1 採 (a) 轉接層自有 `INetworkHandler`（approval 拒絕不 throw、在 session 內進 LobbyWaiting）②avatar 延後到 `PlayerJoined` 才 `SpawnAsPlayerObject`（approval `CreatePlayerObject=false`、`PlayerPrefab=null`）③pagehide 不分 persisted 一律送 DELETE＋`pageshow(persisted)` 重載④ADR-0005 改組合根＋一處 `#if`（不用自我註冊）
+- **主審採用的預設（未另問）**：handler 立即啟網、不做延後 Resume（避開 Relay join bind 期限未知）；`IsPrivate = true`（文件證實私人 lobby 可以碼加入）；`shift_eta` 加 `shift_seq`＋發布者 UTC 時刻；離開通知以「每秒＋階段變更重算」保鮮、SDK leave Task 完成後才 Clear；Lobby REST 常數 `https://lobby.services.api.unity.com/v1`＋反射守門測試
+- **推翻 r3 之處**：EA-3 的 `OnStopped` 是 internal → 改 `OnServerStopped`／`OnClientStopped`；EA-8 前提錯（SDK 已吞 PlayerNotFound）；FV-4 第二點（persisted 不送）依裁決③改；EA-4 的 `[Preserve]` 非必要
+- 查證原始輸出：`$CLAUDE_JOB_DIR/tmp/inv-*.md`、`refute.md`（工作目錄，job 刪除即消失；要點已寫進 ADR 草稿）
+- **草稿已完成**（`$CLAUDE_JOB_DIR/tmp/draft/`）：ADR-0006 r2（619→約 900 行，文末「r2 修訂紀錄」逐條對照 r3）、ADR-0005 r2（287→約 350 行）、registry（13 條 revised＋1 api `session_network_handler`＋3 forbidden `ngo_start_outside_session_handler`／`disconnectclient_without_reason`／`presence_from_connection_events`；PyYAML 通過：state 5／interface 12／api 14／forbidden 20；順手修掉 r1 就有的「純量內 ` #if` 被當註解截斷」）
+- **草稿審查完成並已修正**：6 視角＋反駁，100 條（blocking 2／high 5／medium 32／low 61），原始碼核對 108 處。主要補強：handler `Bind`＋`AttemptStarted`（初始化路徑讀不到 session）、#26 Host 時序（`OnServerStarted` 固定 `ShiftEndTs`、轉 InShift、`ShiftStartAborted`）、`shift_eta` 與網路屬性同一次存檔、看門狗改計時器並移入 Core（`JoinWatchdog`／`RecoveryPolicy`）、沙盒獨立 Core＋`NgoOwner` 路由、開班同批 vs 中途加入的 `PlayerJoined` 時點、`build_token` 加入後比對、`MaxPlayers = max_players`、`NotAMember` 先 Pending 重查、`T_lobby`／`T_spawn` 分段、每次新 `SessionOptions.Type`、`global::` 命名空間陷阱
+- **複核**：3 agent 的複核 workflow 撞上本週子 agent 用量上限（台北 10:00 重置）未跑；改由主審自行複核：交叉引用全通（V1–V16、T0 (a)–(j)、T1 (g)–(s)、T1-Web (l0)–(l8)、Alternative 1–10、具名小節）、這輪新增的 22 處原始碼引用抽查全吻合、三檔關鍵名稱一致、registry 無 ` #` 截斷
+- **已寫入並 commit（arlong 2026-10-04 核准）**：`docs/architecture/adr-0006-netcode-session-lifecycle.md`（98→217 KB，文末「r2 修訂紀錄」）、`docs/architecture/adr-0005-platform-abstraction-layer.md`（文末「r2 修訂紀錄」）、`docs/registry/architecture.yaml`（state 5／interface 12／api 14／forbidden 20）。兩份 ADR 仍 Proposed
+- **Next**：新 session 跑 `/architecture-review`（r4，驗 r2 是否解掉 7 條必修）→ ADR-0001／0002／0003 r1（ADR-0006 Migration 3：`PeerKey`、Depends On 0006、TickRate 改引用、avatar 綁定改掛 `OnNetworkSpawn(IsLocalPlayer)`、`SessionRoot.Ready`、pointer lock T1-Web）→ G2（延後 spawn 契約、掉落路由、第 5 步不池化）→ ADR-0004 → G4 → G8。GDD r5 回填（ADR-0006 Migration 4，r2 新增 GF-7／9／13–17／20、#26 `ShiftStartAborted` 邊、三個新旋鈕）**尚未做**
+- **不在 r2 範圍、已登記**：`docs/engine-reference/unity/` 的 15 條缺口（r3 §6；含 web.md「離開通知」一節、`AlwaysLinkAssembly`）；`BuildId` 雜湊輸入（G4，含 `GetConfig(false)` 與 `ProductCatalogAsset`）
+- **待實測的承重前提**（全部列在 ADR-0006 V1／V10／V11／V13–V16）：自有 handler 在 WebGL IL2CPP 的行為與 MPS 升版相容性、Lobby* 等待者停留 ≥ 150 s 仍是成員、keepalive＋preflight 三引擎在關分頁時的送達、班次交界的屬性合併率、延後 spawn 的事件順序、UGS 實際錯誤碼、同帳號雙開
+
 ## 目前任務（2026-10-03）
 
 - **Task**：**ADR-0006 r1＋ADR-0005 r1 已寫入**（成對；依 `architecture-review-2026-10-01-r2.md`），registry 同步完成。本 session 以 `/architecture-review` 開場，但 r2 之後審查輸入一份都沒變（檔案修改時間為證），arlong 裁決先修 r1 再審
