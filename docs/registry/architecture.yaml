@@ -30,7 +30,7 @@
 #   Superseded entries:     Grep pattern="status: superseded"
 
 version: 1
-last_updated: "2026-10-03"
+last_updated: "2026-10-12"
 
 # ─── STATE OWNERSHIP ─────────────────────────────────────────────────────────
 # Who is the authoritative owner of each piece of shared game state.
@@ -102,23 +102,23 @@ state_ownership:
     owner_system: netcode-session（Host 端 SlotTable；NightShift.Session.Core）
     adr: docs/architecture/adr-0006-netcode-session-lifecycle.md
     # r2 前：RosterEntry 為 { PlayerId, ClientId, Online, JoinedTick }，未規定非 Host 端的在場來源
-    interface: "Host 寫、Everyone 讀的 NetworkVariable<RosterState> SessionRoot.Roster（固定 4 格：PlayerId（UTF-8 ≤ 61 bytes）、ClientId（占用世代：單調、不重用，判斷 slot 換人看它）、Phase（PeerPhase）、Online（PlayerJoined 已發、PlayerLeft 未發）、JoinedTick）——只供 UI 與冪等補強，不是在場的來源：各端的在場來源是該 slot avatar 的 OnNetworkSpawn／OnNetworkDespawn（ADR-0006 r2 Decision 13）；遊戲系統只以 slot（byte）為玩家鍵；clientId 只在 NGO 邊界經 SlotTable.SlotOf()/ClientOf() 轉換；PlayerLeft(slot) 先於同 slot 的 PlayerJoined，且相隔 ≥ 3.0 s"
+    interface: "Host 寫、Everyone 讀的 NetworkVariable<RosterState> SessionRoot.Roster（固定 4 格：PlayerId（UTF-8 ≤ 61 bytes）、ClientId（占用世代：單調、不重用，判斷 slot 換人看它）、Phase（PeerPhase）、Online（PlayerJoined 已發、PlayerLeft 未發）、JoinedTick）——只供 UI 與冪等補強，不是在場的來源：各端的在場來源是該 slot avatar 的 OnNetworkSpawn／OnNetworkDespawn（ADR-0006 r2 Decision 13）；遊戲系統只以 slot（byte）為玩家鍵；clientId 只在 NGO 邊界經 SlotTable.SlotOf()/ClientOf() 轉換；同一班之內，PlayerLeft(slot) 先於同 slot 的 PlayerJoined，且相隔 ≥ 3.0 s（跨班次不逐 slot 發 PlayerLeft，以 NgoRunStopped 全清，任何擁有者的運行停止都發；r3 依 r4 R4B-10，r3 依審查擴充）"
     write_access: host-only   # Decision 4；MVP 離線即回收 slot，Post-MVP 保留 reconnect_window_sec
     referenced_by:
       - docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-01
-    revised: 2026-10-03   # r2：補 Phase、ClientId 世代語意、Roster 不是在場來源（r3 CX-2）
+    revised: 2026-10-12   # r2：補 Phase、ClientId 世代語意、Roster 不是在場來源（r3 CX-2）；r3：順序與間隔只在同一班之內成立（r4 R4B-10）
 
   - state: shift_end_ts
     status: active
     owner_system: netcode-session（SessionRoot）
     adr: docs/architecture/adr-0006-netcode-session-lifecycle.md
-    interface: "NetworkVariable<long> SessionRoot.ShiftEndTs（ms，Host 單調時鐘基準）；end_shift_early 直接改寫；所有「班次剩餘」的權威判定在 Host（approval 閘門即依此）；client 倒數為套用心跳 offset 後的估計值。沒有 NGO 連線的端（加入後的 Lobby、Lobby* 等待畫面）不讀本值，改讀 session property shift_eta = { phase, shift_seq, remaining_ms, published_utc_ms }（Member 可見）：remaining = clamp(remaining_ms − (utc_now − published_utc_ms), 0, remaining_ms)；shift_seq 每次 #26 +1，供看門狗判斷新班已開始。初值＝Host 在 OnServerStarted 寫入 nowMs + shift_length_sec（GDD 的「建立時刻」），在 SessionRoot spawn 之前；#26 的 shift_eta 與 _session_network、#23a 的 shift_eta(Lobby) 與屬性移除，各自同一次存檔送出（ADR-0006 r2 Decision 5）"
+    interface: "NetworkVariable<long> SessionRoot.ShiftEndTs（ms，Host 單調時鐘基準）；end_shift_early 直接改寫；所有「班次剩餘」的權威判定在 Host（approval 閘門即依此）；client 倒數為套用心跳 offset 後的估計值。沒有 NGO 連線的端（加入後的 Lobby、Lobby* 等待畫面）不讀本值，改讀 session property shift_eta = { phase, shift_seq, remaining_ms, published_utc_ms }（Member 可見）：remaining = clamp(remaining_ms − (utc_now − published_utc_ms), 0, remaining_ms)；shift_seq 每次寫入 shift_eta(InShift) 的 #26 嘗試 +1（OnServerStarted 寫入本機即占用，之前就失敗的嘗試不占用，#26 中止也不回收，撤回的 shift_eta(Lobby) 沿用同值），供看門狗判斷新班已開始。初值＝Host 在 OnServerStarted 寫入 nowMs + shift_length_sec × 1000（ShiftEndTs 為 ms、shift_length_sec 為秒，r3 更正單位；GDD 的「建立時刻」），在 SessionRoot spawn 之前；#26 的 shift_eta 與 _session_network、#23a 的 shift_eta(Lobby) 與屬性移除，各自同一次存檔送出（ADR-0006 r2 Decision 5）；Host 的 session 屬性一律經 HostPropertyWriter（forbidden_patterns host_property_write_outside_writer；#23a 與 #26 中止見 api_decisions session_layer_split；ADR-0006 r3 Decision 5，r4 M4／K12／R4C-10）"
     write_access: host-only   # Decision 13；G9 遊戲時鐘消費
     referenced_by:
       - docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-01
-    revised: 2026-10-03   # r1：補「無 NGO 連線的端改讀 shift_eta」（r2 E5）；r2：shift_eta 加 shift_seq 與 published_utc_ms，晚到的讀者也成立（r3 FV-2）；初值時點與寫入配對（r3 FV-3）。r2 前：讀者為「Lobby 預檢、Lobby* 等待畫面」；shift_eta = { phase, remaining_ms }，收到時以本機單調時鐘錨定；初值時點未定
+    revised: 2026-10-12   # r1：補「無 NGO 連線的端改讀 shift_eta」（r2 E5）；r2：shift_eta 加 shift_seq 與 published_utc_ms，晚到的讀者也成立（r3 FV-2）；初值時點與寫入配對（r3 FV-3）；r3：shift_seq 每次寫入 shift_eta(InShift) 的嘗試 +1、中止不回收（r4 R4C-10），初值單位 ×1000（R4B-6），Host 屬性一律經 HostPropertyWriter（M4、K12）。r2 前：讀者為「Lobby 預檢、Lobby* 等待畫面」；shift_eta = { phase, remaining_ms }，收到時以本機單調時鐘錨定；初值時點未定。r3 前：shift_seq「每次 #26 +1」、中止時是否前進未定；初值寫成 nowMs + shift_length_sec（漏乘 1000）
 
 # ─── INTERFACE CONTRACTS ──────────────────────────────────────────────────────
 # How systems are required to communicate with each other.
@@ -218,33 +218,34 @@ interfaces:
     pattern: direct_call   # IUnloadNotifier：Web 只在 pagehide 送出 keepalive fetch（不分 persisted）、beforeunload 只掛確認框；Desktop wantsToQuit 有序關閉
     producer: platform-services
     consumers:
-      - netcode-session   # 唯一安裝者：Session.Unity 依 Core 的 LeaveBeaconPlan 呼叫 Install／Clear（Lobby 與 InShift 皆同），Host 進出 InShift 時呼叫 SetLeaveConfirmation（ADR-0006 r2 Decision 9）；lobby-ui 不得直接呼叫本介面
+      - netcode-session   # 唯一安裝者：Session.Unity 依 Core 的 LeaveBeaconPlan 呼叫 Install／Clear（Lobby 與 InShift 皆同），只有 Online Core 在 Host 進出 InShift 時呼叫 SetLeaveConfirmation(true／false)（ADR-0006 r2 Decision 9；r3 依 r4 M3：沙盒 Core 與 Solo 從不掛框）；每次 Teardown 第 1 步的 SetLeaveConfirmation(false) 是冪等的清理，任何模式都執行；lobby-ui 不得直接呼叫本介面
       # r2 前另列 lobby-ui「#12 Lobby 階段的 pagehide＋beforeunload 主動通知」——r3 FV-6 要求收斂為單一安裝者，且 beforeunload 永不送出
     adr: docs/architecture/adr-0005-platform-abstraction-layer.md
     # r1 前：void InstallLeaveBeacon(string url, string payload)，Web 走 beforeunload→sendBeacon
     # r2 前：InstallLeaveBeacon(string url, string method, IReadOnlyDictionary<string,string> headers, string body = null)，pagehide 為主、beforeunload 備援——實際上由 beforeunload 送出，與確認框衝突（r3 FV-4）；.jslib 收不了字典（r3 EA-9）
-    signal_signature: "void InstallLeaveBeacon(string url, string method, string authorization)（authorization 是完整標頭值、含「Bearer 」前綴，由 ADR-0006 LeaveBeaconPlan 產生，.jslib 原樣放進 Authorization 標頭；Web：只在 pagehide 送出 fetch keepalive、不分 persisted，無 body；.jslib 單發旗標只擋 bfcache 往返後的第二次 pagehide；重複呼叫即覆寫；Desktop no-op）；void ClearLeaveBeacon()；void SetLeaveConfirmation(bool armed)（armed 時才掛 beforeunload，處理器只 preventDefault＋returnValue、永不送出；Safari 對跨源 iframe 不跳框）；event Action RestoredFromBackForwardCache（pageshow persisted；觸發後 .jslib 自行 location.reload()；Desktop 永不觸發）；event Func<bool> QuitRequested（Desktop：Application.wantsToQuit 回 false 延後退出；Web 不觸發）；void CompleteQuit()（Desktop：設旗標後 Application.Quit()，第二次 wantsToQuit 回 true；呼叫端在「NGO 已停且 leave／delete 的 Task 已完成」或 1 s 逾時後才呼叫，ADR-0006 Decision 9）。visibilitychange 不得作為送出點"
+    # r3 前：另有 event Action RestoredFromBackForwardCache（pageshow persisted 時觸發、只供記錄與測試，理由寫「WebSocket 已被瀏覽器關閉」——Chrome 不成立，r4 R4F-3）
+    signal_signature: "void InstallLeaveBeacon(string url, string method, string authorization)（authorization 是完整標頭值、含「Bearer 」前綴，由 ADR-0006 LeaveBeaconPlan 產生，.jslib 原樣放進 Authorization 標頭；Web：只在 pagehide 送出 fetch keepalive、不分 persisted，無 body；.jslib 單發旗標只擋 bfcache 往返後的第二次 pagehide；重複呼叫即覆寫；Desktop no-op）；void ClearLeaveBeacon()；void SetLeaveConfirmation(bool armed)（armed 時才掛 beforeunload，處理器只 preventDefault＋returnValue、永不送出；Safari 對跨源 iframe 不跳框）；pageshow persisted 時 .jslib 自行寫一行 console.info 並 location.reload()，C# 端無事件、無介面（r3 刪去 r2 的 event Action RestoredFromBackForwardCache：重載前同步觸發、沒有消費者，r4 R4C-25）；event Func<bool> QuitRequested（Desktop：Application.wantsToQuit 回 false 延後退出；Web 不觸發）；void CompleteQuit()（Desktop：設旗標後 Application.Quit()，第二次 wantsToQuit 回 true；呼叫端在「NGO 已停且 leave／delete 的 Task 已完成」或 1 s 逾時後才呼叫，只等 SDK 那一次呼叫、不等移除重試；沒有 leave／delete 在途時（Duplicate、Solo）只等 NGO 已停，已在 Idle 時 QuitRequested 直接回 true，ADR-0006 Decision 9）。visibilitychange 不得作為送出點"
     referenced_by:
       - docs/architecture/adr-0005-platform-abstraction-layer.md
       - docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-01
-    revised: 2026-10-03   # r1：sendBeacon 帶不了 Authorization，改 keepalive fetch＋headers；補 pagehide 與送出端去重（r2 X2）；r2：只在 pagehide 送出、確認框介面、bfcache 恢復事件、三個字串參數、單一安裝者、CompleteQuit 語意（r3 FV-4、FV-6、EA-7、EA-9）
+    revised: 2026-10-12   # r1：sendBeacon 帶不了 Authorization，改 keepalive fetch＋headers；補 pagehide 與送出端去重（r2 X2）；r2：只在 pagehide 送出、確認框介面、bfcache 恢復事件、三個字串參數、單一安裝者、CompleteQuit 語意（r3 FV-4、FV-6、EA-7、EA-9）；r3：刪去 RestoredFromBackForwardCache（r4 R4C-25）、SetLeaveConfirmation 只由 Online Core 驅動（M3）、CompleteQuit 只等 SDK 那一次呼叫（K13）；r3 依審查：沒有 leave／delete 在途時只等 NGO 已停
 
   - contract: launch_params
     status: active
     pattern: direct_call   # ILaunchParams：帶碼連結；Steam Rich Presence connect 的延伸點
     producer: platform-services
     consumers:
-      - netcode-session   # #8 帶碼連結是主要入口（iframe 內讀 document.referrer，[P-4]；可能為 null）
+      - netcode-session   # #8 帶碼連結是主要入口（iframe 內讀 document.referrer，[P-4]；可能為 null；Safari 恆為 null，r4 R4F-5）
       - lobby-ui          # 輸碼／帶碼加入
     adr: docs/architecture/adr-0005-platform-abstraction-layer.md
     # r1 前：Web 為「自身 query → iframe 父頁 query」——[P-4] 實測兩者皆不可讀
-    signal_signature: "string RoomCode（Web：IsEmbedded 時解析 document.referrer，否則讀自身 location.search；無則 null——referrer 可能被 Referrer-Policy 削減，輸碼備援不可砍；Desktop 命令列 --code=；Steam 延伸點）；bool IsEmbedded（Web iframe 內；Desktop false）"
+    signal_signature: "string RoomCode（Web：IsEmbedded 時解析 document.referrer，否則讀自身 location.search；無則 null——referrer 可能被 Referrer-Policy 或瀏覽器隱私設定削減；Safari（WebKit 對第三方 referrer 一律只給 origin）在 itch.io 上恆為 null（推論，未以真實 Safari 驗）；輸碼備援不可砍；Desktop 命令列 --code=；Steam 延伸點）；bool IsEmbedded（Web iframe 內；Desktop false）"
     referenced_by:
       - docs/architecture/adr-0005-platform-abstraction-layer.md
       - docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-01
-    revised: 2026-10-03   # r1：RoomCode 改讀 document.referrer（r2 X3）
+    revised: 2026-10-12   # r1：RoomCode 改讀 document.referrer（r2 X3）；r3：Safari 恆為 null（r4 R4F-5）
 
   - contract: clipboard
     status: active
@@ -276,9 +277,9 @@ interfaces:
   - contract: session_events
     status: active
     pattern: direct_call   # C# event；名稱＝netcode GDD 契約表（:795-809）的 PascalCase
-    producer: netcode-session（NightShift.Session.Core 經轉接層發布）
+    producer: netcode-session（NightShift.Session.Core 經轉接層發布；NgoRunStopped(NgoRunToken) 由 NgoBridge 產生、不經 Core，ADR-0006 r3 Decision 2、4）
     consumers:
-      - first-person-controller   # 本端的 PlayerJoined/PlayerLeft(slot)——非 Host 端＝該 slot avatar 的 OnNetworkSpawn/OnNetworkDespawn（r2）：PairMachine 清鍵（ADR-0001 r1）；擁有者端清自己 PassThrough 遮罩的第 slot 位（ADR-0003 r1）
+      - first-person-controller   # 輸入閘門：adoptInput 每幀與 NgoBridge.LocalInputGateOpen 的現值取 AND，LocalInputGateChanged 只供推播（ADR-0001 r1，r3 依 r4 M8；讀現值 r3 依審查）；本端的 PlayerJoined/PlayerLeft(slot)——非 Host 端＝該 slot avatar 的 OnNetworkSpawn/OnNetworkDespawn（r2）：PairMachine 清鍵（ADR-0001 r1）；擁有者端清自己 PassThrough 遮罩的第 slot 位（ADR-0003 r1）；NgoRunStopped：跨班次與跨運行（含 Lobby* 沙盒與 Solo 收場）全清 PairMachine 的 slot 鍵、不論 run.Owner（遮罩住在 avatar 上、隨 NGO 銷毀，不必另清；r3 依 r4 R4B-10，r3 依審查擴充）
       - machine-interaction       # PlayerDisconnected(slot, playerId, heldItems)：只釋放 claim（C10，ADR-0004）
       # r1 移除 customer-system「PlayerLeft(slot)：遮罩位元清零」——遮罩是 owner-write（ADR-0003 D1），#7 只讀，Host 代清會被 CannotWrite() 靜默丟棄（r2 X5）
       - wave-director             # OnlinePlayerCountChanged(count, graceActive, hostSolo)
@@ -287,11 +288,11 @@ interfaces:
       - settlement                # FinalRoster、DisconnectLog
     adr: docs/architecture/adr-0006-netcode-session-lifecycle.md
     # r2 前：未規定非 Host 端的來源；r1 要求擁有者端「收到 PlayerLeft(slot)」時清遮罩，但 PlayerLeft 只在 Host 發出（r3 CX-2）
-    signal_signature: "分端來源（ADR-0006 r2 Decision 13）：PlayerJoined/PlayerLeft 是 Host Core 的事件；其他端以該 slot avatar 的 OnNetworkSpawn/OnNetworkDespawn 為準（OnNetworkDespawn 排除本機 ShutdownInProgress 與本機自己的 avatar；本機 avatar 的 OnNetworkSpawn（IsLocalPlayer）是本機進 InShift 的訊號，不是他人的 PlayerJoined；只限 NgoOwner == Online，練習沙盒的事件只進沙盒 Core）；OnConnectionEvent 的 PeerConnected/PeerDisconnected 只供記錄；Roster NV 只供 UI 與冪等補強；不得依賴 NV 與 Destroy/Create 的相對順序。PlayerJoined(byte slot, string playerId)；PlayerLeft(byte slot, string playerId)；PlayerDisconnected(byte slot, string playerId, heldItems)；OnlinePlayerCountChanged(int count, bool graceActive, bool hostSolo)；ConnectionStateChanged(ConnectionState)；RoomCodeAvailable(string code)；SessionStarted；RosterUpdated；FinalRoster／DisconnectLog。ConnectionState 枚舉是 UI 唯一的連線狀態來源，店語字串表 data-driven"
+    signal_signature: "分端來源（ADR-0006 r2 Decision 13）：PlayerJoined/PlayerLeft 是 Host Core 的事件；其他端以該 slot avatar 的 OnNetworkSpawn/OnNetworkDespawn 為準（OnNetworkDespawn 排除本機 ShutdownInProgress 與本機自己的 avatar（「是否本機」讀 OnNetworkSpawn 時快取的旗標，不讀即時 IsLocalPlayer，r3 依 r4 R4G-CX-4）；本機 avatar 的 OnNetworkSpawn（IsLocalPlayer）是本機進 InShift 的訊號，不是他人的 PlayerJoined；Host 自己的 slot 0 由 HostShiftStarted 的同一個 Step 輸出 PlayerJoined(0)＋SpawnAvatar(0)，NgoBridge 不把 ServerClientId 的 connected／disconnect 回呼、也不把 Host（IsServer）本機 avatar 的 spawn／despawn 送進 Core——Host 的 InShift 只來自 HostShiftStarted（r3 依 r4 M2）；只限 NgoOwner.Owner == Online，練習沙盒的事件只進沙盒 Core，停機回呼除外、改收斂為給 Online Core 的 SandboxStopped）；訂閱範圍（ADR-0006 Decision 10）：遊戲系統經 NgoBridge 取當前 NgoOwner 那台 Core 的事件，lobby-ui 與連線狀態 UI 只訂閱 Online Core；OnConnectionEvent 的 PeerConnected/PeerDisconnected 只供記錄；Roster NV 只供 UI 與冪等補強；不得依賴 NV 與 Destroy/Create 的相對順序。跨班次與跨運行邊界（r3 依 r4 R4B-10；r3 依審查擴充）：NgoRunStopped(NgoRunToken run)——NgoBridge 在 Owner 為 Online／Sandbox／Solo 的運行停止（OnServerStopped／OnClientStopped，全部 NetworkObject 已銷毀之後；StartHost() 回 false 而無停止回呼時於得知 false 時補發；被 AbandonRun 的運行也發，從未 StartHost 的沙盒不發）時每個權杖發一次、不是 Core 輸入，語義＝本端所有 slot 的 PlayerLeft；逐 slot 狀態不住在隨 NGO 銷毀之物件上的消費者以它全清、不論 run.Owner，不得自行訂閱 NetworkManager 的停止回呼；GDD 契約表沒有。PlayerJoined(byte slot, string playerId)；PlayerLeft(byte slot, string playerId)；PlayerDisconnected(byte slot, string playerId, heldItems)；OnlinePlayerCountChanged(int count, bool graceActive, bool hostSolo)；ConnectionStateChanged(ConnectionState)；RoomCodeAvailable(string code)；SessionStarted；RosterUpdated；FinalRoster／DisconnectLog；LocalInputGateChanged(bool open)（r3 依 r4 M8，GDD 契約表沒有）：open ⇔ 本機 SessionPhase == InShift ∧ 已開店（Host：ShiftCohort 全數已發 PlayerJoined，或自 HostShiftStarted 起 T_spawn 到期；client：恆成立，即本機 avatar spawn 進 InShift 時打開；Solo／沙盒：HostShiftStarted 即開），值改變的那一個 Step 才輸出，任何離開 InShift 的轉移都會關閉（client 進 Settlement 的 Core 輸入是 ShiftClockElapsed：本機估計的 Host 時間（nowMs＋ClockOffsetMs）達到 ShiftEndTs，或 shift_eta.phase == Settlement，先到者為準；時鐘基準由 G9 提供）；NgoBridge.LocalInputGateOpen 恆等於當前 NgoOwner 對應、未放棄未棄置之 Core 的 SessionMachine.LocalInputGateOpen（否則 false），在 Core 輸出、NgoOwner 換手或清除、AbandonRun、Core 棄置、Teardown 完成時重算，值變才發；ADR-0001 的 adoptInput 每幀與 LocalInputGateOpen 的現值取 AND，LocalInputGateChanged 只供推播（訂閱時先讀一次現值）。ConnectionState 枚舉是 UI 唯一的連線狀態來源，店語字串表 data-driven"
     referenced_by:
       - docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-01
-    revised: 2026-10-03   # r1：遮罩清零的消費者改為擁有者端（r2 X5）；r2：補分端來源（r3 CX-2）
+    revised: 2026-10-12   # r1：遮罩清零的消費者改為擁有者端（r2 X5）；r2：補分端來源（r3 CX-2）；r3：OnlineSessionStopped（r4 R4B-10）、LocalInputGateChanged（M8）、slot 0 只由 HostShiftStarted 的 Step 輸出（M2）、訂閱範圍與沙盒停機收斂（M3）、「是否本機」讀快取旗標（R4G-CX-4）；r3 依審查：OnlineSessionStopped 擴為 NgoRunStopped（每種擁有者）、client 進 Settlement 的 ShiftClockElapsed、adoptInput 讀閘門現值
 
   - contract: disconnect_sequence
     status: active
@@ -303,31 +304,34 @@ interfaces:
       - machine-interaction       # Priority 20 ReleaseClaims：只釋放 claim、ClaimGeneration+1，不判 Failed（C10）
     adr: docs/architecture/adr-0006-netcode-session-lifecycle.md
     # r2 前：Roster=30、DespawnAvatar=40 無附註；ReleaseMembership=50（session.AsHost().RemovePlayerAsync，Host 唯一寫入者）；只有 Onboarding 分流（第 1、2、3、7 步不做事），無 Settlement 分流與兩個守衛
-    signal_signature: "void IDisconnectParticipant.OnPeerLost(in PeerLostContext{ byte Slot; string PlayerId; PeerLostCause Cause; PeerPhase Phase; long NowMs })；Priority：FreezeInput=0, DropHeldItems=10, ReleaseClaims=20, Roster=30（含 HeartbeatMonitor.Release(slot)）, DespawnAvatar=40（Despawn(destroy: true)、同步、不池化；Onboarding 期間不做事，待發的 PlayerJoined 由 Core 取消）, DisconnectTransport=45（cause ≠ TransportDisconnect 時 NetworkManager.DisconnectClient(clientId, 非空 reason)；空 reason 會同步斷線並在本幀重入）, ReleaseMembership=50（Host 唯一寫入者；try { await session.AsHost().RemovePlayerAsync } catch；SDK 已吞 PlayerNotFound，SessionNotFound/NotInLobby 視為完成，不重試）, Resample=60；Phase == Onboarding 時第 1、2、3、5、7 步不做事，第 4 步只釋放 slot、不發 PlayerLeft；Phase == Settlement 時第 1、2、3、7 步不做事，第 4 步照發 PlayerLeft、不計 #15a；clientId == ServerClientId 或 ShutdownInProgress 時不跑本序列"
+    # r3 前：SessionNotFound/NotInLobby 同列「視為完成」
+    signal_signature: "void IDisconnectParticipant.OnPeerLost(in PeerLostContext{ byte Slot; string PlayerId; PeerLostCause Cause; PeerPhase Phase; long NowMs })；Priority：FreezeInput=0, DropHeldItems=10, ReleaseClaims=20, Roster=30（含 HeartbeatMonitor.Release(slot)）, DespawnAvatar=40（Despawn(destroy: true)、同步、不池化；Onboarding 期間不做事，待發的 PlayerJoined 由 Core 取消）, DisconnectTransport=45（cause ≠ TransportDisconnect 時 NetworkManager.DisconnectClient(clientId, 非空 reason)；空 reason 會同步斷線並在本幀重入）, ReleaseMembership=50（Host 唯一寫入者；try { await session.AsHost().RemovePlayerAsync } catch；SDK 已吞 PlayerNotFound，SessionNotFound 視為完成、NotInLobby（本機已失去 lobby 把手）視為放棄，兩者都不重試）, Resample=60；Phase == Onboarding 時第 1、2、3、5、7 步不做事，第 4 步只釋放 slot、不發 PlayerLeft；Phase == Settlement 時第 1、2、3、7 步不做事，第 4 步照發 PlayerLeft、不計 #15a；clientId == ServerClientId 或 ShutdownInProgress 時不跑本序列（守衛掛在序列入口，三種觸發源都適用）；NgoBridge 對 ServerClientId 的 connected／disconnect 回呼都不送 Core、不對 slot 0 啟動心跳（r3 依 r4 M2）"
     referenced_by:
       - docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-01
-    revised: 2026-10-03   # r1：補 DisconnectTransport=45（r2 E6）與 PeerLostContext.Phase（r2 E4）；r2：Settlement 分流（r3 FV-8）、Release(slot)（FV-10）、第 5 步不池化（CX-6）、第 6 步 await 包 try（EA-8 前提更正）、兩個守衛
+    revised: 2026-10-12   # r1：補 DisconnectTransport=45（r2 E6）與 PeerLostContext.Phase（r2 E4）；r2：Settlement 分流（r3 FV-8）、Release(slot)（FV-10）、第 5 步不池化（CX-6）、第 6 步 await 包 try（EA-8 前提更正）、兩個守衛；r3：守衛掛在序列入口、NgoBridge 不送 ServerClientId 的回呼（r4 M2），NotInLobby 改為放棄（R4D-5）
 
   - contract: approval_payload
     status: active
     pattern: rpc   # NGO ConnectionApprovalCallback 握手；截止與版本閘唯一的決策閘（前面另有 NGO 連線設定雜湊的引擎層硬閘）
-    producer: player-client（NetworkConfig.ConnectionData）
+    producer: player-client（NetworkConfig.ConnectionData；每次 Start*() 之前由寫入該次運行權杖的一方（handler；Solo／沙盒為 TransportSwitch.UseSinglePlayer）以當下身分重寫，Host 自身請求亦同）
     consumers:
       - netcode-session   # Host：ApprovalGate.Evaluate（純函式）
     adr: docs/architecture/adr-0006-netcode-session-lifecycle.md
     # r2 前：≤ 72 bytes、n ≤ 64；Approve 時 CreatePlayerObject = true；Host 自核准的斷言掛「StartHost() 之後」（Online 沒有這個呼叫點，r3 FV-3）
-    signal_signature: "ConnectionData ≤ 69 bytes：byte PayloadVersion=1、ushort ProtocolVersion、uint BuildId、byte n（≤ 61，FixedString64Bytes 的實際容量；解碼端先檢查，超過即拒）、PlayerId UTF-8[n]；兩層：NGO 連線設定雜湊在 ConnectionRequestMessage.Deserialize 先擋（通用原因 'Client-{id} disconnected by server.'，client 在 connected 之前看到即歸 StaleBuild），ApprovalGate 在後；拒絕順序 StaleBuild → NotAMember（第一次判到時回 Pending、RefreshAsync 後重判）→ Duplicate → LateJoinCutoff → Full，否則 Approve(slot) 且 CreatePlayerObject = false（avatar 到 PlayerJoined 才 SpawnAsPlayerObject；NetworkConfig.PlayerPrefab = null）；每個拒絕的 response.Reason = JoinRejectReason 枚舉名且非空；NetworkConfig.ProtocolVersion 固定 0、與 ApprovalGate.ProtocolVersion 無關；Host 自身請求（ClientNetworkId == ServerClientId）只判第 1–3 項，HostView.MemberIds 必含 Host 自己（Online＝session.Players；Solo／Lobby* 沙盒＝{ 本機 PlayerId }）；第三道防線掛 NetworkManager.OnServerStarted（三種模式通用）：斷言 SlotOf(0) == 0 → 寫入 ShiftEndTs 初值 → spawn SessionRoot → Host 的 PlayerJoined(0) → SpawnAsPlayerObject(ServerClientId) → 斷言 LocalClient.PlayerObject == avatar → Host 轉 InShift，任一步失敗即 throw，NGO 中止 StartHost；遠端請求必定在這之後才到（join code 由 MPS 之後才發布），所以讀到的 Host 一定是 InShift／Settlement、ShiftEndTs 已設定；加入後轉接層比對 Host 發布的 build_token"
+    # r3 前：NotAMember「第一次判到時回 Pending、RefreshAsync 後重判」；第三道防線由轉接層自發 PlayerJoined(0)、最後才轉 InShift，任一步失敗即 throw、沒有收場
+    signal_signature: "ConnectionData ≤ 69 bytes：byte PayloadVersion=1、ushort ProtocolVersion、uint BuildId、byte n（≤ 61，FixedString64Bytes 的實際容量；解碼端先檢查，超過即拒）、PlayerId UTF-8[n]；兩層：NGO 連線設定雜湊在 ConnectionRequestMessage.Deserialize 先擋（通用原因 'Client-{id} disconnected by server.'，client 在 connected 之前看到即歸 StaleBuild），ApprovalGate 在後；拒絕順序 StaleBuild → NotAMember（非 Host 自身且 IsMemberRefreshRetry = false 時回 Pending；RefreshAsync 以 ClientConnectionBufferTimeout − 2 s 為上限，完成時 NetworkManager.PendingClients 仍含該 clientId 且 session 世代未變，才以 IsMemberRefreshRetry = true 重判，否則放棄、不指派；refresh 失敗或逾時同樣以完成當下自 session.Players 重建的 HostView 與 IsMemberRefreshRetry = true 交 Core 重判（Wire 也沒補上該成員時即拒）；同一時間只一個 refresh 在途，且與 HostPropertyWriter 的存檔互斥（RefreshAsync 以快照整份取代 Lobby、不比版本，並觸發 LobbyChanged）；Host 自身請求永不 pending）→ Duplicate → LateJoinCutoff → Full，否則 Approve(slot) 且 CreatePlayerObject = false（avatar 到 PlayerJoined 才 SpawnAsPlayerObject；NetworkConfig.PlayerPrefab = null）；轉接層在寫回 Approved 的同一個同步段內、寫回之前送 Core ApprovalCommitted(playerId, clientId, isHostSelf, nowMs)，slot 的 TryAssign 與開班同批／中途加入的分流都在那個 Step 內（Evaluate 只讀不改；Host 自身只指派、不分流）；每個拒絕的 response.Reason = JoinRejectReason 枚舉名且非空；NetworkConfig.ProtocolVersion 固定 0、與 ApprovalGate.ProtocolVersion 無關；Host 自身請求（ClientNetworkId == ServerClientId）只判第 1–3 項，HostView.MemberIds 必含 Host 自己（Online＝session.Players；Solo／Lobby* 沙盒＝{ 本機 PlayerId }）；第三道防線掛 NetworkManager.OnServerStarted（三種模式通用）：斷言 SlotOf(0) == 0 → 寫入 ShiftEndTs 初值 → spawn SessionRoot → 送 Core HostShiftStarted（同一個 Step：Host 轉 InShift、PeerPhase[0] = InShift、輸出 PlayerJoined(0)＋SpawnAvatar(0, PlayerId, ServerClientId)；Host 自身不參與開班同批／中途加入的分流）→ 執行 SpawnAvatar(0) → 斷言 LocalClient.PlayerObject == avatar →（只有 Online）SetProperty shift_eta(InShift) 為最後一步；HostShiftStarted 之前失敗直接 throw；之後的步驟包在 try/catch 內，任何例外或斷言失敗都先收場再 throw：Online 送 Core ShiftStartAborted(retractionPending: false)（效果見 ADR-0006 Decision 5「#26 中止」：回 Lobby、逐 slot PlayerLeft、清空 SlotTable；false 不鎖 #26），Solo／沙盒不送、Core 整台棄置（沙盒經 SandboxStopped 由 Online Core 輸出 AbortSandbox，Solo 由啟動器回 Idle）；Online 與 Solo 接著 NgoBridge.AbandonRun（沙盒不放棄，好讓它產生 SandboxStopped）；StartHost 內同步觸發的停機回呼不進任何 Core 的轉移；NGO 中止 StartHost；NgoBridge 不把 ServerClientId 的 connected／disconnect 回呼送進 Core；下一班的 SlotTable 在 Online Core 接受 #26 的 Step 清空，早於 StartHost 內的 Host 自核准（r3 依 r4 M2）；遠端請求必定在這之後才到（join code 由 MPS 之後才發布），所以讀到的 Host 一定是 InShift／Settlement、ShiftEndTs 已設定；加入後轉接層比對 Host 發布的 build_token"
     referenced_by:
       - docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-01
-    revised: 2026-10-03   # r1：RejectReason 改名 JoinRejectReason（r2 X4）；補 Host 自核准（r2 E2）；r2：兩層閘門（r3 EA-2）、69 bytes（FV-9）、延後 spawn、Host 自身只判 1–3、OnServerStarted 掛點（FV-3）
+    revised: 2026-10-12   # r1：RejectReason 改名 JoinRejectReason（r2 X4）；補 Host 自核准（r2 E2）；r2：兩層閘門（r3 EA-2）、69 bytes（FV-9）、延後 spawn、Host 自身只判 1–3、OnServerStarted 掛點（FV-3）；r3：NotAMember 重判以 IsMemberRefreshRetry 區分、refresh 的上限、放棄條件與存檔互斥（r4 M6），slot 0 由 HostShiftStarted 的 Step 輸出、第三道防線失敗先收場（M2），每次 Start 前以當下身分重寫 ConnectionData（R4A-5）；r3 審查：ApprovalCommitted 讓指派與分流回到 Core，refresh 失敗時的 HostView 改為完成當下自 session.Players 重建
 
   - contract: session_heartbeat
     status: active
     pattern: rpc   # 自 NGO 連線起至 StopNetwork；涵蓋 Onboarding／InShift／Settlement；Lobby 不跑
     # r2 前：producer 為「SessionRoot，Host 擁有、啟網後第一個 Spawn」；HeartbeatToClientRpc 未設 InvokePermission（預設 Everyone）
-    producer: netcode-session（SessionRoot，Host 擁有；Host 在 OnServerStarted 內第一個由轉接層 spawn 的物件，先於所有 avatar；avatar／HUD 訂閱 SessionRoot.Ready，不假設它先到）
+    # r3 前：avatar／HUD 訂閱 SessionRoot.Ready（實例事件，avatar 先到時無處訂閱）
+    producer: netcode-session（SessionRoot，Host 擁有；Host 在 OnServerStarted 內第一個由轉接層 spawn 的物件，先於所有 avatar；avatar／HUD 先讀 NgoBridge.CurrentSessionRoot、為 null 才訂閱 NgoBridge.SessionRootSpawned，不假設它先到（r3 依 r4 M7：r2 的實例事件 SessionRoot.Ready 刪除）；Host 不對自己（ServerClientId）跑心跳）
     consumers:
       - netcode-session   # HeartbeatMonitor：逾時 8 s、單向失效 4 拍、RTT、offset
       - hud               # ping 顯示（同一次往返）
@@ -337,7 +341,7 @@ interfaces:
     referenced_by:
       - docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-01
-    revised: 2026-10-03   # r1：16 bytes 更正為 20；RPC 參數改 HeartbeatWire（r2 E8）；r2：InvokePermission = Server（r3 EA-5）、SessionRoot 改述（EA-6）、Release(slot)（FV-10）
+    revised: 2026-10-12   # r1：16 bytes 更正為 20；RPC 參數改 HeartbeatWire（r2 E8）；r2：InvokePermission = Server（r3 EA-5）、SessionRoot 改述（EA-6）、Release(slot)（FV-10）；r3：SessionRoot 的入口改在 NgoBridge（r4 M7）、Host 不對自己跑心跳（M2）
 
 # ─── PERFORMANCE BUDGETS ──────────────────────────────────────────────────────
 # Frame time allocations per system, against a defined total frame budget.
@@ -465,15 +469,16 @@ api_decisions:
   - purpose: platform_implementation_dispatch
     status: active
     # r2 前：RuntimeInitializeOnLoadMethod 自我註冊到 PlatformRoot、無人註冊時回 Desktop、#if 在 .Web 的註冊入口——.Web 無人引用會被 IL2CPP 剝除、回 Desktop 需要 asmdef 循環（r3 EA-4、CX-8）
-    api: "asmdef 平台約束（NightShift.Platform.Web includePlatforms [WebGL]；NightShift.Platform.Desktop excludePlatforms [WebGL]）＋ 組合根 NightShift.Platform.Composition（同時引用兩者，player 編譯時被平台排除的參照靜默移除）：PlatformComposition.Create() 內唯一一處 #if UNITY_WEBGL && !UNITY_EDITOR 直接建構該平台的工廠並 Build()；組合根由開機場景的 MonoBehaviour 呼叫、從 root 可達；Editor 一律 Desktop 實作"
-    not: "Application.platform 執行期分支（連結期問題無法在執行期解）；散落於各消費者的 #if UNITY_WEBGL；RuntimeInitializeOnLoadMethod 自我註冊（無人引用的組件會被剝除，要另加 AlwaysLinkAssembly）；「無人註冊時回 Desktop」；只靠 RIOLM 進場的組合根；Editor 用 (editor) 假值 stub"
+    # r3 前：api 寫「組合根由開機場景的 MonoBehaviour 呼叫、從 root 可達」，not 寫「只靠 RIOLM 進場的組合根」，ADR-0005 D3 另有「或者住在 Assembly-CSharp 裡」——Assembly-CSharp 不保證可達，RIOLM 在被處理的組件裡仍是 root（r4 R4E-5、R4E-6）
+    api: "asmdef 平台約束（NightShift.Platform.Web includePlatforms [WebGL]；NightShift.Platform.Desktop excludePlatforms [WebGL]）＋ 組合根 NightShift.Platform.Composition（同時引用兩者，player 編譯時被平台排除的參照靜默移除）：PlatformComposition.Create() 內唯一一處 #if UNITY_WEBGL && !UNITY_EDITOR 直接建構該平台的工廠並 Build()；PlatformComposition.Create() 唯一的呼叫點是開機場景序列化的 MonoBehaviour（Awake 直接呼叫、每個行程一次，結果以建構子注入各轉接層；CI grep 鎖單一呼叫點，只掃 Tests/ 以外的 .cs、排除 // 開頭的行）——可達性由呼叫端保證，不由組合根所在組件保證；Editor 一律 Desktop 實作；CI 每次 push 建一次 WebGL player（.Web 與 Web 分支在 Editor 永不編譯）"
+    not: "Application.platform 執行期分支（連結期問題無法在執行期解）；散落於各消費者的 #if UNITY_WEBGL；RuntimeInitializeOnLoadMethod 自我註冊（無人引用的組件會被剝除，要另加 AlwaysLinkAssembly）；「無人註冊時回 Desktop」；以 RIOLM 把組合根結果寫進靜態欄位、消費者讀欄位的間接取得（消費者不引用 .Composition，組件不被 linker 處理），以及任何非由存活程式碼直接呼叫 Create() 的取得方式（含反射）；轉接層各自呼叫 Create()（Create() 非冪等，Web 上多份 SendMessage 接收物件只有一份收得到）；以「住在 Assembly-CSharp」當可達性保證；Editor 用 (editor) 假值 stub"
     adr: docs/architecture/adr-0005-platform-abstraction-layer.md
-    reason: "DllImport(__Internal) 在非 Web 平台的 IL2CPP 原生連結期硬性失敗，而 Editor 走 Mono 延遲解析測不出；只靠 IL2CPP 可達性分析排除從未驗證——asmdef 排除＋建置期 grep 雙鎖比照 ADR-0001。平台字串以 6000.3 Editor 的 Inspector 產生，EditMode 以 CompilationPipeline.GetAssemblyDefinitionPlatforms() 斷言 WebGL 有效；Unity 自家 com.unity.services.wire 1.5.0 的 asmdef 仍寫 WebGL（ADR-0005 r1）。r2：W1 的 WebGL build 中 UnityLinker 只以場景型別所在的兩個組件為 root，其餘有 8 個整包被剝除；Editor＋WebGL target 同時定義 UNITY_EDITOR 與 UNITY_WEBGL（W1 rsp）；Wire 套件即組合根＋一處 #if 的先例（WebSocket.cs:775-785）。"
+    reason: "DllImport(__Internal) 在非 Web 平台的 IL2CPP 原生連結期硬性失敗，而 Editor 走 Mono 延遲解析測不出；只靠 IL2CPP 可達性分析排除從未驗證——asmdef 排除＋建置期 grep 雙鎖比照 ADR-0001。平台字串以 6000.3 Editor 的 Inspector 產生，EditMode 以 CompilationPipeline.GetAssemblyDefinitionPlatforms() 斷言 WebGL 有效；Unity 自家 com.unity.services.wire 1.5.0 的 asmdef 仍寫 WebGL（ADR-0005 r1）。r2：W1 的 WebGL build 中 UnityLinker 只以場景型別所在的兩個組件為 root，其餘有 8 個整包被剝除；Editor＋WebGL target 同時定義 UNITY_EDITOR 與 UNITY_WEBGL（W1 rsp）；Wire 套件即組合根＋一處 #if 的先例（WebSocket.cs:775-785）。r3：6000.3 marking-rules 下 High 的 root 只有 MonoBehaviour／ScriptableObject 衍生型別、RIOLM／[Preserve] 方法與 link.xml，且 RIOLM 只在被 linker 處理的組件內有效（AlwaysLinkAssemblyAttribute 文件）；W1 的兩個 root 組件正是 TypesInScenes.xml 中的兩個非引擎組件（Assembly-CSharp、Unity.Netcode.Runtime）。"
     referenced_by:
       - docs/architecture/adr-0005-platform-abstraction-layer.md
       - docs/architecture/adr-0006-netcode-session-lifecycle.md   # Depends On：組合根 PlatformComposition.Create()（r2）
     added: 2026-10-01
-    revised: 2026-10-03   # r1：補平台字串的驗證方式（首輪 review specialist CONCERN）；r2：組合根取代自我註冊（r3 EA-4、CX-8）
+    revised: 2026-10-12   # r1：補平台字串的驗證方式（首輪 review specialist CONCERN）；r2：組合根取代自我註冊（r3 EA-4、CX-8）；r3：可達性由呼叫端保證、CI 加 WebGL player 建置（r4 R4E-5、R4E-6、R4C-26）；r3 依審查：單一呼叫點的 grep 排除註解與測試
 
   - purpose: session_topology
     status: active
@@ -491,74 +496,77 @@ api_decisions:
   - purpose: session_layer_split
     status: active
     # r1：client 側由 SDK 預設 handler 自動加入、失敗不重試，Lobby／Lobby* 訂閱 StartFailed 即 LeaveAsync()＋以同碼重新加入——預設 handler 被拒即 throw，初始化路徑上 SDK 先 leave，Lobby* 不可達（r3 FV-1）
-    api: "MPS session 跨班次存活（CreateSessionAsync(new SessionOptions { MaxPlayers = max_players, IsPrivate = true, Type = 每次新產生 }.WithNetworkOptions(WSS).WithNetworkHandler(h)) 只設定不啟動；建房、加入、復原的 options 只由 SessionServices 唯一的 options 工廠產生）；Relay＋NGO 每班次建拆：#26 session.Network.StartRelayNetworkAsync(new RelayNetworkOptions(region))、#23a StopNetworkAsync()；#23a 移除網路屬性的存檔完成後，Host 至少等 min_lobby_dwell_ms 才允許下一次 #26；加入者 JoinSessionOptions 各自再宣告 WSS、同一個 handler 與新的 Type；NGO 啟停一律經 SessionNetworkHandler（見 session_network_handler）；IClientSessionNetwork.State 不是 NGO 狀態的真相；看門狗以計時器運作（shift_seq 新於 attemptedSeq、phase=InShift、_session_network 存在、handler 未連線且無進行中嘗試時武裝 network_join_watchdog_ms，到期重檢成立才復原），判定在 Core 的 JoinWatchdog；復原（AbortSandbox → 退訂舊 ISession → leave → 以碼與新 Type 重新加入）只處理真故障，被拒、Duplicate、Teardown 中一律不復原，每個 shift_seq 最多 2 次，用盡即 Teardown，判定在 Core 的 RecoveryPolicy"
-    not: 建 session 時 WithRelayNetwork()（Lobby 期間即有 Relay／NGO 連線）；RelayNetworkOptions 帶 RelayProtocol 的建構子（2.3.1 已 [Obsolete]）；MPS 預設的 GameObjectsNetcodeNetworkHandler；以 StartFailed 或 IClientSessionNetwork.State 推斷 NGO 狀態；以 SessionPropertiesChanged 判斷新班開始（新增 key 時不觸發）；ReconnectAsync（會丟掉 NetworkOptions，協定落回 Default）；寫死 MaxPlayers（MVP 為 2）；重用 SessionOptions.Type（殭屍或未移除的舊 session 會讓加入得到 SessionTypeAlreadyExists）；只在 ISession.Changed 當下判斷看門狗時窗（Wire 事件驅動，班次中可能數分鐘沒有 Changed）
+    # r3 前：SessionOptions 寫 Type = 每次新產生；#23a 為單一 StopNetworkAsync()，dwell 自「移除網路屬性的存檔完成」起算；復原的觸發、計次與 leave 失敗未定
+    api: "MPS session 跨班次存活（CreateSessionAsync(new SessionOptions { MaxPlayers = max_players, IsPrivate = true }.WithNetworkOptions(WSS).WithNetworkHandler(h)) 只設定不啟動；建房、加入、復原的 options 只由 SessionServices 唯一的 options 工廠產生）；Relay＋NGO 每班次建拆：#26 session.Network.StartRelayNetworkAsync(new RelayNetworkOptions(region))、#23a 拆成兩半：Settlement 結束的同一個 Step 內，轉接層同步依序 h.StopAsync()（H5 Shutdown()）→ NgoOwner.Owner == Online、IsServer 且 ShutdownInProgress 時，對 SlotTable 中在線、仍在 ConnectedClients 的每個遠端 client DisconnectClient(clientId, nameof(HostDisconnectReason.ShiftEnded)) → HostPropertyWriter.EnqueueShiftStop（寫 shift_eta(Lobby) 後 StopNetworkAsync()，可排隊），SlotTable 在 Settlement → Lobby 不清；Core 接受 #26 之後、到 HostShiftStarted 或 ShiftStartAborted 為止不接受下一次 #26，Host 端這一段不計 T_spawn（r3 依 r4 K12）；client 收到即回 Lobby、不進 Host 消失排歧（ADR-0006 r3 Decision 8）；#23a 完成（StopNetworkAsync 成功返回且已見 OnServerStopped；存檔失敗時 MPS 把 State 設回 Started，轉接層還原本機 null 後依退避重呼，期間 Core 鎖 #26）或 H4 中止（ShiftStartAborted(retractionPending: true)）的撤回存檔成功後，Core 收到 ShiftNetworkReleased，至少再等 min_lobby_dwell_ms 才允許下一次 #26；加入者 JoinSessionOptions 各自再宣告 WSS 與同一個 handler；options 工廠每次 new 新的 options 實例、不指派 Type（BaseSessionOptions.Type 預設即每個實例新的 GUID），也不重用實例；NGO 啟停一律經 SessionNetworkHandler（見 session_network_handler）；第三條啟網路徑 MigrateClientNetworkAsync（_session_network 的 HostId 改變；r3 依 r4 R4D-8）在 MVP 不可達，萬一發生依 Decision 11 映射為 HostGone → Teardown，路徑上先發的 StartFailed 由「Teardown 中不復原」擋下；IClientSessionNetwork.State 不是 NGO 狀態的真相；看門狗以計時器運作（Core 處於 Lobby 或 LobbyWaiting、shift_eta.shift_seq > attemptedSeq、shift_eta.phase == InShift（session property 的 phase，非 Core 的 SessionPhase）、_session_network 存在、handler 未連線且無進行中嘗試時武裝 network_join_watchdog_ms（attemptedSeq 初值 −1；同一個 seq 每個 session 世代只武裝一次，#26 那一次 Changed 也照樣武裝、由 AttemptStarted 解除）；轉接層以固定 1 s 週期、ISession.Changed、handler 嘗試結束與 JoinCompleted 呼叫 JoinWatchdog.Evaluate，一次完成武裝與到期判定，到期重檢成立才復原；復原進行中不評估），判定在 Core 的 JoinWatchdog（每個 session 世代一個實例）；復原（Core 在 LobbyWaiting 時先轉 Lobby → AbortSandbox → session 世代加一（JoinWatchdog 隨之重建）→ 退訂舊 ISession → leave（失敗時以 LobbyService.Instance.RemovePlayerAsync(舊 session.Id, PlayerId) 依退避重試，確認已不是成員才往下；這段等待算在這次重新加入的 T_lobby 內（自 Core 輸出復原動作的 Step 起算），到期即放棄這次重新加入、記一次失敗，次數仍只歸 RecoveryPolicy）→ 以碼與新 Type 重新加入；確認後仍得 SessionConflict 時比照 Duplicate 不移除、照常計次）只處理真故障：觸發只有看門狗到期，以及屬性變更路徑上失敗當下 _session_network 仍存在（不比值）的 StartFailed——已移除時模組會為下一個新值自己啟網，換值時不會；被拒、Duplicate、Teardown 中一律不復原，每個 shift_seq 最多 2 次（計次輸入三種：看門狗、StartFailed、一串復原中的一次嘗試失敗——重新加入撞到 T_lobby（含等待確認離開）或後備期限、或 Faulted，沿用啟動該串復原的 shift_seq；跨世代累計），第 3 次計次即用盡；加入與復原的重新加入的結果只經 JoinCompleted(outcome) 進 Core（加入回傳、H7、Bind、build_token 比對、回填 attemptedSeq 都完成後送一次；歸屬以 Bind 為界，Bind 時仍有嘗試在進行即 NoNetwork；build_token 不符一律 Rejected(StaleBuild)；Faulted 帶 JoinFailureKind（SessionNotFound＝CodeNotFound，其餘 Other）；LateJoinCutoff 以外的拒絕由 Core 輸出 Teardown 與依原因的店語；Faulted 在 JoiningRoom 輸出 Teardown，在復原的重新加入（Lobby）記一次計次，Core 已在 InShift 時走失敗出口、不計次），初始化路徑上 Core 自 AttemptStarted 起只設後備期限 T_spawn＋join_return_budget_ms（15 000，≥ LobbyRequestTimeoutMs＋FrameHopReserveMs＝15 000），到 JoinCompleted 或本機 avatar spawn 進 InShift 為止，不另起與 handler 同時到期的 T_spawn；加入所屬世代因計時放棄或 Teardown 而過期之後，日後成功回傳只以過期世代 LeaveAsync（失敗進移除重試；r3 依審查補）；用盡即 Teardown，判定在 Core 的 RecoveryPolicy"
+    not: 建 session 時 WithRelayNetwork()（Lobby 期間即有 Relay／NGO 連線）；RelayNetworkOptions 帶 RelayProtocol 的建構子（2.3.1 已 [Obsolete]）；MPS 預設的 GameObjectsNetcodeNetworkHandler；以 StartFailed 或 IClientSessionNetwork.State 推斷 NGO 狀態；以 SessionPropertiesChanged 判斷新班開始（新增 key 時不觸發）；ReconnectAsync（會丟掉 NetworkOptions，協定落回 Default）；寫死 MaxPlayers（MVP 為 2）；重用 SessionOptions.Type 或 options 實例（殭屍或未移除的舊 session 會讓加入得到 SessionTypeAlreadyExists；同一實例再加同型別 option 會 throw）；把 Type 指派成常數；只在 ISession.Changed 當下判斷看門狗時窗（Wire 事件驅動，班次中可能數分鐘沒有 Changed）；把 Bind 之前結束的 handler 結果以 JoinCompleted 以外的事件送進 Core，或另起一個與 handler 同時到期的 T_spawn（上限附近先後未定，本該進 Lobby* 的人只剩過期世代 LeaveAsync、被移出）
     adr: docs/architecture/adr-0006-netcode-session-lifecycle.md
     reason: "GDD #23／#23a；W1 第 1 批 runtime 證實 network 是 session 之上可獨立啟停的一層（NetworkState.Stopped 與 SessionState.Connected 並存），且不需 NetworkManager 單例即可建 session；協定不會從 Host 傳染給加入者"
     referenced_by:
       - docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-01
-    revised: 2026-10-03   # r1：補自動加入失敗不重試的復原路徑（r2 E11、V1）；r2：自有 handler、options 工廠、MaxPlayers = max_players、IsPrivate、每次新 Type、計時器看門狗與復原判定移入 Core（r3 FV-1，arlong 裁決；r2 草稿審查）
+    revised: 2026-10-12   # r1：補自動加入失敗不重試的復原路徑（r2 E11、V1）；r2：自有 handler、options 工廠、MaxPlayers = max_players、IsPrivate、每次新 Type、計時器看門狗與復原判定移入 Core（r3 FV-1，arlong 裁決；r2 草稿審查）；r3：#23a 拆成兩半與 ShiftEnded、dwell 自 ShiftNetworkReleased 起算、#26 進行中守衛（r4 M1、M4、K12），不指派 Type（R4D-7），MigrateClientNetworkAsync（R4D-8），看門狗週期評估與世代重建（K7、R4C-20），復原觸發不比值（R4C-19）、移除重試計入 T_lobby（K13）、三種計次，JoinCompleted 與後備期限（R4A-4）；r3 審查：看門狗武裝補 Core 階段守衛與 shift_eta.phase（K7、R4B-2），Faulted 依狀態分流，後備期限在本機 avatar spawn 進 InShift 時停止、過期世代收場擴及 Teardown、Validate 下界 ≥ 15 000
 
   - purpose: utp_constants_contract
     status: active
     # r2 前：「所有值經 SessionConfig 注入」——r1 的 SessionConfig 是 ScriptableObject、住在 noEngineReferences 的 Core（r3 FV-5）；Validate() 涵蓋 11 條
-    api: "UnityTransport.HeartbeatTimeoutMS=500（不得動）、DisconnectTimeoutMS=30000、ConnectTimeoutMS=1000 × MaxConnectAttempts=10（連線階段 10 s＝T_spawn 閘門）、MaxSendQueueSize 顯式（值由 [P-16] 定）；NetworkConfig.ClientConnectionBufferTimeout=10；UnityTransport.UseWebSockets 見 relay_transport_protocol（ADR-0005 Decision 6 擁有，此處只做建置期斷言）；所有值由 Core 的純 C# SessionConfig 提供（Session.Unity 的 SessionConfigAsset : ScriptableObject 以 ToCore() 轉換；建置期斷言在 Editor 專用組件 NightShift.Session.Editor），Validate() 機械驗證 12 條約束（GDD 的 ①②③⑤⑥⑦⑨⑩⑪⑫⑬，加 r2 的 leave_beacon_refresh_ms < 300 000；④⑧⑭⑮ 不是組態不等式，交 T1／T3 與 code review）、EngineFactProbeTests 續用"
+    # r3 前：Validate() 12 條（GDD 11 條＋leave_beacon_refresh_ms 上限）
+    api: "UnityTransport.HeartbeatTimeoutMS=500（不得動）、DisconnectTimeoutMS=30000、ConnectTimeoutMS=1000 × MaxConnectAttempts=10（連線階段 10 s＝T_spawn 閘門）、MaxSendQueueSize 顯式（值由 [P-16] 定）；NetworkConfig.ClientConnectionBufferTimeout=10；UnityTransport.UseWebSockets 見 relay_transport_protocol（ADR-0005 Decision 6 擁有，此處只做建置期斷言）；所有值由 Core 的純 C# SessionConfig 提供（Session.Unity 的 SessionConfigAsset : ScriptableObject 以 ToCore() 轉換；建置期斷言在 Editor 專用組件 NightShift.Session.Editor；這個命名空間會遮蔽 UnityEditor.Editor，自訂 Inspector 的基底一律寫完整名稱），Validate() 機械驗證 14 條約束（GDD 的 ①②③⑤⑥⑦⑨⑩⑪⑫⑬，加 r2 的 leave_beacon_refresh_ms < 300 000，r3 的 1 ≤ MaxPlayers ≤ PlayerSlot.Capacity 與 join_return_budget_ms ≥ LobbyRequestTimeoutMs(10 000)＋FrameHopReserveMs(5 000)；④⑧⑭⑮ 不是組態不等式，交 T1／T3 與 code review）、EngineFactProbeTests 續用"
     not: 調動 HeartbeatTimeoutMS（兼 Relay PING，>10 s 即被踢）；保留 MaxConnectAttempts=60（總逾時 60 s 超過 T_spawn）；在程式碼硬寫常數
     adr: docs/architecture/adr-0006-netcode-session-lifecycle.md
     reason: "multiplayer.md:97-113 與 EngineFactProbeTests 8/8 實機複驗；app 心跳 8 s 必須是比傳輸層逾時更早的判定者（約束⑤）；DisconnectTimeoutMS 決定 send queue 容量"
     referenced_by:
       - docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-01
-    revised: 2026-10-03   # r1：Validate() 範圍更正為 11 條（r2 E9）；r2：SessionConfig 分兩層（r3 FV-5，r1 把 ScriptableObject 放進 noEngineReferences 的 Core）、補 UseWebSockets
+    revised: 2026-10-12   # r1：Validate() 範圍更正為 11 條（r2 E9）；r2：SessionConfig 分兩層（r3 FV-5，r1 把 ScriptableObject 放進 noEngineReferences 的 Core）、補 UseWebSockets；r3：Validate() 14 條（r4 R4C-24、R4A-4）、Editor 組件的命名空間遮蔽（R4E-7）；r3 依審查：join_return_budget_ms 下界收緊為 ≥ 15 000
 
   - purpose: solo_offline_transport
     status: active
     # r1 前：api 為「StartHost() 搭配手刻 OfflineTransport（繼承 NetworkTransport；StartServer 回 true、PollEvent 永遠 Nothing、無 socket）」
     # r2 前：api 要求「離開 Solo 必須在 Shutdown() 之後立刻指回 UnityTransport」——r2 反轉為 not，改掛 OnServerStopped（r3 EA-3）
-    api: 單人練習與 Lobby* 等待沙盒＝NetworkManager.StartHost() 搭配 NGO 內建 SinglePlayerTransport（Unity.Netcode.Transports.SinglePlayer，NGO 2.4.0+，只能以 Host 啟動）；與 UnityTransport 兩個元件並存於 NetworkManager 物件，只切 NetworkConfig.NetworkTransport 的指派：UseSinglePlayer 只在 !IsListening && !ShutdownInProgress（且距上次 stopped ≥ 1 幀）時、緊接 StartHost() 之前；UseUnityTransport 掛 OnServerStopped（OnStopped 是 internal），StartHost() 回 false 時當場指回；不變式：NGO 閒置 ⇒ 指派的是 UnityTransport；Lobby* 沙盒以獨立的 SessionMachine(Solo) 運行，NgoBridge 依啟動時記錄的 NgoOwner 路由事件；不初始化 UGS、不配 Relay；SessionRoot／approval（HostView.MemberIds = { 本機 PlayerId }）／Settlement 照常
+    # r3 前：「Lobby* 沙盒以獨立的 SessionMachine(Solo) 運行，NgoBridge 依啟動時記錄的 NgoOwner 路由事件」——NgoOwner 只有 Online／Sandbox、stopped 後下一幀無條件清除，沙盒 Core 的輸出沒有作用域（r4 M3、R4C-12、R4C-13）
+    api: 單人練習與 Lobby* 等待沙盒＝NetworkManager.StartHost() 搭配 NGO 內建 SinglePlayerTransport（Unity.Netcode.Transports.SinglePlayer，NGO 2.4.0+，只能以 Host 啟動）；與 UnityTransport 兩個元件並存於 NetworkManager 物件，只切 NetworkConfig.NetworkTransport 的指派：UseSinglePlayer 只在 !IsListening && !ShutdownInProgress（且距上次 stopped ≥ 1 幀）時、緊接 StartHost() 之前；UseUnityTransport 掛 OnServerStopped（OnStopped 是 internal），StartHost() 回 false 時當場指回；不變式：NGO 閒置 ⇒ 指派的是 UnityTransport；Lobby* 沙盒以獨立的 SessionMachine(Solo, lobbySandbox=true) 運行，NgoBridge 依啟動時記錄的運行權杖 NgoRunToken{Owner ∈ None/Online/Sandbox/Solo, SessionGeneration, RunId} 路由事件（沙盒運行的停機回呼例外：收斂為給 Online Core 的單一 SandboxStopped，停機回呼的下一幀才送，已被 AbandonRun 的運行不送），收回只准比較後清除（stopped 時記下 t，下一幀且現值仍等於 t 才清）；UseSinglePlayer(nm, bridge, owner) 以 NgoBridge.BeginRun 寫 Sandbox（Lobby* 沙盒）或 Solo（從 Idle 進）並回傳權杖、不自己呼叫 StartHost()，handler 寫 Online（RunId 由 BeginRun 配發、永不重用）；沙盒 Core 的效果只准作用於沙盒自己的 NGO、SessionRoot、avatar 與練習 HUD，外加送給 Online Core 的 SandboxShiftEnded（沙盒 Settlement 結束時取代 Teardown）——SetLeaveConfirmation、Install/ClearLeaveBeacon、ConnectionStateChanged、Teardown、ISession 呼叫與訂閱只由 Online Core 驅動；沙盒 Core 的對外事件只給沙盒作用域的訂閱者（遊戲系統經 NgoBridge 取當前 NgoOwner 那台 Core 的事件面），lobby-ui 與連線狀態 UI 只訂閱 Online Core；沙盒 Core 不接 IPageLifecycle 事件，沙盒的開始與結束是 Online Core 的 StartSandbox（只在 LobbyWaiting、且無未收場的沙盒時）／AbortSandbox（先 NgoBridge.AbandonRun 並棄置沙盒 Core，再 Shutdown；SandboxStopped、SandboxShiftEnded、NetworkJoinRequested 都只讓 Online Core 輸出 AbortSandbox、不轉移）；Solo 模式暫不套用（#12、#17，待 GDD r5）；Solo／沙盒 Core 每次運行新建、建構即 Idle，純 Solo 的 Settlement 結束輸出 Teardown 回 Idle，純 Solo 運行的停機由 NgoBridge 於下一幀以 NetworkStopped(Other) 送 Solo Core（InShift／Settlement → Teardown，Idle 只記錄）；不初始化 UGS、不配 Relay；SessionRoot／approval（HostView.MemberIds = { 本機 PlayerId }）／Settlement 照常
     not: 走 Relay 的單人房（依賴 UGS，ServiceError 時不可玩）；純 Core 不經 NGO 的第二條程式路徑；手刻 OfflineTransport（由官方版取代）；離開 Solo 後不指回 UnityTransport（MPS 以 as UnityTransport 取 transport，取不到就拋 TransportComponentMissing）；在 Shutdown() 之後立刻指回（拆網窗口內 NGO 混讀當前與快取的 transport，會洩漏 UTP driver，r3 EA-3）
     adr: docs/architecture/adr-0006-netcode-session-lifecycle.md
     reason: "GDD States 表要求 ServiceError 放棄後單人練習仍可玩（TR-netcode-039）；Host 本機的 approval、連線、spawn 與 RPC 不經 transport（NetworkManager.cs:1501-1537）；SinglePlayerTransport 自 NGO 2.4.0 內建，2.13.1 起附官方切換範例（Documentation~/advanced-topics/singleplayer.md）；MPS 以 NetworkConfig.NetworkTransport as UnityTransport 取 transport（NetworkManagerSession.cs:66-69）；WebGL IL2CPP 實機待 V3"
     referenced_by:
       - docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-01
-    revised: 2026-10-03   # r1：改用 NGO 內建 SinglePlayerTransport（r2 E3）；r2：切換時機改掛 OnServerStopped（r3 EA-3；r3 寫的 OnStopped 是 internal）
+    revised: 2026-10-12   # r1：改用 NGO 內建 SinglePlayerTransport（r2 E3）；r2：切換時機改掛 OnServerStopped（r3 EA-3；r3 寫的 OnStopped 是 internal）；r3：運行權杖（BeginRun 配發）＋比較後清除、加 Solo、沙盒 Core 效果白名單與 lobbySandbox、SandboxStopped／SandboxShiftEnded、Solo 暫不套 #12／#17（r4 M3、R4C-12、R4C-13）；r3 依審查：UseSinglePlayer 回傳權杖、SandboxStopped 延後一幀、純 Solo 的停機輸入
 
   - purpose: player_identity_key
     status: active
-    api: 玩家鍵一律為 slot（byte，0..max_players-1，NoSlot=255）；PeerKey{ PeerKind Kind; byte Index } 統一玩家（Index=slot）與 NPC（Index=npcId ∈ [0,64)）；PlayerId（string，UGS）只在 MPS 層、approval payload（UTF-8 ≤ 61 bytes）、SlotTable、#15a 計數、session 事件的 playerId 參數、結算 final_roster；clientId（ulong）只在 NGO 邊界；型別住在零依賴組件 NightShift.Identity（PeerKind、PeerKey、PlayerSlot.NoSlot、NpcId.Max = 64）——NPC id 值域歸 ADR-0006，ADR-0003 的遮罩寬度由 NpcId.Max 推導並靜態斷言；SlotOf 回 NoSlot 的 RPC 與 NGO 回呼一律丟棄（NoSlot 與 claim 的「無人」同為 255）
+    api: 玩家鍵一律為 slot（byte，0..max_players-1，NoSlot=255）；PeerKey{ PeerKind Kind; byte Index } 統一玩家（Index=slot）與 NPC（Index=npcId ∈ [0,64)）；PlayerId（string，UGS）只在 MPS 層、approval payload（UTF-8 ≤ 61 bytes）、SlotTable、#15a 計數、session 事件與 SpawnAvatar 效果的 playerId 參數、結算 final_roster、PeerLostContext.PlayerId、HostView.MemberIds／ShiftCohort、SessionRoot.Roster 的 PlayerId 欄與 avatar 的 PlayerId NV（只供顯示與對帳、不當鍵）、LeaveBeaconPlan 的輸入與離開通知 URL（/players/{PlayerId}），任何位置都不得當遊戲系統的玩家鍵；clientId（ulong）只在 NGO 邊界；型別住在零依賴組件 NightShift.Identity（PeerKind、PeerKey、PlayerSlot.NoSlot、NpcId.Max = 64）——NPC id 值域歸 ADR-0006，ADR-0003 的遮罩寬度由 NpcId.Max 推導並靜態斷言；SlotOf 回 NoSlot 的 RPC 與 NGO 回呼一律丟棄（NoSlot 與 claim 的「無人」同為 255）
     not: "ClaimState.ClaimedBy 存 ulong clientId；CapsuleGhost.Id／PairKey 以 string 或 clientId 為鍵；以 clientId 做 #15a 離線計數（重連換號每次都算第一次）"
     adr: docs/architecture/adr-0006-netcode-session-lifecycle.md
     reason: "architecture-review §3 C1 BLOCKING：三份 ADR 三套編碼、無重連穩定性契約；[P-2b] 實測 PlayerId 跨 session 不變、GDD :849-851 已定 PlayerId↔slot 自建對照；遮罩位元本來就只能是 slot"
     referenced_by:
       - docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-01
-    revised: 2026-10-03   # r1：補 NightShift.Identity 組件、NPC id 值域歸屬、NoSlot 丟棄規則（r2 §3B、E6、E12）；r2：PlayerId 的範圍補齊（r3 CX-9）
+    revised: 2026-10-12   # r1：補 NightShift.Identity 組件、NPC id 值域歸屬、NoSlot 丟棄規則（r2 §3B、E6、E12）；r2：PlayerId 的範圍補齊（r3 CX-9）；r3：PlayerId 範圍再補 SpawnAvatar、PeerLostContext、HostView／ShiftCohort、Roster 與 avatar 的 PlayerId 欄、LeaveBeaconPlan（r4 R4B-3）
 
   - purpose: lobby_rest_leave_notification
     status: active
     # r2 前：Host DELETE lobbies/{id}、client DELETE lobbies/{id}/players/{playerId}（多了一段 lobbies/，照寫拿到 404）；pagehide 為主、beforeunload 備援（實際由 beforeunload 送出）；第二次的 404 視為成功（把路徑錯誤吞掉）——r3 EA-1、FV-4；not 原有「在 unload 期間呼叫 SDK 的 LeaveAsync／DeleteAsync（async 請求會被瀏覽器取消，[P-18]）」，理由屬推論（r3 CX-9），r2 改寫保留於下
-    api: 離開通知直打 UGS Lobby REST，base 為常數 https://lobby.services.api.unity.com/v1（MPS 2.3.1 InternalLobbyService.cs:57；PlayMode 反射守門測試比對 SDK 的 BasePath）——Host DELETE {base}/{session.Id}、client DELETE {base}/{session.Id}/players/{PlayerId}；只帶 Authorization Bearer AccessToken，無 body、不設 Content-Type、credentials 維持預設；經 IUnloadNotifier.InstallLeaveBeacon(url, method, authorization)，只在 pagehide 送出（不分 persisted）；計畫由 Core 的 LeaveBeaconPlan 宣告式算出，轉接層每秒＋階段變更時重算、結果不同才重裝，SDK leave 的 Task 結束後才 Clear；回應判讀只供 T1-Web dry-run（unload 期間無人讀回應）：只有 204 算成功，404 只在 problem+json code 為 16001（Host 刪房）或 16001／16002（client 退出）時算效果已達成，其餘 404 判路徑錯誤
-    not: navigator.sendBeacon（只能 POST、帶不了 Authorization）；beforeunload 送出（按「留下」時房間已被刪）；visibilitychange 送出（背景≠離開）；persisted == true 時不送（進 bfcache 時 WebSocket 已被關、逐出時沒有事件）；「404 視為成功」；Unity-Client-* 等其他標頭；IAccessTokenObserver（Internal 命名空間）；被判 Duplicate 的分頁安裝離開通知（共用 PlayerId）；要求服務端以自訂 nonce 去重（UGS 不認）；在 pagehide 內以 SDK 的 LeaveAsync／DeleteAsync 取代 keepalive fetch（unload 後 async 請求能否送達未實測，推論多半送不出去）
+    api: 離開通知直打 UGS Lobby REST，base 為常數 https://lobby.services.api.unity.com/v1（MPS 2.3.1 InternalLobbyService.cs:57；PlayMode 反射守門測試比對 SDK 的 BasePath）——Host DELETE {base}/{session.Id}、client DELETE {base}/{session.Id}/players/{PlayerId}；只帶 Authorization Bearer AccessToken，無 body、不設 Content-Type、credentials 維持預設；經 IUnloadNotifier.InstallLeaveBeacon(url, method, authorization)，只在 pagehide 送出（不分 persisted）；計畫由 Core 的 LeaveBeaconPlan 宣告式算出（r3 依 r4 R4C-17：持有小狀態的類別——BeginSession(世代) 綁定、只接受更新的世代；Recompute 回 Install／Clear／NoChange；上次安裝的結果、綁定的世代、是否已 settle 都由 Core 持有，轉接層只執行），轉接層每 leave_beacon_refresh_ms（1000）＋Online Core 的階段變更時呼叫 Recompute（輸入取自 Online Core）；Teardown 只在 ADR-0006 Decision 9 第 4 步的「離開已確認」成立時（SDK leave／delete 成功；失敗後移除重試已確認；沒有 session 時立刻，但復原的 leave 尚未確認時同前；token 遺失或被判 Duplicate 時立刻；移除重試終止時不成立、通知保留到關頁；在背景到來，Teardown 不等）以該 Teardown 的世代（沒有 session 時為當下的世代）呼叫 OnLeaveSettled 再 Recompute → Clear，小於綁定世代的通知被忽略；移除重試：client 以 LobbyService.Instance.RemovePlayerAsync 重試，Host 以 GetLobbyAsync 判斷、房還在才重呼 DeleteAsync，只對 RateLimited／RequestTimeOut／NetworkError／5xx 退避重試，確認＝已不是成員或房已不存在（只看 Reason 列舉值）；復原不經第 4 步、全程不清；回應判讀只供 T1-Web dry-run（unload 期間無人讀回應）：只有 204 算成功，404 只在 problem+json code 為 16001（Host 刪房）或 16001／16002（client 退出）時算效果已達成，其餘 404 判路徑錯誤
+    not: navigator.sendBeacon（只能 POST、帶不了 Authorization）；beforeunload 送出（按「留下」時房間已被刪）；visibilitychange 送出（背景≠離開）；persisted == true 時不送（進 bfcache 後 session 已不可用：Chrome 149+ 的 WebSocket 在頁面層判為失敗、網路連線要到恢復或逐出才關，Safari 進入即關，Firefox 不進；逐出時沒有事件，不送就沒人送；r3 依 r4 R4F-3 更正 r2 的「WebSocket 已被關」）；「404 視為成功」；Unity-Client-* 等其他標頭；IAccessTokenObserver（Internal 命名空間）；被判 Duplicate 的分頁安裝離開通知（共用 PlayerId）；要求服務端以自訂 nonce 去重（UGS 不認）；在 pagehide 內以 SDK 的 LeaveAsync／DeleteAsync 取代 keepalive fetch（unload 後 async 請求能否送達未實測，推論多半送不出去）
     adr: docs/architecture/adr-0006-netcode-session-lifecycle.md
-    reason: "GDD #12：Lobby 中 Host 優雅離開 1.14 s，強制終止要 132.61 s。此路徑繞過 Sessions SDK，「session id ＝ lobby id、REST 路徑、Bearer 授權」三者皆無編譯期保護，MPS 升版必重驗 V10。r2 證據：UGS 對 itch.io 來源的 preflight 回 204、Allow-Origin *、允許 DELETE 與 authorization（2026-10-03 實測）；WPT redirect-keepalive 的 cross-origin＋preflight 子測試在 Chrome 154／Firefox 157／Safari 27 通過；HTML 規範中按「留下」時 pagehide 不觸發。unload 期間 SDK 的 async 請求多半送不出去是推論（[P-18] 量的是 sendBeacon），不是實測"
+    reason: "GDD #12：Lobby 中 Host 優雅離開 1.14 s，強制終止要 132.61 s。此路徑繞過 Sessions SDK，「session id ＝ lobby id、REST 路徑、Bearer 授權」三者皆無編譯期保護，MPS 升版必重驗 V10。r2 證據：UGS 對 itch.io 來源的 preflight 回 204、Allow-Origin *、允許 DELETE 與 authorization（2026-10-03 實測）；WPT redirect-keepalive 的 cross-origin＋preflight 子測試在 Chrome 154／Firefox 157／Safari 27 通過；HTML 規範中按「留下」時 pagehide 不觸發。r3 補證：r4 本機實測（Playwright：Chrome 154 stable、Chromium 153、Firefox 155、WebKit 26.6；跨站 iframe 於 pagehide 送出、接收端延遲 800 ms 回應）四者都送達 1 筆 OPTIONS＋1 筆 DELETE；UGS 回應帶 Cross-Origin-Resource-Policy: same-origin，但 CORP 只檢查 no-cors 回應，CORS mode 不受影響（r4 R4F-7、R4F-8）。仍待真實 Safari、真實 itch.io、真實網路。unload 期間 SDK 的 async 請求多半送不出去是推論（[P-18] 量的是 sendBeacon），不是實測"
     referenced_by:
       - docs/architecture/adr-0006-netcode-session-lifecycle.md
       - docs/architecture/adr-0005-platform-abstraction-layer.md
     added: 2026-10-03
-    revised: 2026-10-03   # r2：完整 URL、單一標頭、只在 pagehide 送出、宣告式保鮮、204 判讀（r3 EA-1、FV-4、FV-6、CX-9）
+    revised: 2026-10-12   # r2：完整 URL、單一標頭、只在 pagehide 送出、宣告式保鮮、204 判讀（r3 EA-1、FV-4、FV-6、CX-9）；r3：LeaveBeaconPlan 改為帶世代的類別（r4 R4C-17），Clear 改在「離開已確認」並加移除重試（K13），bfcache 理由更正、r4 送達實測、CORP（R4F-3、R4F-7、R4F-8）。r3 前：LeaveBeaconPlan 是純函式 TryFor、「上次結果」在轉接層；SDK leave 的 Task 一結束就 Clear（leave 失敗時通知也被清掉）
 
   - purpose: session_network_handler
     status: active
-    api: "NGO 啟停的唯一擁有者是轉接層的 SessionNetworkHandler : Unity.Services.Multiplayer.INetworkHandler，由 SessionServices 唯一的 options 工廠以 WithNetworkHandler 掛在建房、加入、復原的 options 上（不經 ADR-0005；Host 與 client 共用，一個 session 一個實例）。初始化路徑上 handler 讀不到 session（RegisterSession 在模組初始化之後），所以轉接層在 H7 斷言通過後才 Bind(session)。契約：H1 client 啟網前主動收掉沙盒、斷言 UnityTransport，已 Bind 時前後兩次比對 _session_network（未 Bind 時略過，不得把讀不到當成缺席而 throw）；H2 approval 拒絕（JoinRejectReason，或 connected 前的 NGO 通用字串＝StaleBuild）記為 Rejected 並正常返回、永不 throw；H3 真故障才 throw SessionException；H4 Host 先等 NGO 完全停止、再一律 StartHost，false 即 throw，handler 成功後 MPS 寫屬性失敗時由轉接層 StopAsync 並撤回本機 _session_network；H5 StopAsync 冪等、永不 throw、永不懸掛、只停自己啟動的 NGO；H6 以 session 世代隔離；H7 建房與加入後斷言 session.Network.NetworkHandler == h，通過即 Bind（失敗且模組仍 Stopped 時以 setter 補掛）。Core 的 NetworkStarted／NetworkStopped／JoinRejected 只從 handler 觀察到的 NGO 狀態產生"
+    api: "NGO 啟停的唯一擁有者是轉接層的 SessionNetworkHandler : Unity.Services.Multiplayer.INetworkHandler，由 SessionServices 唯一的 options 工廠以 WithNetworkHandler 掛在建房、加入、復原的 options 上（不經 ADR-0005；Host 與 client 共用，一個 session 一個實例）。初始化路徑上 handler 讀不到 session（RegisterSession 在模組初始化之後），所以轉接層在 H7 斷言通過後才 Bind(session)。契約：H1 client 啟網前等沙盒收場（AttemptStarted 時由 Online Core 輸出 AbortSandbox；沙盒仍在（含其 NGO 尚未停妥）時另送冪等的 NetworkJoinRequested）、斷言 UnityTransport，已 Bind 時前後兩次比對 _session_network（未 Bind 時略過，不得把讀不到當成缺席而 throw），StartClient 之前再比一次世代（閘門期間這次加入可能已被放棄）；H2 approval 拒絕（JoinRejectReason，或 connected 前的 NGO 通用字串＝StaleBuild）記為 Rejected 並正常返回、永不 throw；H3 真故障才 throw SessionException；H4 Host 路徑全程同步、不在 handler 內等待：進入時斷言 NGO 已完全停止且距上次 stopped ≥ 1 幀（不成立即 throw，#26 以 StartFailed 失敗、Host 留在 Lobby；前提由 Core 的 #26 守衛與 handler 之前的兩次 Relay REST 共同保證），一律 StartHost，false 即 throw，true 即回傳已完成的 Task；handler 成功後 MPS 寫屬性失敗時，轉接層在同一個同步段內 StopAsync 並以 ShiftEnded 斷開已連上的 client，再經 HostPropertyWriter 立即存出撤回（_session_network＝null＋shift_eta(Lobby)，失敗還原非 null 值後退避重試，shift_seq 不回收），Core 走 ShiftStartAborted(retractionPending: true)；H5 StopAsync 冪等、永不 throw、永不懸掛、只停自己啟動的 NGO；H6 以 session 世代隔離：世代只在離開 session 或放棄進行中的加入時加一（Teardown 開始、CreatingRoom／JoiningRoom 的計時失敗出口、復原的重新加入撞到 T_lobby 或後備期限、復原的世代加一步驟）；#26 轉場的計時失敗不加一（同一 session 已掛上的 handler 跨班次重用只在世代不變時成立；那次嘗試改以 H5 的取消結束、依 H3 throw）；StartAsync 入口（Client 與 Host 皆然，早於 AttemptStarted 與寫入 NgoOwner）世代不符即 throw SessionException——初始化路徑上 SDK 自己 leave、屬性變更路徑只發 StartFailed（r3 依 r4 R4C-13）；放棄進行中的加入時先記下被放棄的世代 g 再加一，NgoOwner == {Online, g} 就 Shutdown()、仍在閘門中的世代 g handler 以 H5 的取消結束，遲到的回傳只剩過期世代 LeaveAsync；H7 建房與加入後斷言 session.Network.NetworkHandler == h，通過即 Bind（失敗且模組仍 Stopped 時以 setter 補掛）。Core 的 NetworkStarted／NetworkStopped／JoinRejected 只從 handler 觀察到的 NGO 狀態產生；連線之後的停機在 stopped 當下快照 DisconnectReason，經 DisconnectReasonParser.ClassifyStop 分類為 ShiftEnded／Other，以 NetworkStopped(cause) 送進 Core（r3）"
     not: MPS 預設的 GameObjectsNetcodeNetworkHandler（internal，被拒即 throw → 初始化路徑上 SDK 先 leave，Lobby* 不可達）；在 handler 外呼叫 StartClient／StartHost（Solo 與 Lobby* 沙盒除外）；以 IClientSessionNetwork.State 判斷是否已連線；在 stopped 回呼內同步完成 Task（MPS 會在 NGO 關機途中重入）
     adr: docs/architecture/adr-0006-netcode-session-lifecycle.md
     reason: "r3 FV-1：MPS 2.3.1 在初始化路徑上，handler 一拋例外就 CleanupSessionAsync → LeaveAsync（SessionManager.cs:311-347）；handler 正常返回則模組設 Started、不發 StartFailed、不 leave（NetworkModule.cs:470-477）。MPS 內只有預設 handler 訂閱 NGO 事件，沒有任何從 NGO 斷線到 leave 的路徑。這份契約違反 INetworkHandler 文件註解的兩句：StartAsync「Task 完成後 client 應已連線」（H2 被拒時正常返回）與 StopAsync「Task 完成後不應再連線或接受連線」（H5 在 Shutdown() 只設旗標時就回傳）（INetworkHandler.cs:20-22、:34-36）；MPS 2.3.1 都未強制，升版必重驗（V1、V13）。arlong 2026-10-03 裁決"
     referenced_by:
       - docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-03
-    revised: ""
+    revised: 2026-10-12   # r3：H1 由 AttemptStarted 讓 Online Core 收掉沙盒（r4 M9）；H4 全程同步、撤回帶 ShiftEnded 並經 HostPropertyWriter（K12、R4C-10）；H6 世代只在離開 session 或放棄加入時加一＋入口世代檢查（R4C-13）；連線後的停機以 NetworkStopped(cause) 進 Core（M1）；r3 審查：StartClient 前再比世代、放棄加入時當場收掉該世代的 NGO。r3 前：H1「主動收掉沙盒」；H4「先等 NGO 完全停止」、撤回只改本機 _session_network；H6 只寫「以 session 世代隔離」，沒有入口檢查
 
 # ─── FORBIDDEN PATTERNS ──────────────────────────────────────────────────────
 # Architecture anti-patterns explicitly banned by accepted ADRs.
@@ -650,10 +658,10 @@ forbidden_patterns:
     status: active
     # r2 前：#if UNITY_WEBGL 恰一處且位於 .Web 的註冊入口（與 ADR-0005 架構圖、Migration 3 的「在 PlatformRoot」互相矛盾，r3 CX-8）
     description: "DllImport(__Internal) 只得出現在 NightShift.Platform.Web；遊戲程式碼中任何含 UNITY_WEBGL 的前置處理式（#if 或 #elif）恰一處、位於組合根 PlatformComposition.Create()，且必須帶 !UNITY_EDITOR；Core 組件的 asmdef 不得引用 NightShift.Platform。"
-    why: "每多一處 #if 就多一組會在桌面 build 靜默生效的 Editor 假值；桌面 IL2CPP 的原生連結期失敗在 Editor（Mono，P/Invoke 延遲解析）測不出。Editor＋WebGL target 同時定義 UNITY_EDITOR 與 UNITY_WEBGL（W1 rsp），只寫 #if UNITY_WEBGL 會在 Editor 走 Web 分支。建置期 grep（^\\s*#\\s*(if|elif).*UNITY_WEBGL）與 asmdef 平台約束雙鎖，缺一不可。"
+    why: "每多一處 #if 就多一組會在桌面 build 靜默生效的 Editor 假值；桌面 IL2CPP 的原生連結期失敗在 Editor（Mono，P/Invoke 延遲解析）測不出。Editor＋WebGL target 同時定義 UNITY_EDITOR 與 UNITY_WEBGL（W1 rsp），只寫 #if UNITY_WEBGL 會在 Editor 走 Web 分支。建置期 grep（^\\s*#\\s*(if|elif).*UNITY_WEBGL）與 asmdef 平台約束雙鎖，缺一不可。r3：兩把鎖只管位置，管不到 .Web 本身與組合根 Web 分支的編譯錯誤——它們在 Editor 永不編譯，CI 另以 WebGL player 建置補上（ADR-0005 Migration 3，r4 R4C-26）。"
     adr: docs/architecture/adr-0005-platform-abstraction-layer.md
     added: 2026-10-01
-    revised: 2026-10-03   # r2：位置統一為組合根、#elif 也算、必須帶 !UNITY_EDITOR（r3 CX-8）
+    revised: 2026-10-12   # r2：位置統一為組合根、#elif 也算、必須帶 !UNITY_EDITOR（r3 CX-8）；r3：why 補 CI 的 WebGL player 建置（r4 R4C-26）
 
   - pattern: platform_stub_fake_values
     status: active
@@ -674,20 +682,21 @@ forbidden_patterns:
   - pattern: session_logic_outside_core
     status: active
     # r2 前：決策清單未列看門狗與復原
-    description: "任何 session 決策（要不要判斷線、能不能加入、該不該 teardown、slot 指派與回收、Host 消失排歧，以及 r2 的看門狗武裝／觸發與復原的次數、退避、用盡——JoinWatchdog／RecoveryPolicy）不得住在 NetworkBehaviour／MonoBehaviour／UGS 回呼裡；轉接層只翻譯事件、執行 SessionMachine 吐出的效果。NightShift.Session.Core 的 asmdef noEngineReferences = true。"
+    description: "任何 session 決策（要不要判斷線、能不能加入、該不該 teardown、slot 指派與回收、Host 消失排歧，以及 r2 的看門狗武裝／觸發與復原的次數、退避、用盡——JoinWatchdog／RecoveryPolicy，r3 的本機輸入閘門與 #26 守衛）不得住在 NetworkBehaviour／MonoBehaviour／UGS 回呼裡；轉接層只翻譯事件、執行 SessionMachine 吐出的效果。NightShift.Session.Core 的 asmdef noEngineReferences = true。"
     why: "TR-netcode-044 要求心跳／排歧／世代在 EditMode 純邏輯可測；W1 證明對沒人跑過的系統只有儀器能反駁斷言，而儀器必須在沒有 NGO、沒有 UGS 時也能跑。與 ADR-0001 movement_logic_outside_core 同一條紀律。"
     adr: docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-01
-    revised: 2026-10-03   # r2：看門狗與復原的判定屬 Core（r2 草稿審查；SessionNetworkHandler 的 H1–H5 是 MPS 協定層的機械規則，不在此限）
+    revised: 2026-10-12   # r2：看門狗與復原的判定屬 Core（r2 草稿審查；SessionNetworkHandler 的 H1–H5 是 MPS 協定層的機械規則，不在此限）；r3：本機輸入閘門（LocalInputGateChanged）與 #26 守衛屬 Core（r4 M8、M4）
 
   - pattern: clientid_as_player_identity
     status: active
     # r2 前：「只准在 RPC 的 SenderClientId、OwnerClientId、連線回呼與 RpcTarget.Single 定址處出現」
-    description: "NGO clientId（ulong）不得作為任何遊戲狀態、遮罩、claim、roster、計數的玩家鍵；只准在 RPC 的 SenderClientId、OwnerClientId、連線回呼、RpcTarget.Single 定址，以及轉接層對 NGO 的呼叫（SpawnAsPlayerObject、DisconnectClient）處出現，進 Core 前一律經 SlotTable.SlotOf() 換成 slot。唯一例外是 SessionRoot.Roster 的 ClientId 欄：它是 slot 的占用世代，只准比較「變了沒」，不得拿來查表、定址或當鍵（ADR-0006 r2 Decision 13）。"
+    # r3 前：「唯一例外是 SessionRoot.Roster 的 ClientId 欄」
+    description: "NGO clientId（ulong）不得作為任何遊戲狀態、遮罩、claim、roster、計數的玩家鍵；只准在 RPC 的 SenderClientId、OwnerClientId、連線回呼、RpcTarget.Single 定址，以及轉接層對 NGO 的呼叫（SpawnAsPlayerObject、DisconnectClient）處出現，進 Core 前一律經 SlotTable.SlotOf() 換成 slot。Core 的決策不讀 clientId；NGO 邊界之外它只出現在：SlotTable 的對照欄（TryAssign／SlotOf(ulong)／ClientOf／IsCurrentOccupancy）、ApprovalRequest.ClientId（判 IsHostSelf 與回填 SlotTable）、SpawnAvatar 效果、SessionRoot.Roster 的 ClientId 欄。後兩者是 slot 的占用世代：Roster 的 ClientId 只准比較「變了沒」，不得拿來查表、定址或當鍵（ADR-0006 r2 Decision 13）；SpawnAvatar 的 clientId 只供轉接層經 IsCurrentOccupancy 比對「占用是否仍是這一次」並作為 SpawnAsPlayerObject 的參數（ADR-0006 r3 Decision 7 前提 4，依 r4 K11）。"
     why: "重連配發新 clientId、OwnerClientId 不保證連續、Host 恆 0；以 clientId 為鍵的條目在重連後成為孤兒，PassThrough 側沒有任何保險絲（architecture-review §6 BLOCKING）。"
     adr: docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-01
-    revised: 2026-10-03   # r2：容許 Roster.ClientId 作占用世代、補 NGO 呼叫端（r3 CX-2、arlong 裁決②）
+    revised: 2026-10-12   # r2：容許 Roster.ClientId 作占用世代、補 NGO 呼叫端（r3 CX-2、arlong 裁決②）；r3：列全 clientId 在 Core 內的出現處，SpawnAvatar 帶占用世代（r4 K11）
 
   - pattern: lobby_with_live_relay
     status: active
@@ -709,20 +718,21 @@ forbidden_patterns:
   - pattern: avatar_destroyed_with_owner
     status: active
     # r2 前：「第 5 步才顯式 despawn avatar」，未規定 spawn 時點（approval 即建）、destroy 與否、可否池化
-    description: "玩家 avatar prefab 的 NetworkObject 必須 DontDestroyWithOwner = true（可攜道具同）；avatar 在 PlayerJoined 才由轉接層 SpawnAsPlayerObject（approval 回 CreatePlayerObject = false、NetworkConfig.PlayerPrefab = null；spawn 前同步確認 clientId 仍在線、每個 client 只 spawn 一次）；斷線處置的順序由 ADR-0006 的 DisconnectSequencer 掌握，第 5 步才顯式 Despawn(destroy: true)，同步完成、不得池化；第 5 步之後，掉落的道具在每個留守 client 上都必須存活——不得只靠 NetworkVariable 傳達掉落。"
-    why: "預設 false 時，NGO 在 OnClientDisconnectCallback 之前就 despawn＋destroy avatar（NetworkConnectionManager.cs:1366-1395）。Host 端會把子 NetworkObject 移到根節點而存活，client 端沒有這層保護（NetworkSpawnManager.cs:1664-1680、:1714），掛在手部 socket 的道具隨 avatar 一起消失——Host 有、client 沒有。NV 的 delta 要到下一個 tick 才送，一定晚於當下入列的 DestroyObjectMessage。AC10／AC14 只在真實斷線時紅燈。r2：池化或非同步的第 5 步會讓 RemoveOwnership 後仍帶 IsPlayerObject 的孤兒 avatar 被晚加入者誤認為 Host 的 PlayerObject（NetworkSpawnManager.cs:124-160）；對已斷線的 clientId SpawnAsPlayerObject 會被 AddClient 加回成永遠清不掉的鬼 client（:127-131）；重複 spawn 會留下一具第 5 步抓不到的舊 avatar（:134-139）。"
+    # r3 前：spawn 前只「同步確認 clientId 仍在線」
+    description: "玩家 avatar prefab 的 NetworkObject 必須 DontDestroyWithOwner = true（可攜道具同）；avatar 在 PlayerJoined 才由轉接層 SpawnAsPlayerObject（approval 回 CreatePlayerObject = false、NetworkConfig.PlayerPrefab = null；spawn 前先比對占用世代——SpawnAvatar 帶 Core 輸出當下的 clientId，須等於 SlotTable.ClientOf(slot) 且該 slot 在線（r3 依 r4 K11）——再同步確認 clientId 仍在 ConnectedClients、其 PlayerObject 仍為 null（每個 client 只 spawn 一次））；斷線處置的順序由 ADR-0006 的 DisconnectSequencer 掌握，第 5 步才顯式 Despawn(destroy: true)，同步完成、不得池化；第 5 步之後，掉落的道具在每個留守 client 上都必須存活——不得只靠 NetworkVariable 傳達掉落。"
+    why: "預設 false 時，NGO 在 OnClientDisconnectCallback 之前就 despawn＋destroy avatar（NetworkConnectionManager.cs:1366-1395）。Host 端會把子 NetworkObject 移到根節點而存活，client 端沒有這層保護（NetworkSpawnManager.cs:1664-1680、:1714），掛在手部 socket 的道具隨 avatar 一起消失——Host 有、client 沒有。NV 的 delta 要到下一個 tick 才送，一定晚於當下入列的 DestroyObjectMessage。AC10／AC14 只在真實斷線時紅燈。r2：池化或非同步的第 5 步會讓 RemoveOwnership 後仍帶 IsPlayerObject 的孤兒 avatar 被晚加入者誤認為 Host 的 PlayerObject（NetworkSpawnManager.cs:124-160）；對已斷線的 clientId SpawnAsPlayerObject 會被 AddClient 加回成永遠清不掉的鬼 client（:127-131）；重複 spawn 會留下一具第 5 步抓不到的舊 avatar（:134-139）。r3：只查 ConnectedClients 擋不住第 5a 步帶原因斷線的延後窗口——client 要到同一幀的 PostLateUpdate 才被移出（NetworkConnectionManager.cs:917-929、NetworkManager.cs:497-504）；slot 重派後才以 ClientOf(slot) 反查，會把舊玩家的 avatar 生給新占用者。"
     adr: docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-03
-    revised: 2026-10-03   # r2：延後 spawn、Despawn(true) 同步不池化（r3 CX-6、arlong 裁決②）
+    revised: 2026-10-12   # r2：延後 spawn、Despawn(true) 同步不池化（r3 CX-6、arlong 裁決②）；r3：spawn 前先比對占用世代（r4 K11）
 
   - pattern: avatar_ownership_callback_side_effects
     status: active
     # r2 前：未列 ADR-0002／0003 的元件，未規定綁定掛點（延後 spawn 前不存在這個問題）
-    description: "avatar 上的元件（含 ADR-0001 的移動、ADR-0002 的互動 RPC、ADR-0003 的遮罩元件）不得以 IsOwner／IsLocalPlayer 的即時值判斷「是不是本機玩家」，也不得在 OnGainedOwnership／OnOwnershipChanged 裡做輸入、攝影機或 HUD 綁定；本機玩家的判定在 OnNetworkSpawn() 快取一次，綁定也掛在 OnNetworkSpawn（IsLocalPlayer）——不掛 OnClientConnectedCallback（延後 spawn 下那時 PlayerObject 還是 null），不依賴 OnNetworkSessionSynchronized（晚 spawn 的物件收不到），OnNetworkSpawn 內不讀 LocalClient.PlayerObject。"
+    description: "avatar 上的元件（含 ADR-0001 的移動、ADR-0002 的互動 RPC、ADR-0003 的遮罩元件）不得以 IsOwner／IsLocalPlayer 的即時值判斷「是不是本機玩家」，也不得在 OnGainedOwnership／OnOwnershipChanged 裡做輸入、攝影機或 HUD 綁定；本機玩家的判定在 OnNetworkSpawn() 快取一次，綁定也掛在 OnNetworkSpawn（IsLocalPlayer）——不掛 OnClientConnectedCallback（延後 spawn 下那時 PlayerObject 還是 null），不依賴 OnNetworkSessionSynchronized（晚 spawn 的物件收不到），OnNetworkSpawn 內不讀 LocalClient.PlayerObject。r3 依 r4 M7、M8：輸入的綁定可在 OnNetworkSpawn 完成，但採納（ADR-0001 的 adoptInput）每幀另與 NgoBridge.LocalInputGateOpen 的現值取 AND（LocalInputGateChanged 只供推播，訂閱時先讀現值）——Host 的 avatar 在 OnServerStarted 就 spawn，比開班同批早數秒，「現在可不可以輸入」不得由 avatar 元件或 ADR-0001 的轉接層自行判斷；SessionRoot 經 NgoBridge.CurrentSessionRoot／SessionRootSpawned 取得，不在 OnNetworkSpawn 假設它已存在。"
     why: "avatar 設 DontDestroyWithOwner = true 之後，NGO 在斷線時呼叫 RemoveOwnership()，也就是 ChangeOwnership(obj, 0)（NetworkSpawnManager.cs:457-467）；它不清 IsPlayerObject，於是 Host 上該 avatar 的 IsOwner 與 IsLocalPlayer 都變成 true（NetworkObject.cs:1232,1237），並觸發 ownership 回呼。依即時值綁定的元件，會把 Host 的輸入或攝影機接到斷線玩家的身體上。"
     adr: docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-03
-    revised: 2026-10-03   # r2：適用範圍擴及 ADR-0002／0003 的 avatar 元件（r3 CX-7）、延後 spawn 下的綁定時點
+    revised: 2026-10-12   # r2：適用範圍擴及 ADR-0002／0003 的 avatar 元件（r3 CX-7）、延後 spawn 下的綁定時點；r3：輸入採納另與 LocalInputGateChanged 取 AND、SessionRoot 經 NgoBridge 取得（r4 M7、M8）；r3 依審查：改讀 LocalInputGateOpen 現值
 
   - pattern: ngo_start_outside_session_handler
     status: active
@@ -733,14 +743,24 @@ forbidden_patterns:
 
   - pattern: disconnectclient_without_reason
     status: active
-    description: "專案程式碼不得呼叫 NetworkManager.DisconnectClient(ulong) 的單參數多載，也不得傳 null 或空字串的 reason；一律 DisconnectClient(clientId, 非空原因代碼)。"
-    why: "單參數多載會補上通用字串 'Client-{id} disconnected by server.'（NetworkManager.cs:1570）——ADR-0006 靠它在 connected 之前辨識 NGO 連線設定雜湊的拒絕（歸 StaleBuild），專案自己也用它就失去辨識力；null／空 reason 則會同步斷線、在本幀重入斷線序列（NetworkConnectionManager.cs:917-931）。"
+    description: "專案程式碼不得呼叫 NetworkManager.DisconnectClient(ulong) 的單參數多載，也不得傳 null 或空字串的 reason；一律 DisconnectClient(clientId, 非空原因代碼)，原因代碼只准用列舉名：JoinRejectReason（approval 拒絕）、PeerLostCause（斷線序列第 5a 步）、HostDisconnectReason（ShiftEnded：Host 結束本次 NGO 運行而 session 保留時——#23a 與 #26 中止的撤回，r3），三者名稱互斥，不得手寫字串字面值（一律 nameof）；client 端只經 Core 的 DisconnectReasonParser 解析。"
+    why: "單參數多載會補上通用字串 'Client-{id} disconnected by server.'（NetworkManager.cs:1570）——ADR-0006 靠它在 connected 之前辨識 NGO 連線設定雜湊的拒絕（歸 StaleBuild），專案自己也用它就失去辨識力；有 peer 的 Host Shutdown() 對班次結束（#23a）與 Host 離房送同一句 'Disconnected due to host shutting down.'（NetworkManager.cs:554-566），所以 #23a 要自己先送 ShiftEnded；null／空 reason 則會同步斷線、在本幀重入斷線序列（NetworkConnectionManager.cs:917-931）。"
     adr: docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-03
+    revised: 2026-10-12   # r3：原因代碼只准列舉名、加 HostDisconnectReason.ShiftEnded、一律 nameof，client 只經 DisconnectReasonParser 解析（r4 M1）
+
+  - pattern: host_property_write_outside_writer
+    status: active
+    description: "Online Host 的 session 屬性寫入（SetProperty、SavePropertiesAsync，以及內含存檔的 StartRelayNetworkAsync／StopNetworkAsync）只得經 SessionServices 的 HostPropertyWriter：任何時刻最多一筆存檔在途中，失敗者退避期間保留隊首，帶 shift_eta 的較新寫入取消所有尚未成功的 shift_eta 重發；SetProperty 只准出現在送出它的那次存檔的同一個同步段內、緊接其前，唯一例外是設 null 的存檔失敗時，必須在失敗回呼或 catch 的第一個陳述式還原成先前的非 null 值（之後不存檔）；存檔失敗後殘留的未存出修改視同作廢，下一筆自行重寫；#23a 的 NGO 收場（h.StopAsync＋ShiftEnded）在 Settlement 結束的同一個 Step 直接執行，不得排進佇列；Host 端 approval 重判的 RefreshAsync 也只得經它發出、與存檔互斥（r3 依 r4 M6）；SessionNetworkHandler 的 Host 路徑必須回傳已完成的 Task；不得依賴下一次 StartRelayNetworkAsync 把卡在 Started 的模組狀態歸零；不得把 build_token 放進 SessionOptions.SessionProperties。"
+    why: "每次 LobbyChanged 都會經 UpdateDerivedProperties 刪掉伺服器沒有的 key、把值不同的 key 改回伺服器值，未存出的本機修改就此消失（MPS SessionHandler.cs:1114-1139）；SavePropertiesAsync 呼叫當下定格整份字典、await 後無條件清 Modified，沒有鎖也沒有佇列（:1044、:1055-1056），並行存檔會無聲遺失更新；本機留著 null 而伺服器仍有該 key 時，:1131 沒有 null 檢查，之後每次 LobbyChanged 都拋 NRE；StopNetworkAsync 存檔失敗時 State 回到 Started（NetworkModule.cs:711-716）；建房時帶 SessionProperties 會在清理範圍外多送一次 UpdateLobby，失敗即留下孤兒房（SessionManager.cs:251-262）（ADR-0006 r3 Decision 5，r4 M4／K12／R4C-10／R4D-3）。"
+    adr: docs/architecture/adr-0006-netcode-session-lifecycle.md
+    added: 2026-10-12
 
   - pattern: presence_from_connection_events
     status: active
-    description: "NGO 連線存在期間（Onboarding／InShift／Settlement，且只限 NgoOwner == Online），「哪個 slot 有人在場」與逐 slot 的清理只得以本端看到的 avatar NetworkObject 生命週期為準（Host 端另有 Core 的 PlayerJoined／PlayerLeft）；不得以 NetworkManager.OnConnectionEvent 的 PeerConnected／PeerDisconnected、SessionRoot.Roster 的 NV 變化、或 MPS 的成員事件作為這類在場或清理的觸發點，也不得在 avatar 的 OnNetworkSpawn／OnNetworkDespawn 內拿 Roster 交叉驗證；OnNetworkDespawn 必須排除本機 ShutdownInProgress 與本機自己的 avatar。MPS 成員事件仍是成員資格的來源：Lobby／Lobby* 的名單、Host 消失排歧（ADR-0006 Decision 8）與 approval 的 MemberIds 不受本條限制。"
-    why: "PeerConnected 在 approval 當下就觸發、比 PlayerJoined 早 3 s 以上；PeerDisconnected 相對 avatar despawn 的先後在傳輸斷線與心跳逾時兩種觸發源之間翻轉；Roster 的 NV delta 晚一個 tick，ChangeOwnership 又會強制先送出 dirty NV；MPS 事件只代表成員資格、晚秒級（ADR-0006 r2 Decision 13，r3 CX-2）。"
+    # r3 前：Roster 的 NV 變化與 OnConnectionEvent、MPS 成員事件並列為不得作觸發點、未定義「冪等補強」；沒有跨班次邊界
+    description: "NGO 連線存在期間（Onboarding／InShift／Settlement，且只限 NgoOwner.Owner == Online），「哪個 slot 有人在場」與逐 slot 的清理只得以本端看到的 avatar NetworkObject 生命週期為準（Host 端另有 Core 的 PeerLost 序列——DisconnectSequencer 第 1–3 步由 PeerLost 觸發、早於第 4 步的 PlayerLeft——以及 PlayerJoined／PlayerLeft）；跨班次的邊界（#23a、Teardown 拆網）不逐 slot 發 PlayerLeft，改由 Session 層事件 NgoRunStopped（NgoBridge 在任何擁有者——Online、Lobby* 沙盒、Solo——的運行停止時每個權杖發一次）代表本端所有 slot 的 PlayerLeft：逐 slot 的消費者以它全清，或本身住在隨 NGO 銷毀的物件上；消費者不得直接訂閱 NetworkManager 的 OnServerStopped／OnClientStopped（ADR-0006 r3 Decision 4、13，r4 R4B-4、R4B-10）；不得以 NetworkManager.OnConnectionEvent 的 PeerConnected／PeerDisconnected、或 MPS 的成員事件作為這類在場或清理的觸發點（r3 依 r4 R4B-4：前者只供記錄，ADR-0006 Decision 13；後者只代表成員資格），也不得以 SessionRoot.Roster 的 NV 變化作為這類在場或清理的首要觸發點（Roster 只准用於 UI 與冪等補強：avatar 事件——Host 端為 Core 事件——處理過之後的重算或對帳，對已清除的 slot 必為 no-op），也不得在 avatar 的 OnNetworkSpawn／OnNetworkDespawn 內拿 Roster 交叉驗證；OnNetworkDespawn 必須排除本機 ShutdownInProgress 與本機自己的 avatar；「是否本機」讀 avatar 在 OnNetworkSpawn 時快取的旗標，不讀即時的 IsLocalPlayer／IsOwner（Host 上，經 OnClientDisconnectCallback 斷線者的 avatar 在 RemoveOwnership 之後即時的 IsLocalPlayer 為 true，r3 依 r4 R4G-CX-4）。MPS 成員事件仍是成員資格的來源：Lobby／Lobby* 的名單、Host 消失排歧（ADR-0006 Decision 8）與 approval 的 MemberIds 不受本條限制。"
+    why: "Host 上的 PeerConnected 與 OnClientConnectedCallback 在同一次 HandleConnectionApproval 內、緊接其後觸發（NetworkConnectionManager.cs:1061-1066），其他 client 在收到 ClientConnectedMessage 時觸發（ClientConnectedMessage.cs:47-50）；對開班同批它與 PlayerJoined 同時、對中途加入者早一整段定長過場（3–5 s），兩種情況都分不出來（r3 依 r4 R4C-23 更正「approval 當下就觸發、比 PlayerJoined 早 3 s 以上」）；PeerDisconnected 相對 avatar despawn 的先後在傳輸斷線與心跳逾時兩種觸發源之間翻轉；Roster 的 NV delta 晚一個 tick，ChangeOwnership 又會強制先送出 dirty NV；MPS 事件只代表成員資格、晚秒級（ADR-0006 r2 Decision 13，r3 CX-2）。"
     adr: docs/architecture/adr-0006-netcode-session-lifecycle.md
     added: 2026-10-03
+    revised: 2026-10-12   # r3：OnlineSessionStopped 作跨班次邊界（r4 R4B-10）、Roster 只作冪等補強（R4B-4）、「是否本機」讀快取旗標（R4G-CX-4）、PeerConnected 時點更正（R4C-23）；r3 依審查：改名 NgoRunStopped、擴及沙盒與 Solo

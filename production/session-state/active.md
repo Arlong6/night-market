@@ -1,6 +1,6 @@
 # Active Session State
 
-> Last Updated: 2026-10-04
+> Last Updated: 2026-10-12
 > Purpose: Living checkpoint. Read this first after compaction or new session.
 
 **目前唯一在推進的專案＝大夜班 (Night Shift)。** Road Rage 與其他遊戲皆為已完成／暫停
@@ -11,6 +11,18 @@
 # 現行專案：大夜班 (Night Shift)
 
 **階段：Pre-production。** 2026-09-03 開案，至今 13 天。
+
+## Session Extract — ADR-0006 r3＋ADR-0005 r3（小修）寫入 docs/（2026-10-12）
+- **已覆寫 docs/（arlong 2026-10-12 同意）**：`adr-0006-netcode-session-lifecycle.md`（217→466 KB）、`adr-0005-platform-abstraction-layer.md`（57→86 KB）、`docs/registry/architecture.yaml`（74→104 KB）。**尚未 commit**。Status 仍 Proposed；兩份成對 Accept
+- 範圍：r4 §3A M1–M9 全修；§3B 九項全修；§3C 全修（R4B-1 REFUTED 不改）；ADR-0005 的 Chrome／Safari、Verification ④、R4E-5／6、R4C-25／26、N-a、R4F-6–10；另依 arlong 同意加修 GF-24（Migration 4 依角色分寫 `LeaveAsync`／`DeleteAsync`）
+- 主要新機制：`HostDisconnectReason.ShiftEnded`（#23a 在 Step 內同步 `h.StopAsync()`→`DisconnectClient`）、`HostPropertyWriter`（Host 屬性單一寫入者）、`ShiftNetworkReleased`／`ShiftStartAborted(retractionPending)`、`NgoBridge`（`CurrentSessionRoot`、`SessionRootSpawned`、`NgoRunToken`、`AbandonRun`、`NgoRunStopped`）、`LocalInputGateChanged`、`JoinCompleted(outcome)`＋後備期限 `join_return_budget_ms`、沙盒 Core 白名單與 `SandboxStopped`、`LeaveBeaconPlan` 改為類別（`OnLeaveSettled`）、K13 移除重試；新 forbidden pattern `host_property_write_outside_writer`；`Validate()` 14 條
+- 偏離 r4 建議：M1（先停 NGO 再送原因）、M3、K11（clientId 作占用世代）、K12、R4A-4、R4C-25 刪除 `RestoredFromBackForwardCache` 等，全列在兩份 ADR 的「r3 修訂紀錄」
+- 方法：9 cluster 設計→對抗審查→修訂；整合 326 條編輯；5 輪跨 cluster 協調（61 處矛盾）；12 鏡頭審查＋反駁（55 條成立）→ 3 位修訂者；精簡 23 條（稽核補回 4 處遺失）
+- **arlong 2026-10-12 接受的暫定值**（交 GDD r5）：Host／client 開放輸入時點不對稱；純 Solo 與 Lobby\* 沙盒不套 #12、#17
+- 仍未實測：V1、V10、V11、V13–V16；FV-1 只有原始碼證據
+- 不在 r3 範圍：GF-21、GF-22；r4 §4 R4G-CX-5、7–12；§1 GDD 對照表漏報；§5 Migration 4 其餘涵蓋缺口；engine-reference 22 條缺口
+- 審閱包與中間產物：`$CLAUDE_JOB_DIR/tmp/draft/REVIEW.md`、`$CLAUDE_JOB_DIR/tmp/r3fix/`（job 刪除即消失）
+- **Next**：arlong 決定是否 commit；之後可重跑 `/architecture-review`（r5）確認 ADR-0006 r3 能否 Accept，再進 ADR-0001／0002／0003 r1（CX-1 身份傳播）
 
 ## Session Extract — /architecture-review 2026-10-04（r4，ADR-0006 r2＋ADR-0005 r2 寫入後重跑）
 - Verdict: **FAIL**（Foundation Gap 20 不變；CX-1 未傳播；ADR-0006 仍不能 Accept——r3 必修 7／7 已修，新必修 9 條，全部局部、無需裁決）
